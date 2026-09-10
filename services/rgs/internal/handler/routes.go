@@ -6,6 +6,7 @@ package handler
 import (
 	"net/http"
 
+	"fastgame/services/rgs/internal/middleware"
 	"fastgame/services/rgs/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
@@ -13,7 +14,9 @@ import (
 
 func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
-		[]rest.Route{
+		rest.WithMiddlewares(
+			[]rest.Middleware{middleware.RateLimitMiddleware(serverCtx.RateLimit)},
+			[]rest.Route{
 			{
 				// 查询玩家余额
 				Method:  http.MethodGet,
@@ -32,7 +35,8 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/game/bet",
 				Handler: BetHandler(serverCtx),
 			},
-		},
+			}...,
+		),
 		rest.WithPrefix("/api/v1"),
 	)
 }

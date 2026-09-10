@@ -32,6 +32,9 @@ func BalanceHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			writeSecurityError(w, r, err)
 			return
 		}
+		if !checkUserRateLimit(w, r, svcCtx, req.UserId) {
+			return
+		}
 
 		l := logic.NewBalanceLogic(r.Context(), svcCtx)
 		resp, err := l.Balance(&req)

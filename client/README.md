@@ -14,6 +14,24 @@
 5. 启动后端：`make up && make seed && make run-rgs && make run-broadcast`，Gateway 随 `make up` 启动
 6. Cocos 预览运行
 
+## 生产构建与代码混淆
+
+导出 Web Mobile 后，对游戏业务 JS 进行高强度混淆（控制流扁平化、变量替换、死代码注入）：
+
+```bash
+# 1. Cocos Creator: 项目 -> 构建 -> Web Mobile -> 构建
+# 2. 混淆导出产物
+cd client
+npm install
+chmod +x scripts/obfuscate-build.sh
+./scripts/obfuscate-build.sh build/web-mobile
+```
+
+混淆目标：`assets/main/index.js`、`assets/internal/index.js`、`src/chunks/*.js`  
+**不会**混淆 Cocos 引擎 (`cocos-js/`)，避免破坏 runtime。
+
+配置见 `obfuscator.config.json`，也可通过 `make obfuscate-client` 执行。
+
 ## API 对接
 
 | 接口 | 路径 |

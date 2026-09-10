@@ -7,7 +7,11 @@ import (
 )
 
 func ClientIP(r *http.Request) string {
+	// Nginx + Cloudflare: real_ip 模块已将 CF-Connecting-IP 写入 X-Real-IP
 	if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
+		return ip
+	}
+	if ip := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); ip != "" {
 		return ip
 	}
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {

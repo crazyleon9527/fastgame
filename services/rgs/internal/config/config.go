@@ -60,7 +60,7 @@ type GameConf struct {
 type SecurityConf struct {
 	SkipSignVerify     bool
 	TimestampWindowSec int
-	UserBetLimitPerMin int
+	UserLimitPerSec    int
 	IPLimitPerSec      int
 	MinResponseDelayMs int
 }

@@ -36,6 +36,9 @@ func SessionHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			writeSecurityError(w, r, err)
 			return
 		}
+		if !checkUserRateLimit(w, r, svcCtx, req.UserId) {
+			return
+		}
 
 		l := logic.NewSessionLogic(r.Context(), svcCtx)
 		resp, err := l.CreateSession(&req)

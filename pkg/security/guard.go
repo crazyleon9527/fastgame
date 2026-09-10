@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"fastgame/internal/model"
-	"fastgame/pkg/ratelimit"
 	"fastgame/pkg/validator"
 
 	"github.com/redis/go-redis/v9"
@@ -21,18 +20,15 @@ const (
 )
 
 type Config struct {
-	SkipSignVerify       bool
-	TimestampWindow      time.Duration
-	UserBetLimitPerMin   int
-	IPLimitPerSec        int
-	MinResponseDelay     time.Duration
+	SkipSignVerify   bool
+	TimestampWindow  time.Duration
+	MinResponseDelay time.Duration
 }
 
 type Guard struct {
 	cfg       Config
 	merchants model.MerchantsModel
 	replay    *ReplayGuard
-	limiter   *ratelimit.Limiter
 	blacklist *Blacklist
 	whitelist *IPWhitelist
 	waf       *WAF
@@ -42,17 +38,10 @@ func NewGuard(cfg Config, merchants model.MerchantsModel, redis *redis.Client) *
 	if cfg.TimestampWindow <= 0 {
 		cfg.TimestampWindow = 60 * time.Second
 	}
-	if cfg.UserBetLimitPerMin <= 0 {
-		cfg.UserBetLimitPerMin = 60
-	}
-	if cfg.IPLimitPerSec <= 0 {
-		cfg.IPLimitPerSec = 20
-	}
 	return &Guard{
 		cfg:       cfg,
 		merchants: merchants,
 		replay:    NewReplayGuard(redis, cfg.TimestampWindow, 5*time.Minute),
-		limiter:   ratelimit.NewLimiter(redis),
 		blacklist: NewBlacklist(redis),
 		whitelist: NewIPWhitelist(merchants, redis),
 		waf:       NewWAF(),
@@ -87,24 +76,6 @@ func (g *Guard) CheckBet(ctx context.Context, in BetCheckInput, limits validator
 
 	if err := validator.BetLimits(limits).Validate(betAmount); err != nil {
 		return err
-	}
-
-	if in.ClientIP != "" {
-		ok, err := g.limiter.Allow(ctx, "ip:"+in.ClientIP, g.cfg.IPLimitPerSec, time.Second)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return fmt.Errorf("ip rate limit exceeded")
-		}
-	}
-
-	ok, err := g.limiter.Allow(ctx, fmt.Sprintf("user:%d", in.UserID), g.cfg.UserBetLimitPerMin, time.Minute)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("user rate limit exceeded")
 	}
 
 	if g.cfg.SkipSignVerify {

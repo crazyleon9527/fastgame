@@ -1,4 +1,4 @@
-.PHONY: up down restart ps logs init clean run-rgs run-consumer run-rollback run-admin run-broadcast build install-goctl codegen seed seed-admin migrate-security migrate-wallet
+.PHONY: up down restart ps logs init clean run-rgs run-consumer run-rollback run-admin run-broadcast build install-goctl codegen seed seed-admin migrate-security migrate-wallet obfuscate-client fetch-cf-ips
 
 seed:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/02-seed.sql
@@ -67,3 +67,10 @@ run-admin: build
 
 run-broadcast: build
 	./bin/broadcast -f services/broadcast/etc/broadcast.yaml
+
+obfuscate-client:
+	cd client && npm install && chmod +x scripts/obfuscate-build.sh && ./scripts/obfuscate-build.sh
+
+fetch-cf-ips:
+	chmod +x deploy/origin-shield/*.sh
+	./deploy/origin-shield/fetch-cloudflare-ips.sh

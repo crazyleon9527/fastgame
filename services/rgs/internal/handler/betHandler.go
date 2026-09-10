@@ -62,6 +62,9 @@ func BetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			writeSecurityError(w, r, err)
 			return
 		}
+		if !checkUserRateLimit(w, r, svcCtx, req.UserId) {
+			return
+		}
 
 		l := logic.NewBetLogic(r.Context(), svcCtx)
 		resp, err := l.Bet(&req)

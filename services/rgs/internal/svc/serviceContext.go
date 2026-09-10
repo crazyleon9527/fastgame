@@ -9,33 +9,38 @@ import (
 	"fastgame/pkg/idempotent"
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/lock"
+	"fastgame/pkg/ratelimit"
 	"fastgame/pkg/security"
 	"fastgame/pkg/session"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rgs/internal/config"
 
-	"github.com/redis/go-redis/v9"
+	goredis "github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/logx"
+	zeroredis "github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
 type ServiceContext struct {
 	Config      config.Config
-	Redis       *redis.Client
+	Redis       *goredis.Client
 	Lock        *lock.RedisLock
 	Idempotent  *idempotent.Store
 	Wallet      wallet.Client
 	GameConfig  *gameconfig.Loader
 	Kafka       *kafka.Producer
 	Guard       *security.Guard
+	RateLimit   *ratelimit.Gateway
 	Session     *session.Store
 	PendingOps  model.WalletPendingOpsModel
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	rdb := redis.NewClient(&redis.Options{Addr: c.Redis.Addr})
+	rdb := goredis.NewClient(&goredis.Options{Addr: c.Redis.Addr})
 	conn := sqlx.NewMysql(c.MySQL.DataSource)
 	merchants := model.NewMerchantsModel(conn)
+
+	zeroRedis := zeroredis.MustNewRedis(zeroredis.RedisConf{Host: c.Redis.Addr, Type: "node"})
 
 	svcCtx := &ServiceContext{
 		Config:     c,
@@ -49,12 +54,15 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		),
 		Kafka: kafka.NewProducer(c.Kafka.Brokers),
 		Guard: security.NewGuard(security.Config{
-			SkipSignVerify:     c.Security.SkipSignVerify,
-			TimestampWindow:    c.Security.TimestampWindow(),
-			UserBetLimitPerMin: c.Security.UserBetLimitPerMin,
-			IPLimitPerSec:      c.Security.IPLimitPerSec,
-			MinResponseDelay:   c.Security.MinResponseDelay(),
+			SkipSignVerify:   c.Security.SkipSignVerify,
+			TimestampWindow:  c.Security.TimestampWindow(),
+			MinResponseDelay: c.Security.MinResponseDelay(),
 		}, merchants, rdb),
+		RateLimit: ratelimit.NewGateway(
+			zeroRedis,
+			c.Security.IPLimitPerSec, c.Security.IPLimitPerSec,
+			c.Security.UserLimitPerSec, c.Security.UserLimitPerSec,
+		),
 		Session:    session.NewStore(rdb, c.Session.TTL()),
 		PendingOps: model.NewWalletPendingOpsModel(conn),
 	}
@@ -63,7 +71,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	return svcCtx
 }
 
-func bootstrapBlacklist(rdb *redis.Client, blacklistModel model.RiskBlacklistModel) {
+func bootstrapBlacklist(rdb *goredis.Client, blacklistModel model.RiskBlacklistModel) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

@@ -1,0 +1,11 @@
+{
+  "name": "fastgame-client-tools",
+  "private": true,
+  "description": "Cocos export obfuscation toolchain",
+  "scripts": {
+    "obfuscate": "bash scripts/obfuscate-build.sh"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^4.1.1"
+  }
+}
