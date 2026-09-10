@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"fastgame/pkg/trace"
+
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 )
@@ -18,6 +20,7 @@ const (
 
 type RoundSettledEvent struct {
 	EventID    string    `json:"eventId"`
+	TraceID    string    `json:"traceId"`
 	RoundID    string    `json:"roundId"`
 	UserID     uint64    `json:"userId"`
 	MerchantID string    `json:"merchantId"`
@@ -43,6 +46,7 @@ type BigWinEvent struct {
 
 type WalletRollbackEvent struct {
 	EventID      string    `json:"eventId"`
+	TraceID      string    `json:"traceId"`
 	RoundID      string    `json:"roundId"`
 	UserID       uint64    `json:"userId"`
 	MerchantID   string    `json:"merchantId"`
@@ -100,11 +104,15 @@ func (p *Producer) publish(ctx context.Context, topic, key string, payload any) 
 	if err != nil {
 		return err
 	}
-	return p.writer.WriteMessages(ctx, kafka.Message{
+	msg := kafka.Message{
 		Topic: topic,
 		Key:   []byte(key),
 		Value: body,
-	})
+	}
+	if tid := trace.ID(ctx); tid != "" {
+		msg.Headers = []kafka.Header{{Key: trace.HeaderTraceID, Value: []byte(tid)}}
+	}
+	return p.writer.WriteMessages(ctx, msg)
 }
 
 func (p *Producer) Close() error {

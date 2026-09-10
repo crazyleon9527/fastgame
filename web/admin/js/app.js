@@ -1,6 +1,6 @@
 (() => {
   const TYPE_LABELS = { ip: 'IP', user_id: '用户 ID', merchant: '商户' };
-  const TAB_TITLES = { blacklist: '风控黑名单', merchants: '商户密钥轮换', whitelist: 'IP 白名单' };
+  const TAB_TITLES = { blacklist: '风控黑名单', merchants: '商户密钥轮换', whitelist: 'IP 白名单', trace: 'Trace 追踪' };
 
   let activeTab = 'blacklist';
 
@@ -40,11 +40,62 @@
     $('#panel-blacklist').classList.toggle('hidden', tab !== 'blacklist');
     $('#panel-merchants').classList.toggle('hidden', tab !== 'merchants');
     $('#panel-whitelist').classList.toggle('hidden', tab !== 'whitelist');
+    $('#panel-trace').classList.toggle('hidden', tab !== 'trace');
     $('#page-subtitle').textContent = TAB_TITLES[tab] || '';
 
     if (tab === 'blacklist') loadBlacklist();
     if (tab === 'merchants') loadMerchants();
     if (tab === 'whitelist') loadWhitelist();
+  }
+
+  async function lookupTrace() {
+    const traceId = $('#trace-id-input').value.trim();
+    const box = $('#trace-result');
+    if (!traceId) {
+      box.innerHTML = '<p class="empty error">请输入 Trace ID</p>';
+      return;
+    }
+    box.innerHTML = '<p class="empty">查询中…</p>';
+    try {
+      const data = await AdminAPI.lookupTrace(traceId);
+      const spans = data.spans || [];
+      const txs = data.pendingTransactions || [];
+      box.innerHTML = `
+        <h3>Trace: <code>${escapeHtml(traceId)}</code></h3>
+        <h4>网络 I/O Spans (${spans.length})</h4>
+        <div class="table-wrap"><table>
+          <thead><tr><th>时间</th><th>服务</th><th>操作</th><th>Round</th><th>状态</th><th>耗时</th><th>详情</th></tr></thead>
+          <tbody>${spans.length ? spans.map((s) => `
+            <tr>
+              <td>${formatTime(s.occurredAt)}</td>
+              <td>${escapeHtml(s.service)}</td>
+              <td><code>${escapeHtml(s.operation)}</code></td>
+              <td><code>${escapeHtml(s.roundId || '—')}</code></td>
+              <td><span class="badge ${s.status === 'ok' ? 'active' : 'inactive'}">${escapeHtml(s.status)}</span></td>
+              <td>${s.durationMs}ms</td>
+              <td>${escapeHtml(s.detail || '—')}</td>
+            </tr>`).join('') : '<tr><td colspan="7" class="empty">暂无 Span 记录</td></tr>'}
+          </tbody>
+        </table></div>
+        <h4>孤儿注单补偿 (${txs.length})</h4>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Round</th><th>阶段</th><th>状态</th><th>下注</th><th>派彩</th><th>期望动作</th><th>重试</th></tr></thead>
+          <tbody>${txs.length ? txs.map((t) => `
+            <tr>
+              <td><code>${escapeHtml(t.roundId)}</code></td>
+              <td>${escapeHtml(t.phase)}</td>
+              <td>${escapeHtml(t.status)}</td>
+              <td>${t.betAmount}</td>
+              <td>${t.winAmount}</td>
+              <td>${escapeHtml(t.expectedAction)}</td>
+              <td>${t.retryCount}</td>
+            </tr>`).join('') : '<tr><td colspan="7" class="empty">无 pending_transactions</td></tr>'}
+          </tbody>
+        </table></div>`;
+    } catch (err) {
+      box.innerHTML = `<p class="empty error">${escapeHtml(err.message)}</p>`;
+      handleAuthError(err);
+    }
   }
 
   function toast(msg, type = 'success') {
@@ -384,6 +435,9 @@
   });
   $('#whitelist-prev-page').addEventListener('click', () => { if (whitelistPage > 1) { whitelistPage--; loadWhitelist(); } });
   $('#whitelist-next-page').addEventListener('click', () => { if (whitelistPage * whitelistPageSize < whitelistTotal) { whitelistPage++; loadWhitelist(); } });
+
+  $('#trace-search-btn').addEventListener('click', lookupTrace);
+  $('#trace-id-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') lookupTrace(); });
 
   $('#cancel-whitelist').addEventListener('click', () => $('#whitelist-dialog').close());
   $('#whitelist-form').addEventListener('submit', async (e) => {

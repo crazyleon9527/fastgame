@@ -26,6 +26,7 @@ type ServiceContext struct {
 	Blacklist      *security.Blacklist
 	IPWhitelist    *security.IPWhitelist
 	Reporter       *clickhouse.Writer
+	PendingTx      model.PendingTransactionsModel
 }
 
 func NewServiceContext(c config.Config) (*ServiceContext, error) {
@@ -49,7 +50,8 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		RiskBlacklist:  blacklistModel,
 		Blacklist:      blacklist,
 		IPWhitelist:    security.NewIPWhitelist(merchantsModel, rdb),
-		Reporter:       reporter,
+		Reporter:  reporter,
+		PendingTx: model.NewPendingTransactionsModel(conn),
 	}
 
 	bootstrapBlacklist(rdb, blacklistModel)

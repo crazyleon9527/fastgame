@@ -11,10 +11,18 @@ type Config struct {
 	MySQL    MySQLConf
 	Redis    RedisConf
 	Kafka    KafkaConf
+	CH       CHConf
 	Wallet   WalletConf
 	Game     GameConf
 	Security SecurityConf
 	Session  SessionConf
+}
+
+type CHConf struct {
+	Addr     string
+	Database string
+	User     string
+	Password string
 }
 
 type MySQLConf struct {

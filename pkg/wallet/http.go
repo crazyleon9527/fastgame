@@ -110,6 +110,37 @@ func (c *HTTPClient) Rollback(ctx context.Context, req RollbackReq) error {
 	}, &txResp{})
 }
 
+type checkTxReq struct {
+	MerchantID string `json:"merchantId"`
+	UserID     uint64 `json:"userId"`
+	RoundID    string `json:"roundId"`
+}
+
+type checkTxResp struct {
+	RoundID   string  `json:"roundId"`
+	Status    string  `json:"status"`
+	BetAmount float64 `json:"betAmount"`
+	WinAmount float64 `json:"winAmount"`
+}
+
+func (c *HTTPClient) CheckTransaction(ctx context.Context, merchantID string, userID uint64, roundID string) (*TxCheckResult, error) {
+	var resp checkTxResp
+	err := c.post(ctx, "/api/v1/wallet/check-transaction", checkTxReq{
+		MerchantID: merchantID,
+		UserID:     userID,
+		RoundID:    roundID,
+	}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &TxCheckResult{
+		RoundID:   resp.RoundID,
+		Status:    resp.Status,
+		BetAmount: resp.BetAmount,
+		WinAmount: resp.WinAmount,
+	}, nil
+}
+
 func (c *HTTPClient) post(ctx context.Context, path string, body any, dest any) error {
 	raw, err := json.Marshal(body)
 	if err != nil {

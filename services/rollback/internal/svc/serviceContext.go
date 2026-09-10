@@ -16,6 +16,7 @@ type ServiceContext struct {
 	Writer     *clickhouse.Writer
 	Merchants  model.MerchantsModel
 	PendingOps model.WalletPendingOpsModel
+	PendingTx  model.PendingTransactionsModel
 	Wallet     wallet.Client
 }
 
@@ -36,6 +37,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		Writer:     writer,
 		Merchants:  model.NewMerchantsModel(conn),
 		PendingOps: model.NewWalletPendingOpsModel(conn),
+		PendingTx:  model.NewPendingTransactionsModel(conn),
 		Wallet:     newWalletClient(c.Wallet),
 	}, nil
 }

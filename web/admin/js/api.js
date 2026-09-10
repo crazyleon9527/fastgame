@@ -80,5 +80,9 @@ const AdminAPI = (() => {
     updateMerchantAllowedIPs(id, allowedIps) {
       return request('PUT', `/api/v1/admin/merchants/${id}/allowed-ips`, { allowedIps });
     },
+
+    lookupTrace(traceId) {
+      return request('GET', `/api/v1/admin/traces/${encodeURIComponent(traceId)}`);
+    },
   };
 })();

@@ -13,6 +13,7 @@ import (
 
 type WalletRollbackRow struct {
 	EventID      string
+	TraceID      string
 	RoundID      string
 	UserID       uint64
 	MerchantID   uint64
@@ -23,8 +24,21 @@ type WalletRollbackRow struct {
 	OccurredAt   time.Time
 }
 
+type TraceSpanRow struct {
+	TraceID    string
+	SpanID     string
+	Service    string
+	Operation  string
+	RoundID    string
+	Status     string
+	Detail     string
+	DurationMs uint32
+	OccurredAt time.Time
+}
+
 type RoundSettledRow struct {
 	EventID      string
+	TraceID      string
 	RoundID      string
 	UserID       uint64
 	MerchantID   uint64
@@ -104,7 +118,7 @@ func (w *Writer) BatchInsertRoundSettled(ctx context.Context, rows []RoundSettle
 
 	batch, err := w.conn.PrepareBatch(ctx, `
 		INSERT INTO fastgame.game_round_settled (
-			event_id, round_id, user_id, merchant_id, game_code,
+			event_id, trace_id, round_id, user_id, merchant_id, game_code,
 			bet_amount, win_amount, multiplier, rtp_tier, balance_after, settled_at
 		)
 	`)
@@ -123,6 +137,7 @@ func (w *Writer) BatchInsertRoundSettled(ctx context.Context, rows []RoundSettle
 		}
 		if err := batch.Append(
 			eventID,
+			row.TraceID,
 			row.RoundID,
 			row.UserID,
 			row.MerchantID,
@@ -148,7 +163,7 @@ func (w *Writer) BatchInsertWalletRollback(ctx context.Context, rows []WalletRol
 
 	batch, err := w.conn.PrepareBatch(ctx, `
 		INSERT INTO fastgame.game_wallet_rollback (
-			event_id, round_id, user_id, merchant_id, rollback_type,
+			event_id, trace_id, round_id, user_id, merchant_id, rollback_type,
 			amount, reason, status, occurred_at
 		)
 	`)
@@ -171,6 +186,7 @@ func (w *Writer) BatchInsertWalletRollback(ctx context.Context, rows []WalletRol
 		}
 		if err := batch.Append(
 			eventID,
+			row.TraceID,
 			row.RoundID,
 			row.UserID,
 			row.MerchantID,
@@ -185,6 +201,69 @@ func (w *Writer) BatchInsertWalletRollback(ctx context.Context, rows []WalletRol
 	}
 
 	return batch.Send()
+}
+
+func (w *Writer) BatchInsertTraceSpans(ctx context.Context, rows []TraceSpanRow) error {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	batch, err := w.conn.PrepareBatch(ctx, `
+		INSERT INTO fastgame.trace_spans (
+			trace_id, span_id, service, operation, round_id, status, detail, duration_ms, occurred_at
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	for _, row := range rows {
+		occurredAt := row.OccurredAt
+		if occurredAt.IsZero() {
+			occurredAt = time.Now().UTC()
+		}
+		if err := batch.Append(
+			row.TraceID,
+			row.SpanID,
+			row.Service,
+			row.Operation,
+			row.RoundID,
+			row.Status,
+			row.Detail,
+			row.DurationMs,
+			occurredAt,
+		); err != nil {
+			return err
+		}
+	}
+	return batch.Send()
+}
+
+func (w *Writer) QueryTraceSpans(ctx context.Context, traceID string) ([]TraceSpanRow, error) {
+	rows, err := w.conn.Query(ctx, `
+		SELECT trace_id, span_id, service, operation, round_id, status, detail, duration_ms, occurred_at
+		FROM fastgame.trace_spans
+		WHERE trace_id = ?
+		ORDER BY occurred_at ASC
+		LIMIT 500
+	`, traceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []TraceSpanRow
+	for rows.Next() {
+		var row TraceSpanRow
+		if err := rows.Scan(
+			&row.TraceID, &row.SpanID, &row.Service, &row.Operation, &row.RoundID,
+			&row.Status, &row.Detail, &row.DurationMs, &row.OccurredAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
 }
 
 func (w *Writer) Close() error {

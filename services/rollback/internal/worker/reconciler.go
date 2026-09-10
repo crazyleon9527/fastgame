@@ -52,13 +52,32 @@ func (r *Reconciler) processPending(ctx context.Context) {
 
 		switch op.OpType {
 		case model.PendingOpWinFailed, model.PendingOpWinTimeout:
-			r.retryRollback(ctx, op)
+			r.retryWin(ctx, op)
 		case model.PendingOpRollback:
 			r.retryRollback(ctx, op)
 		default:
 			logx.Errorf("unknown pending op type: %s", op.OpType)
 		}
 	}
+}
+
+func (r *Reconciler) retryWin(ctx context.Context, op *model.WalletPendingOp) {
+	_, err := r.svcCtx.Wallet.Win(ctx, wallet.WinReq{
+		MerchantID: op.MerchantCode,
+		UserID:     op.UserID,
+		RoundID:    op.RoundID,
+		Amount:     op.WinAmount,
+	})
+	if err != nil {
+		if incErr := r.svcCtx.PendingOps.IncrementRetry(ctx, op.Id, err.Error()); incErr != nil {
+			logx.Errorf("increment retry: id=%d err=%v", op.Id, incErr)
+		}
+		return
+	}
+	if err := r.svcCtx.PendingOps.MarkDone(ctx, op.Id); err != nil {
+		logx.Errorf("mark done: id=%d err=%v", op.Id, err)
+	}
+	logx.Infof("reconciled win op: roundId=%s type=%s", op.RoundID, op.OpType)
 }
 
 func (r *Reconciler) retryRollback(ctx context.Context, op *model.WalletPendingOp) {

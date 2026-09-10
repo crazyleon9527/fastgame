@@ -149,3 +149,36 @@ type UpdateMerchantAllowedIPsReq struct {
 	Id         uint64   `path:"id"`
 	AllowedIps []string `json:"allowedIps"`
 }
+
+type TraceLookupReq struct {
+	TraceId string `path:"traceId"`
+}
+
+type TraceSpanItem struct {
+	SpanId     string `json:"spanId"`
+	Service    string `json:"service"`
+	Operation  string `json:"operation"`
+	RoundId    string `json:"roundId"`
+	Status     string `json:"status"`
+	Detail     string `json:"detail"`
+	DurationMs uint32 `json:"durationMs"`
+	OccurredAt int64  `json:"occurredAt"`
+}
+
+type PendingTxItem struct {
+	RoundId        string  `json:"roundId"`
+	Phase          string  `json:"phase"`
+	Status         string  `json:"status"`
+	BetAmount      float64 `json:"betAmount"`
+	WinAmount      float64 `json:"winAmount"`
+	ExpectedAction string  `json:"expectedAction"`
+	RetryCount     int64   `json:"retryCount"`
+	LastError      string  `json:"lastError,omitempty"`
+	CreatedAt      int64   `json:"createdAt"`
+}
+
+type TraceLookupResp struct {
+	TraceId             string          `json:"traceId"`
+	Spans               []TraceSpanItem `json:"spans"`
+	PendingTransactions []PendingTxItem `json:"pendingTransactions"`
+}

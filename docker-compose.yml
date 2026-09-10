@@ -133,6 +133,7 @@ services:
     volumes:
       - ./docker/clickhouse/init-db.sh:/scripts/init-db.sh:ro
       - ./docker/clickhouse/init/01-init.sql:/scripts/01-init.sql:ro
+      - ./docker/clickhouse/init/02-trace-migration.sql:/scripts/02-trace-migration.sql:ro
     restart: on-failure
     networks:
       - fastgame

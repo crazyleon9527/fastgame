@@ -18,6 +18,12 @@ Kafka:
   Brokers:
     - localhost:19092
 
+CH:
+  Addr: localhost:19000
+  Database: fastgame
+  User: fastgame
+  Password: fastgame_pass
+
 Wallet:
   Mock: true
   BaseURL: ""

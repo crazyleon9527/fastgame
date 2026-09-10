@@ -87,6 +87,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Path:    "/reports/rtp",
 					Handler: RtpReportHandler(serverCtx),
 				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/traces/:traceId",
+					Handler: GetTraceHandler(serverCtx),
+				},
 			}...,
 		),
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),

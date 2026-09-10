@@ -10,6 +10,7 @@ import (
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/lock"
 	"fastgame/pkg/prng"
+	"fastgame/pkg/trace"
 	"fastgame/pkg/wallet"
 	"fastgame/pkg/xerr"
 	"fastgame/services/rgs/internal/svc"
@@ -90,14 +91,33 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			return err
 		}
 
+		betStart := time.Now()
 		betResult, err := l.svcCtx.Wallet.Bet(l.ctx, wallet.BetReq{
 			MerchantID: req.MerchantId,
 			UserID:     req.UserId,
 			RoundID:    req.RoundId,
 			Amount:     req.BetAmount,
 		})
+		trace.Record(l.ctx, l.svcCtx.Trace, "rgs", "wallet.bet", req.RoundId,
+			status(err), detailErr(err), time.Since(betStart))
 		if err != nil {
 			return xerr.ErrWalletBetFailed
+		}
+
+		if err := l.svcCtx.PendingTx.Insert(l.ctx, &model.PendingTransaction{
+			TraceID:         trace.ID(l.ctx),
+			RoundID:         req.RoundId,
+			MerchantCode:    req.MerchantId,
+			UserID:          req.UserId,
+			GameCode:        req.GameCode,
+			Phase:           model.PendingTxPhaseBetDebited,
+			Status:          model.PendingTxStatusPending,
+			BetAmount:       req.BetAmount,
+			ExpectedAction:  model.PendingTxActionRollbackBet,
+			WalletBetStatus: "confirmed",
+			WalletWinStatus: "unknown",
+		}); err != nil {
+			logx.Errorf("insert pending_transaction failed: roundId=%s err=%v", req.RoundId, err)
 		}
 
 		scene, proof, err := prng.NewEngine(gameCfg.RtpTier).ComputeReplay(
@@ -115,19 +135,24 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 		settlementStatus := "settled"
 
 		if outcome.WinAmount > 0 {
+			winStart := time.Now()
 			winResult, err := l.svcCtx.Wallet.Win(l.ctx, wallet.WinReq{
 				MerchantID: req.MerchantId,
 				UserID:     req.UserId,
 				RoundID:    req.RoundId,
 				Amount:     outcome.WinAmount,
 			})
+			trace.Record(l.ctx, l.svcCtx.Trace, "rgs", "wallet.win", req.RoundId,
+				status(err), detailErr(err), time.Since(winStart))
 			if err != nil {
 				opType := model.PendingOpWinFailed
 				if wallet.IsTimeoutErr(err) {
 					opType = model.PendingOpWinTimeout
 				}
 				l.recordPending(req, outcome, opType, err)
-				go l.handleWinFailure(req, req.BetAmount, opType)
+				if err := l.svcCtx.PendingTx.MarkWinPending(l.ctx, req.RoundId, outcome.WinAmount, err.Error()); err != nil {
+					logx.Errorf("mark win pending failed: roundId=%s err=%v", req.RoundId, err)
+				}
 				settlementStatus = "pending"
 				balance = betResult.Balance
 			} else {
@@ -150,6 +175,11 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 		}
 
 		if settlementStatus == "settled" {
+			if err := l.svcCtx.PendingTx.MarkSettled(l.ctx, req.RoundId); err != nil {
+				logx.Errorf("mark pending_transaction settled failed: roundId=%s err=%v", req.RoundId, err)
+			}
+			trace.Record(l.ctx, l.svcCtx.Trace, "rgs", "settlement.complete", req.RoundId, "ok", "", 0)
+
 			if err := l.svcCtx.ReplayStore.Insert(l.ctx, &model.GameRoundReplay{
 				RoundID:      req.RoundId,
 				MerchantCode: req.MerchantId,
@@ -206,30 +236,13 @@ func (l *BetLogic) recordPending(req *types.BetReq, outcome prng.Outcome, opType
 	}
 }
 
-func (l *BetLogic) handleWinFailure(req *types.BetReq, betAmount float64, reason string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	rollbackReq := wallet.RollbackReq{
-		MerchantID: req.MerchantId,
-		UserID:     req.UserId,
-		RoundID:    req.RoundId,
-		Amount:     betAmount,
-		Reason:     reason,
-	}
-	if err := l.svcCtx.Wallet.Rollback(ctx, rollbackReq); err != nil {
-		logx.Errorf("wallet rollback failed: roundId=%s err=%v", req.RoundId, err)
-		l.recordPending(req, prng.Outcome{WinAmount: 0}, model.PendingOpRollback, err)
-	}
-
-	go l.publishRollbackEvent(req, betAmount, reason)
-}
-
 func (l *BetLogic) publishSettledEvent(req *types.BetReq, outcome prng.Outcome, balance float64) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
+	ctx = trace.WithID(ctx, trace.ID(l.ctx))
 
 	err := l.svcCtx.Kafka.PublishRoundSettled(ctx, kafka.RoundSettledEvent{
+		TraceID:    trace.ID(l.ctx),
 		RoundID:    req.RoundId,
 		UserID:     req.UserId,
 		MerchantID: req.MerchantId,
@@ -266,7 +279,9 @@ func (l *BetLogic) publishRollbackEvent(req *types.BetReq, amount float64, reaso
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	ctx = trace.WithID(ctx, trace.ID(l.ctx))
 	err := l.svcCtx.Kafka.PublishWalletRollback(ctx, kafka.WalletRollbackEvent{
+		TraceID:      trace.ID(l.ctx),
 		RoundID:      req.RoundId,
 		UserID:       req.UserId,
 		MerchantID:   req.MerchantId,
@@ -277,4 +292,18 @@ func (l *BetLogic) publishRollbackEvent(req *types.BetReq, amount float64, reaso
 	if err != nil {
 		logx.Errorf("publish wallet rollback event failed: roundId=%s err=%v", req.RoundId, err)
 	}
+}
+
+func status(err error) string {
+	if err != nil {
+		return "error"
+	}
+	return "ok"
+}
+
+func detailErr(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

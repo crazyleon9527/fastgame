@@ -24,6 +24,9 @@ wait_for_clickhouse
 
 echo "Applying ClickHouse schema..."
 clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --multiquery < /scripts/01-init.sql
+if [ -f /scripts/02-trace-migration.sql ]; then
+  clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --multiquery < /scripts/02-trace-migration.sql
+fi
 
 echo "ClickHouse tables:"
 clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --query "SHOW TABLES FROM fastgame"

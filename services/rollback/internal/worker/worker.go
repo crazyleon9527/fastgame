@@ -36,6 +36,7 @@ func NewWorker(svcCtx *svc.ServiceContext) *Worker {
 
 func (w *Worker) Run(ctx context.Context) error {
 	go NewReconciler(w.svcCtx).Run(ctx)
+	go NewOrphanReconciler(w.svcCtx).Run(ctx)
 
 	for {
 		msg, err := w.reader.FetchMessage(ctx)
@@ -84,6 +85,7 @@ func (w *Worker) handleMessage(ctx context.Context, raw []byte) error {
 
 	chErr := w.svcCtx.Writer.BatchInsertWalletRollback(ctx, []clickhouse.WalletRollbackRow{{
 		EventID:      evt.EventID,
+		TraceID:      evt.TraceID,
 		RoundID:      evt.RoundID,
 		UserID:       evt.UserID,
 		MerchantID:   merchantID,

@@ -15,7 +15,10 @@ import (
 func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		rest.WithMiddlewares(
-			[]rest.Middleware{middleware.RateLimitMiddleware(serverCtx.RateLimit)},
+			[]rest.Middleware{
+				middleware.TraceMiddleware(),
+				middleware.RateLimitMiddleware(serverCtx.RateLimit),
+			},
 			[]rest.Route{
 			{
 				// 查询玩家余额

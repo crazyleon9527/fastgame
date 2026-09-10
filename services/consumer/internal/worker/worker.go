@@ -80,6 +80,7 @@ func (w *Worker) parseMessage(raw []byte) (clickhouse.RoundSettledRow, error) {
 
 	return clickhouse.RoundSettledRow{
 		EventID:      evt.EventID,
+		TraceID:      evt.TraceID,
 		RoundID:      evt.RoundID,
 		UserID:       evt.UserID,
 		MerchantID:   merchantID,

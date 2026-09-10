@@ -131,6 +131,35 @@ type (
 	RtpReportResp {
 		List []RtpReportItem `json:"list"`
 	}
+	TraceLookupReq {
+		TraceId string `path:"traceId"`
+	}
+	TraceSpanItem {
+		SpanId     string `json:"spanId"`
+		Service    string `json:"service"`
+		Operation  string `json:"operation"`
+		RoundId    string `json:"roundId"`
+		Status     string `json:"status"`
+		Detail     string `json:"detail"`
+		DurationMs uint32 `json:"durationMs"`
+		OccurredAt int64  `json:"occurredAt"`
+	}
+	PendingTxItem {
+		RoundId        string  `json:"roundId"`
+		Phase          string  `json:"phase"`
+		Status         string  `json:"status"`
+		BetAmount      float64 `json:"betAmount"`
+		WinAmount      float64 `json:"winAmount"`
+		ExpectedAction string  `json:"expectedAction"`
+		RetryCount     int64   `json:"retryCount"`
+		LastError      string  `json:"lastError,optional"`
+		CreatedAt      int64   `json:"createdAt"`
+	}
+	TraceLookupResp {
+		TraceId             string          `json:"traceId"`
+		Spans               []TraceSpanItem `json:"spans"`
+		PendingTransactions []PendingTxItem `json:"pendingTransactions"`
+	}
 )
 
 @server (
@@ -182,5 +211,8 @@ service admin-api {
 
 	@handler RtpReport
 	get /reports/rtp (RtpReportReq) returns (RtpReportResp)
+
+	@handler GetTrace
+	get /traces/:traceId (TraceLookupReq) returns (TraceLookupResp)
 }
 

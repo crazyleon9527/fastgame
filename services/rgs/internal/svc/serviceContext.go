@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"fastgame/internal/model"
+	"fastgame/pkg/clickhouse"
 	"fastgame/pkg/gameconfig"
 	"fastgame/pkg/idempotent"
 	"fastgame/pkg/kafka"
@@ -12,6 +13,7 @@ import (
 	"fastgame/pkg/ratelimit"
 	"fastgame/pkg/security"
 	"fastgame/pkg/session"
+	"fastgame/pkg/trace"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rgs/internal/config"
 
@@ -33,7 +35,9 @@ type ServiceContext struct {
 	RateLimit   *ratelimit.Gateway
 	Session     *session.Store
 	PendingOps  model.WalletPendingOpsModel
+	PendingTx   model.PendingTransactionsModel
 	ReplayStore model.GameRoundReplayModel
+	Trace       *trace.CHRecorder
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -66,7 +70,17 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		),
 		Session:    session.NewStore(rdb, c.Session.TTL()),
 		PendingOps:  model.NewWalletPendingOpsModel(conn),
+		PendingTx:   model.NewPendingTransactionsModel(conn),
 		ReplayStore: model.NewGameRoundReplayModel(conn),
+	}
+
+	if c.CH.Addr != "" {
+		writer, err := clickhouse.NewWriterWithAuth(c.CH.Addr, c.CH.Database, c.CH.User, c.CH.Password)
+		if err != nil {
+			logx.Errorf("clickhouse trace writer disabled: %v", err)
+		} else {
+			svcCtx.Trace = trace.NewCHRecorder(writer)
+		}
 	}
 
 	bootstrapBlacklist(rdb, model.NewRiskBlacklistModel(conn))
