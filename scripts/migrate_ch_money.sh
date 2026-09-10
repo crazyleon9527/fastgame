@@ -13,11 +13,16 @@ col_type() {
 rebuild_money_tables() {
   echo "Rebuilding ClickHouse money tables from init SQL (staging-safe)…"
   $CH --multiquery <<'EOF'
-DROP TABLE IF EXISTS fastgame.mv_rtp_hourly;
-DROP TABLE IF EXISTS fastgame.game_round_settled;
-DROP TABLE IF EXISTS fastgame.game_event_bigwin;
-DROP TABLE IF EXISTS fastgame.game_wallet_rollback;
+DROP VIEW IF EXISTS fastgame.mv_rtp_hourly;
+DROP TABLE IF EXISTS fastgame.game_round_settled SYNC;
+DROP TABLE IF EXISTS fastgame.game_event_bigwin SYNC;
+DROP TABLE IF EXISTS fastgame.game_wallet_rollback SYNC;
 EOF
+  left=$($CH -q "SELECT count() FROM system.tables WHERE database='fastgame' AND name IN ('game_round_settled','game_event_bigwin','game_wallet_rollback')" 2>/dev/null || echo 3)
+  if [[ "${left:-3}" != "0" ]]; then
+    echo "FAIL: money tables still present after DROP SYNC (count=$left) — restart clickhouse or reset volume" >&2
+    exit 1
+  fi
   $CH --multiquery < "$INIT/01-init.sql"
   if [[ -f "$INIT/02-trace-migration.sql" ]]; then
     $CH --multiquery < "$INIT/02-trace-migration.sql"
