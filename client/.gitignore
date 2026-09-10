@@ -1,0 +1,6 @@
+library/
+local/
+temp/
+build/
+profiles/
+settings/v2/packages/
