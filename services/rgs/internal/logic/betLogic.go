@@ -44,6 +44,11 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			return xerr.ErrDuplicateRound
 		}
 
+		gameCfg, err := l.svcCtx.GameConfig.Load(l.ctx, req.MerchantId, req.GameCode)
+		if err != nil {
+			return err
+		}
+
 		betResult, err := l.svcCtx.Wallet.Bet(l.ctx, wallet.BetReq{
 			MerchantID: req.MerchantId,
 			UserID:     req.UserId,
@@ -54,7 +59,7 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			return xerr.ErrWalletBetFailed
 		}
 
-		outcome := l.svcCtx.PRNG.Spin(req.BetAmount)
+		outcome := prng.NewEngine(gameCfg.RtpTier).Spin(req.BetAmount)
 		balance := betResult.Balance
 
 		if outcome.WinAmount > 0 {

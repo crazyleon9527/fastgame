@@ -1,4 +1,7 @@
-.PHONY: up down restart ps logs init clean run-rgs build install-goctl codegen
+.PHONY: up down restart ps logs init clean run-rgs run-consumer build install-goctl codegen seed
+
+seed:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/02-seed.sql
 
 # goctl 无独立 v1.10.3 tag，从 go-zero v1.10.3 源码编译安装
 install-goctl:
@@ -36,6 +39,10 @@ clean:
 
 build:
 	go build -o bin/rgs-api ./services/rgs
+	go build -o bin/consumer ./services/consumer
 
 run-rgs: build
 	./bin/rgs-api -f services/rgs/etc/rgs-api.yaml
+
+run-consumer: build
+	./bin/consumer -f services/consumer/etc/consumer.yaml

@@ -7,6 +7,9 @@ Log:
   Mode: console
   Level: info
 
+MySQL:
+  DataSource: fastgame:fastgame_pass@tcp(localhost:13306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC
+
 Redis:
   Addr: localhost:16379
 

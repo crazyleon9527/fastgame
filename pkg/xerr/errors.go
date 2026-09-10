@@ -7,4 +7,5 @@ var (
 	ErrDuplicateRound  = errors.New("duplicate round id")
 	ErrWalletBetFailed = errors.New("wallet bet failed")
 	ErrWalletWinFailed = errors.New("wallet win failed")
+	ErrMerchantInvalid = errors.New("merchant invalid or disabled")
 )

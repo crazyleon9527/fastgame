@@ -3,14 +3,16 @@ package svc
 import (
 	"time"
 
+	"fastgame/internal/model"
+	"fastgame/pkg/gameconfig"
 	"fastgame/pkg/idempotent"
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/lock"
-	"fastgame/pkg/prng"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rgs/internal/config"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
 type ServiceContext struct {
@@ -19,12 +21,13 @@ type ServiceContext struct {
 	Lock       *lock.RedisLock
 	Idempotent *idempotent.Store
 	Wallet     wallet.Client
-	PRNG       *prng.Engine
+	GameConfig *gameconfig.Loader
 	Kafka      *kafka.Producer
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	rdb := redis.NewClient(&redis.Options{Addr: c.Redis.Addr})
+	conn := sqlx.NewMysql(c.MySQL.DataSource)
 
 	var walletClient wallet.Client
 	if c.Wallet.Mock {
@@ -39,7 +42,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Lock:       lock.NewRedisLock(rdb),
 		Idempotent: idempotent.NewStore(rdb, 24*time.Hour),
 		Wallet:     walletClient,
-		PRNG:       prng.NewEngine(c.Game.DefaultRtpTier),
-		Kafka:      kafka.NewProducer(c.Kafka.Brokers),
+		GameConfig: gameconfig.NewLoader(
+			model.NewMerchantsModel(conn),
+			model.NewGameConfigsModel(conn),
+		),
+		Kafka: kafka.NewProducer(c.Kafka.Brokers),
 	}
 }
