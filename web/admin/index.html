@@ -26,6 +26,10 @@
             Google Authenticator (TOTP)
             <input type="text" id="totp-code" inputmode="numeric" autocomplete="one-time-code" placeholder="启用 2FA 时必填" />
           </label>
+          <label>
+            恢复码 (Recovery)
+            <input type="text" id="recovery-code" autocomplete="off" placeholder="丢失 Authenticator 时使用" />
+          </label>
           <button type="submit" class="btn primary">登录</button>
           <p id="login-error" class="error hidden"></p>
         </form>
@@ -126,6 +130,11 @@
 
             <div class="toolbar">
               <button id="merchant-refresh-btn" class="btn">刷新商户列表</button>
+              <button id="breaker-refresh-btn" class="btn">刷新熔断列表</button>
+            </div>
+            <div id="breaker-panel" class="alert info hidden">
+              <strong>钱包熔断中</strong>
+              <ul id="breaker-list"></ul>
             </div>
 
             <div class="stats">
@@ -342,6 +351,10 @@
         <p class="muted-text">扫描下方 URI 或手动输入 Secret，然后在 Authenticator 中输入 6 位验证码确认。</p>
         <div class="key-box"><code id="totp-uri"></code></div>
         <p class="muted-text">Secret: <code id="totp-secret"></code></p>
+        <div id="recovery-box" class="hidden">
+          <p class="muted-text"><strong>恢复码（仅显示一次，请保存）：</strong></p>
+          <ul id="recovery-codes"></ul>
+        </div>
         <label>
           验证码
           <input type="text" id="totp-confirm-code" inputmode="numeric" autocomplete="one-time-code" required />

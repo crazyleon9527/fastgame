@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"fastgame/pkg/auth"
 	"fastgame/services/admin/internal/svc"
 	"fastgame/services/admin/internal/types"
-
-	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -42,17 +41,43 @@ func (l *TotpLogic) Setup(userID uint64) (*types.TotpSetupResp, error) {
 	}, nil
 }
 
-func (l *TotpLogic) Confirm(userID uint64, req *types.TotpConfirmReq) error {
+func (l *TotpLogic) Confirm(userID uint64, req *types.TotpConfirmReq) (*types.TotpConfirmResp, error) {
 	secret, err := l.svcCtx.Redis.Get(l.ctx, fmt.Sprintf("admin:totp:pending:%d", userID)).Result()
 	if err != nil || secret == "" {
-		return errors.New("totp setup expired, run setup again")
+		return nil, errors.New("totp setup expired, run setup again")
 	}
 	if !auth.VerifyTOTP(secret, req.TotpCode) {
-		return errors.New("invalid totp code")
+		return nil, errors.New("invalid totp code")
 	}
 	if err := l.svcCtx.AdminAuth.UpdateTotp(l.ctx, userID, secret, true); err != nil {
-		return err
+		return nil, err
+	}
+
+	plain, hashes, err := auth.GenerateRecoveryCodes()
+	if err != nil {
+		return nil, err
+	}
+	hashesJSON, err := auth.MarshalRecoveryHashes(hashes)
+	if err != nil {
+		return nil, err
+	}
+	if err := l.svcCtx.AdminAuth.UpdateRecoveryHashes(l.ctx, userID, hashesJSON); err != nil {
+		return nil, err
 	}
 	_ = l.svcCtx.Redis.Del(l.ctx, fmt.Sprintf("admin:totp:pending:%d", userID)).Err()
-	return nil
+
+	user, err := l.svcCtx.AdminAuth.FindByID(l.ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	token, expireAt, err := issueAdminToken(user, l.svcCtx.Config.Auth.AccessSecret, l.svcCtx.Config.Auth.AccessExpire)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.TotpConfirmResp{
+		AccessToken:   token,
+		ExpireAt:      expireAt,
+		RecoveryCodes: plain,
+	}, nil
 }

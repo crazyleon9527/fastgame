@@ -3,13 +3,11 @@ package logic
 import (
 	"context"
 	"errors"
-	"time"
 
 	"fastgame/pkg/auth"
 	"fastgame/services/admin/internal/svc"
 	"fastgame/services/admin/internal/types"
 
-	"github.com/golang-jwt/jwt/v4"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -37,29 +35,38 @@ func (l *LoginLogic) Login(req *types.LoginReq) (*types.LoginResp, error) {
 	}
 
 	if user.TotpEnabled == 1 {
-		if req.TotpCode == "" {
-			return nil, errors.New("totp code required")
-		}
-		if !user.TotpSecret.Valid || !auth.VerifyTOTP(user.TotpSecret.String, req.TotpCode) {
-			return nil, errors.New("invalid totp code")
+		if req.RecoveryCode != "" {
+			if !user.TotpRecoveryHashes.Valid {
+				return nil, errors.New("no recovery codes configured")
+			}
+			newJSON, ok, err := auth.ConsumeRecoveryCode(req.RecoveryCode, user.TotpRecoveryHashes.String)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				return nil, errors.New("invalid recovery code")
+			}
+			if err := l.svcCtx.AdminAuth.ConsumeRecoveryHash(l.ctx, user.Id, newJSON); err != nil {
+				return nil, err
+			}
+		} else {
+			if req.TotpCode == "" {
+				return nil, errors.New("totp code required")
+			}
+			if !user.TotpSecret.Valid || !auth.VerifyTOTP(user.TotpSecret.String, req.TotpCode) {
+				return nil, errors.New("invalid totp code")
+			}
 		}
 	}
 
-	now := time.Now().Unix()
-	expireAt := now + l.svcCtx.Config.Auth.AccessExpire
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"exp":    expireAt,
-		"iat":    now,
-		"userId": user.Id,
-		"roleId": user.RoleId,
-	})
-	tokenStr, err := token.SignedString([]byte(l.svcCtx.Config.Auth.AccessSecret))
+	tokenStr, expireAt, err := issueAdminToken(user, l.svcCtx.Config.Auth.AccessSecret, l.svcCtx.Config.Auth.AccessExpire)
 	if err != nil {
 		return nil, err
 	}
 
 	return &types.LoginResp{
-		AccessToken: tokenStr,
-		ExpireAt:    expireAt,
+		AccessToken:       tokenStr,
+		ExpireAt:          expireAt,
+		RequiresTotpSetup: user.TotpEnabled != 1,
 	}, nil
 }

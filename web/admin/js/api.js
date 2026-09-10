@@ -46,8 +46,13 @@ const AdminAPI = (() => {
     clearToken,
     isLoggedIn: () => !!getToken(),
 
-    login(username, password, totpCode = '') {
-      return request('POST', '/api/v1/admin/login', { username, password, totpCode: totpCode || undefined });
+    login(username, password, totpCode = '', recoveryCode = '') {
+      return request('POST', '/api/v1/admin/login', {
+        username,
+        password,
+        totpCode: totpCode || undefined,
+        recoveryCode: recoveryCode || undefined,
+      });
     },
 
     listRiskAlerts(limit = 50) {
@@ -107,6 +112,10 @@ const AdminAPI = (() => {
 
     resetWalletBreaker(merchantCode) {
       return request('POST', '/api/v1/admin/wallet/breaker/reset', { merchantCode });
+    },
+
+    listWalletBreakers() {
+      return request('GET', '/api/v1/admin/wallet/breakers');
     },
   };
 })();

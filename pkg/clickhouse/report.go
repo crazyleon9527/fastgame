@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"fastgame/pkg/money"
 )
 
 type RtpReportRow struct {
@@ -22,18 +24,19 @@ func (w *Writer) QueryRtpReport(ctx context.Context, merchantID uint64, gameCode
 	}
 	since := time.Now().UTC().Add(-time.Duration(hours) * time.Hour)
 
-	query := `
+	scale := money.Scale
+	query := fmt.Sprintf(`
 		SELECT
 			merchant_id,
 			game_code,
 			hour,
-			toFloat64(total_bet) AS total_bet,
-			toFloat64(total_win) AS total_win,
+			toFloat64(total_bet) / %d AS total_bet,
+			toFloat64(total_win) / %d AS total_win,
 			total_rounds,
 			if(total_bet = 0, 0, toFloat64(total_win) / toFloat64(total_bet)) AS actual_rtp
 		FROM fastgame.mv_rtp_hourly
 		WHERE hour >= ?
-	`
+	`, scale, scale)
 	args := []any{since}
 	if merchantID > 0 {
 		query += " AND merchant_id = ?"
@@ -77,18 +80,19 @@ func (w *Writer) QueryRtpReportFromRaw(ctx context.Context, merchantID uint64, g
 	}
 	since := time.Now().UTC().Add(-time.Duration(hours) * time.Hour)
 
-	query := `
+	scale := money.Scale
+	query := fmt.Sprintf(`
 		SELECT
 			merchant_id,
 			game_code,
 			toStartOfHour(settled_at) AS hour,
-			toFloat64(sum(bet_amount)) AS total_bet,
-			toFloat64(sum(win_amount)) AS total_win,
+			toFloat64(sum(bet_amount)) / %d AS total_bet,
+			toFloat64(sum(win_amount)) / %d AS total_win,
 			count() AS total_rounds,
 			if(sum(bet_amount) = 0, 0, toFloat64(sum(win_amount)) / toFloat64(sum(bet_amount))) AS actual_rtp
 		FROM fastgame.game_round_settled
 		WHERE settled_at >= ?
-	`
+	`, scale, scale)
 	args := []any{since}
 	if merchantID > 0 {
 		query += " AND merchant_id = ?"

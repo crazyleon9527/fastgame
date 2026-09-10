@@ -27,6 +27,9 @@ clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --multiqu
 if [ -f /scripts/02-trace-migration.sql ]; then
   clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --multiquery < /scripts/02-trace-migration.sql
 fi
+if [ -f /scripts/03-money-migration.sql ]; then
+  clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --multiquery < /scripts/03-money-migration.sql
+fi
 
 echo "ClickHouse tables:"
 clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --query "SHOW TABLES FROM fastgame"

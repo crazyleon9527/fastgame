@@ -40,10 +40,11 @@ func TotpConfirmHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 		l := logic.NewTotpLogic(r.Context(), svcCtx)
-		if err := l.Confirm(userID, &req); err != nil {
+		resp, err := l.Confirm(userID, &req)
+		if err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
 		}
-		httpx.OkJsonCtx(r.Context(), w, map[string]string{"status": "ok"})
+		httpx.OkJsonCtx(r.Context(), w, resp)
 	}
 }

@@ -58,6 +58,9 @@ func ResetBreaker(ctx context.Context, rdb *redis.Client, merchantID string, ttl
 	pipe.Set(ctx, fmt.Sprintf("wallet:breaker:override:%s", merchantID), "1", ttl)
 	pipe.Del(ctx, fmt.Sprintf("wallet:breaker:open:%s", merchantID))
 	_, err := pipe.Exec(ctx)
+	if err == nil {
+		SetBreakerMetric(merchantID, false)
+	}
 	return err
 }
 
@@ -73,7 +76,8 @@ func (c *breakerClient) markOpen(ctx context.Context, merchantID string) {
 	if c.cfg.Redis == nil {
 		return
 	}
-	_ = c.cfg.Redis.Set(ctx, c.stateKey(merchantID), time.Now().Unix(), 30*time.Minute).Err()
+	_ = c.cfg.Redis.Set(ctx, c.stateKey(merchantID), time.Now().Unix(), breakerOpenTTL()).Err()
+	SetBreakerMetric(merchantID, true)
 }
 
 func (c *breakerClient) run(ctx context.Context, merchantID string, op string, fn func() error) error {

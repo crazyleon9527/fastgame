@@ -29,9 +29,10 @@ type GameConfigListResp struct {
 }
 
 type LoginReq struct {
-	Username string `json:"username" validate:"required"`
-	Password string `json:"password" validate:"required"`
-	TotpCode string `json:"totpCode,optional"`
+	Username     string `json:"username" validate:"required"`
+	Password     string `json:"password" validate:"required"`
+	TotpCode     string `json:"totpCode,optional"`
+	RecoveryCode string `json:"recoveryCode,optional"`
 }
 
 type RiskAlertsReq struct {
@@ -59,8 +60,9 @@ type RiskAlertsResp struct {
 }
 
 type LoginResp struct {
-	AccessToken string `json:"accessToken"`
-	ExpireAt    int64  `json:"expireAt"`
+	AccessToken       string `json:"accessToken"`
+	ExpireAt          int64  `json:"expireAt"`
+	RequiresTotpSetup bool   `json:"requiresTotpSetup,omitempty"`
 }
 
 type MerchantItem struct {
@@ -220,6 +222,23 @@ type TotpSetupResp struct {
 
 type TotpConfirmReq struct {
 	TotpCode string `json:"totpCode" validate:"required"`
+}
+
+type TotpConfirmResp struct {
+	AccessToken   string   `json:"accessToken"`
+	ExpireAt      int64    `json:"expireAt"`
+	RecoveryCodes []string `json:"recoveryCodes"`
+}
+
+type WalletBreakerItem struct {
+	MerchantCode string `json:"merchantCode"`
+	Open         bool   `json:"open"`
+	OpenedAt     int64  `json:"openedAt,omitempty"`
+	Overridden   bool   `json:"overridden"`
+}
+
+type WalletBreakersResp struct {
+	List []WalletBreakerItem `json:"list"`
 }
 
 type AckRiskAlertReq struct {

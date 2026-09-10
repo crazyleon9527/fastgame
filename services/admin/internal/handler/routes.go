@@ -6,6 +6,7 @@ package handler
 import (
 	"net/http"
 
+	"fastgame/services/admin/internal/middleware"
 	"fastgame/services/admin/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
@@ -25,7 +26,7 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 
 	server.AddRoutes(
 		rest.WithMiddlewares(
-			[]rest.Middleware{serverCtx.AuthMiddleware},
+			[]rest.Middleware{serverCtx.AuthMiddleware, middleware.TotpGateMiddleware()},
 			[]rest.Route{
 				{
 					Method:  http.MethodGet,
@@ -116,6 +117,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Method:  http.MethodPost,
 					Path:    "/totp/confirm",
 					Handler: TotpConfirmHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/wallet/breakers",
+					Handler: ListWalletBreakersHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodPost,

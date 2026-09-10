@@ -30,7 +30,7 @@ type ServiceContext struct {
 	Lock        *lock.RedisLock
 	Idempotent  *idempotent.Store
 	Wallet      wallet.Client
-	GameConfig  *gameconfig.Loader
+	GameConfig  gameconfig.Provider
 	Kafka       *kafka.Producer
 	Guard       *security.Guard
 	RateLimit   *ratelimit.Gateway

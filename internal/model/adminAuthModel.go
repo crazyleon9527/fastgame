@@ -14,14 +14,17 @@ type AdminAuthRecord struct {
 	PasswordHash string         `db:"password_hash"`
 	RoleId       uint64         `db:"role_id"`
 	Status       int64          `db:"status"`
-	TotpSecret   sql.NullString `db:"totp_secret"`
-	TotpEnabled  int64          `db:"totp_enabled"`
+	TotpSecret          sql.NullString `db:"totp_secret"`
+	TotpEnabled         int64          `db:"totp_enabled"`
+	TotpRecoveryHashes  sql.NullString `db:"totp_recovery_hashes"`
 }
 
 type AdminAuthModel interface {
 	FindByUsername(ctx context.Context, username string) (*AdminAuthRecord, error)
 	FindByID(ctx context.Context, id uint64) (*AdminAuthRecord, error)
 	UpdateTotp(ctx context.Context, id uint64, secret string, enabled bool) error
+	UpdateRecoveryHashes(ctx context.Context, id uint64, hashesJSON string) error
+	ConsumeRecoveryHash(ctx context.Context, id uint64, hashesJSON string) error
 }
 
 type defaultAdminAuthModel struct {
@@ -35,7 +38,7 @@ func NewAdminAuthModel(conn sqlx.SqlConn) AdminAuthModel {
 
 func (m *defaultAdminAuthModel) FindByID(ctx context.Context, id uint64) (*AdminAuthRecord, error) {
 	query := fmt.Sprintf(`
-select id, username, password_hash, role_id, status, totp_secret, totp_enabled
+select id, username, password_hash, role_id, status, totp_secret, totp_enabled, totp_recovery_hashes
 from %s where id = ? limit 1
 `, m.table)
 	var row AdminAuthRecord
@@ -60,9 +63,21 @@ func (m *defaultAdminAuthModel) UpdateTotp(ctx context.Context, id uint64, secre
 	return err
 }
 
+func (m *defaultAdminAuthModel) UpdateRecoveryHashes(ctx context.Context, id uint64, hashesJSON string) error {
+	query := fmt.Sprintf("update %s set totp_recovery_hashes = ? where id = ?", m.table)
+	_, err := m.conn.ExecCtx(ctx, query, hashesJSON, id)
+	return err
+}
+
+func (m *defaultAdminAuthModel) ConsumeRecoveryHash(ctx context.Context, id uint64, hashesJSON string) error {
+	query := fmt.Sprintf("update %s set totp_recovery_hashes = ? where id = ?", m.table)
+	_, err := m.conn.ExecCtx(ctx, query, hashesJSON, id)
+	return err
+}
+
 func (m *defaultAdminAuthModel) FindByUsername(ctx context.Context, username string) (*AdminAuthRecord, error) {
 	query := fmt.Sprintf(`
-select id, username, password_hash, role_id, status, totp_secret, totp_enabled
+select id, username, password_hash, role_id, status, totp_secret, totp_enabled, totp_recovery_hashes
 from %s where username = ? limit 1
 `, m.table)
 	var row AdminAuthRecord

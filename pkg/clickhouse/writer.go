@@ -8,9 +8,6 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
-
-	"fastgame/pkg/money"
 )
 
 type WalletRollbackRow struct {
@@ -144,11 +141,11 @@ func (w *Writer) BatchInsertRoundSettled(ctx context.Context, rows []RoundSettle
 			row.UserID,
 			row.MerchantID,
 			row.GameCode,
-			minorDecimal(row.BetAmount),
-			minorDecimal(row.WinAmount),
-			minorDecimal(row.Multiplier),
+			row.BetAmount,
+			row.WinAmount,
+			row.Multiplier,
 			row.RtpTier,
-			minorDecimal(row.BalanceAfter),
+			row.BalanceAfter,
 			settledAt,
 		); err != nil {
 			return err
@@ -193,7 +190,7 @@ func (w *Writer) BatchInsertWalletRollback(ctx context.Context, rows []WalletRol
 			row.UserID,
 			row.MerchantID,
 			row.RollbackType,
-			minorDecimal(row.Amount),
+			row.Amount,
 			row.Reason,
 			status,
 			occurredAt,
@@ -297,8 +294,4 @@ func (w *Writer) QueryTraceSpans(ctx context.Context, traceID string) ([]TraceSp
 
 func (w *Writer) Close() error {
 	return w.conn.Close()
-}
-
-func minorDecimal(v int64) decimal.Decimal {
-	return decimal.NewFromInt(v).Div(decimal.NewFromInt(money.Scale))
 }

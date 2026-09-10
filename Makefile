@@ -1,4 +1,4 @@
-.PHONY: up down restart ps logs init clean run-rgs run-consumer run-rollback run-admin run-broadcast build install-goctl codegen seed seed-admin migrate-security migrate-wallet migrate-replay migrate-orphan-trace migrate-antiabuse obfuscate-client compress-client-brotli deploy-client fetch-cf-ips
+.PHONY: up down restart ps logs init clean run-rgs run-consumer run-rollback run-admin run-broadcast build install-goctl codegen seed seed-admin migrate-security migrate-wallet migrate-replay migrate-orphan-trace migrate-antiabuse migrate-money migrate-totp obfuscate-client compress-client-brotli deploy-client fetch-cf-ips
 
 seed:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/02-seed.sql
@@ -18,6 +18,13 @@ migrate-antiabuse:
 migrate-orphan-trace:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/06-orphan-trace-migration.sql
 	docker compose run --rm clickhouse-init
+
+migrate-money:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/08-money-migration.sql
+	docker compose run --rm clickhouse-init
+
+migrate-totp:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/09-totp-recovery-migration.sql
 
 seed-admin:
 	go run scripts/seed_admin.go | docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame

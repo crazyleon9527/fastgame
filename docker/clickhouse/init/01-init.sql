@@ -11,11 +11,11 @@ CREATE TABLE IF NOT EXISTS fastgame.game_round_settled
     user_id        UInt64,
     merchant_id    UInt64,
     game_code      LowCardinality(String),
-    bet_amount     Decimal(18, 4),
-    win_amount     Decimal(18, 4),
-    multiplier     Decimal(10, 4),
+    bet_amount     Int64 COMMENT 'minor units scale=10000',
+    win_amount     Int64,
+    multiplier     Int64 COMMENT 'multiplier minor e.g. 15000=1.5x',
     rtp_tier       LowCardinality(String),
-    balance_after  Decimal(18, 4),
+    balance_after  Int64,
     settled_at     DateTime64(3, 'UTC'),
     ingested_at    DateTime64(3, 'UTC') DEFAULT now64(3)
 )
@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS fastgame.game_event_bigwin
     user_id      UInt64,
     merchant_id  UInt64,
     game_code    LowCardinality(String),
-    win_amount   Decimal(18, 4),
-    multiplier   Decimal(10, 4),
+    win_amount   Int64,
+    multiplier   Int64,
     occurred_at  DateTime64(3, 'UTC'),
     ingested_at  DateTime64(3, 'UTC') DEFAULT now64(3)
 )
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS fastgame.game_wallet_rollback
     user_id       UInt64,
     merchant_id   UInt64,
     rollback_type LowCardinality(String),
-    amount        Decimal(18, 4),
+    amount        Int64,
     reason        String,
     status        LowCardinality(String) DEFAULT 'pending',
     occurred_at   DateTime64(3, 'UTC'),

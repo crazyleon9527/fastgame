@@ -16,7 +16,7 @@ ON DUPLICATE KEY UPDATE
   rtp_tier = VALUES(rtp_tier);
 
 INSERT INTO game_configs (merchant_id, game_code, config_key, config_value, rtp_tier, status)
-SELECT m.id, 'fishing', 'bet_limits', '{"min":1,"max":1000,"allowed":[1,5,10,50,100]}', NULL, 1
+SELECT m.id, 'fishing', 'bet_limits', '{"min":10000,"max":10000000,"allowed":[10000,50000,100000,500000,1000000]}', NULL, 1
 FROM merchants m
 WHERE m.merchant_code = 'm001'
 ON DUPLICATE KEY UPDATE

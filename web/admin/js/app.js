@@ -249,9 +249,31 @@
 
   // ── Merchants ──────────────────────────────────────────
 
+  async function loadOpenBreakers() {
+    const panel = $('#breaker-panel');
+    const listEl = $('#breaker-list');
+    try {
+      const data = await AdminAPI.listWalletBreakers();
+      const list = (data.list || []).filter((b) => b.open);
+      if (!list.length) {
+        panel.classList.add('hidden');
+        return;
+      }
+      panel.classList.remove('hidden');
+      listEl.innerHTML = list.map((b) => `
+        <li><code>${escapeHtml(b.merchantCode)}</code>
+          ${b.overridden ? ' (override)' : ''}
+          · ${b.openedAt ? formatTime(b.openedAt) : '—'}
+        </li>`).join('');
+    } catch {
+      panel.classList.add('hidden');
+    }
+  }
+
   async function loadMerchants() {
     const tbody = $('#merchant-body');
     tbody.innerHTML = '<tr><td colspan="5" class="empty">加载中…</td></tr>';
+    loadOpenBreakers();
 
     try {
       const data = await AdminAPI.listMerchants({ page: merchantPage, pageSize: merchantPageSize });
@@ -408,10 +430,20 @@
     const errEl = $('#login-error');
     errEl.classList.add('hidden');
     try {
-      const resp = await AdminAPI.login($('#username').value, $('#password').value, $('#totp-code').value.trim());
+      const resp = await AdminAPI.login(
+        $('#username').value,
+        $('#password').value,
+        $('#totp-code').value.trim(),
+        $('#recovery-code').value.trim(),
+      );
       AdminAPI.setToken(resp.accessToken);
       $('#user-label').textContent = $('#username').value;
       show('main');
+      if (resp.requiresTotpSetup) {
+        toast('请先完成 2FA 绑定', 'error');
+        $('#totp-setup-btn').click();
+        return;
+      }
       blPage = 1;
       switchTab('blacklist');
     } catch (err) {
@@ -476,6 +508,7 @@
 
   // Merchants toolbar
   $('#merchant-refresh-btn').addEventListener('click', () => loadMerchants());
+  $('#breaker-refresh-btn').addEventListener('click', () => loadOpenBreakers());
   $('#merchant-prev-page').addEventListener('click', () => { if (merchantPage > 1) { merchantPage--; loadMerchants(); } });
   $('#merchant-next-page').addEventListener('click', () => { if (merchantPage * merchantPageSize < merchantTotal) { merchantPage++; loadMerchants(); } });
 
@@ -542,9 +575,18 @@
     const errEl = $('#totp-error');
     errEl.classList.add('hidden');
     try {
-      await AdminAPI.totpConfirm($('#totp-confirm-code').value.trim());
-      $('#totp-dialog').close();
-      toast('2FA 已绑定，下次登录需输入验证码');
+      const resp = await AdminAPI.totpConfirm($('#totp-confirm-code').value.trim());
+      if (resp.accessToken) AdminAPI.setToken(resp.accessToken);
+      const box = $('#recovery-box');
+      const ul = $('#recovery-codes');
+      if (resp.recoveryCodes && resp.recoveryCodes.length) {
+        box.classList.remove('hidden');
+        ul.innerHTML = resp.recoveryCodes.map((c) => `<li><code>${escapeHtml(c)}</code></li>`).join('');
+        toast('2FA 已绑定 — 请立即保存恢复码');
+      } else {
+        $('#totp-dialog').close();
+        toast('2FA 已绑定');
+      }
     } catch (err) {
       errEl.textContent = err.message;
       errEl.classList.remove('hidden');
