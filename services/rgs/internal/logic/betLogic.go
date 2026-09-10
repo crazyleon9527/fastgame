@@ -110,6 +110,9 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 		}
 
 		go l.publishSettledEvent(req, outcome, balance)
+		if outcome.Multiplier >= 50 {
+			go l.publishBigWinEvent(req, outcome)
+		}
 		return nil
 	})
 	if err != nil {
@@ -157,6 +160,23 @@ func (l *BetLogic) publishSettledEvent(req *types.BetReq, outcome prng.Outcome, 
 	})
 	if err != nil {
 		logx.Errorf("publish round settled event failed: roundId=%s err=%v", req.RoundId, err)
+	}
+}
+
+func (l *BetLogic) publishBigWinEvent(req *types.BetReq, outcome prng.Outcome) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := l.svcCtx.Kafka.PublishBigWin(ctx, kafka.BigWinEvent{
+		RoundID:    req.RoundId,
+		UserID:     req.UserId,
+		MerchantID: req.MerchantId,
+		GameCode:   req.GameCode,
+		WinAmount:  outcome.WinAmount,
+		Multiplier: outcome.Multiplier,
+	})
+	if err != nil {
+		logx.Errorf("publish bigwin event failed: roundId=%s err=%v", req.RoundId, err)
 	}
 }
 

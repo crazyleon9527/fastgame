@@ -167,6 +167,19 @@ services:
     networks:
       - fastgame
 
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: fastgame-gateway
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-18000}:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - fastgame
+
   redisinsight:
     image: redis/redisinsight:latest
     container_name: fastgame-redisinsight

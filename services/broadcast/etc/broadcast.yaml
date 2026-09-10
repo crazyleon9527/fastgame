@@ -1,0 +1,7 @@
+Host: 0.0.0.0
+Port: 18900
+
+Kafka:
+  Brokers:
+    - localhost:19092
+  GroupID: fastgame-broadcast
