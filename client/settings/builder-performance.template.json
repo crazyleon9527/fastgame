@@ -1,0 +1,44 @@
+{
+  "_comment": "复制到 Cocos 项目 settings/v2/packages/builder.json 并合并分包配置",
+  "bundleConfig": {
+    "core": {
+      "displayName": "Core (<3MB)",
+      "priority": 10,
+      "paths": [
+        "assets/scenes/Loading",
+        "assets/scenes/Game",
+        "assets/textures/atlas/core-2048",
+        "assets/prefabs/hud",
+        "assets/prefabs/fish-common",
+        "assets/prefabs/coin",
+        "assets/prefabs/bubble",
+        "assets/spine/fish-common"
+      ]
+    },
+    "boss": {
+      "displayName": "Boss & Epic",
+      "priority": 5,
+      "paths": [
+        "assets/spine/fish-boss",
+        "assets/audio/epic",
+        "assets/prefabs/fish-boss"
+      ]
+    },
+    "audio": {
+      "displayName": "Audio Optional",
+      "priority": 1,
+      "paths": ["assets/audio/ambient"]
+    }
+  },
+  "web-mobile": {
+    "embedWebDebugger": false,
+    "orientation": "landscape",
+    "md5Cache": true,
+    "compressTexture": true,
+    "packAutoAtlas": true,
+    "mergeStartScene": false,
+    "mainBundleCompressionType": "merge_dep",
+    "mainBundleIsRemote": false,
+    "bundleCommonChunk": true
+  }
+}

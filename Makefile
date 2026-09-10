@@ -1,4 +1,4 @@
-.PHONY: up down restart ps logs init clean run-rgs run-consumer run-rollback run-admin run-broadcast build install-goctl codegen seed seed-admin migrate-security migrate-wallet migrate-replay migrate-orphan-trace obfuscate-client fetch-cf-ips
+.PHONY: up down restart ps logs init clean run-rgs run-consumer run-rollback run-admin run-broadcast build install-goctl codegen seed seed-admin migrate-security migrate-wallet migrate-replay migrate-orphan-trace obfuscate-client compress-client-brotli deploy-client fetch-cf-ips
 
 seed:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/02-seed.sql
@@ -77,6 +77,14 @@ run-broadcast: build
 
 obfuscate-client:
 	cd client && npm install && chmod +x scripts/obfuscate-build.sh && ./scripts/obfuscate-build.sh
+
+compress-client-brotli:
+	cd client && chmod +x scripts/compress-brotli.sh && ./scripts/compress-brotli.sh
+
+deploy-client: obfuscate-client compress-client-brotli
+	rm -rf web/game/assets web/game/src web/game/cocos-js web/game/index.html 2>/dev/null || true
+	cp -R client/build/web-mobile/. web/game/
+	@echo "Game client deployed to web/game/ — restart gateway: docker compose up -d gateway"
 
 fetch-cf-ips:
 	chmod +x deploy/origin-shield/*.sh

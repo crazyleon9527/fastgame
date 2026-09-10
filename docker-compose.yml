@@ -169,13 +169,17 @@ services:
       - fastgame
 
   gateway:
-    image: nginx:1.27-alpine
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    image: fastgame-gateway:brotli
     container_name: fastgame-gateway
     restart: unless-stopped
     ports:
       - "${GATEWAY_PORT:-18000}:80"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/compression.conf:/etc/nginx/compression.conf:ro
       - ./docker/nginx/cloudflare-realip.conf:/etc/nginx/cloudflare-realip.conf:ro
       - ./docker/nginx/origin-shield.conf:/etc/nginx/origin-shield.conf:ro
       - ./docker/nginx/waf.conf:/etc/nginx/waf.conf:ro
@@ -184,6 +188,7 @@ services:
       - ./web/admin:/usr/share/nginx/admin:ro
       - ./web/verify:/usr/share/nginx/verify:ro
       - ./web/replay:/usr/share/nginx/replay:ro
+      - ./web/game:/usr/share/nginx/game:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

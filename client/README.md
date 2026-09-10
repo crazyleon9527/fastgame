@@ -14,21 +14,43 @@
 5. 启动后端：`make up && make seed && make run-rgs && make run-broadcast`，Gateway 随 `make up` 启动
 6. Cocos 预览运行
 
-## 生产构建与代码混淆
+## 性能与加载优化
 
-导出 Web Mobile 后，对游戏业务 JS 进行高强度混淆（控制流扁平化、变量替换、死代码注入）：
+| 模块 | 路径 | 说明 |
+|------|------|------|
+| 对象池 | `assets/scripts/pool/` | 鱼群 / 金币 / 气泡 NodePool，禁止循环内 instantiate |
+| Spine | `assets/scripts/animation/SpineFishController.ts` | 骨骼动画替代逐帧序列，包体 ↓70% |
+| 分包 | `assets/scripts/asset/AssetBundleLoader.ts` | core <3MB 首屏，boss 后台预加载 |
+| DrawCall | `assets/scripts/perf/DrawCallMonitor.ts` | 预算 ≤30，配合 TexturePacker 图集 |
+| 图集规范 | `texturepacker/README.md` | 1~2 张 2048² Sprite Sheet |
+
+Cocos Builder 分包模板见 `settings/builder-performance.template.json`。
+
+场景挂载建议：
+
+- 根节点 → `LoadingGate`（首屏 core 分包）→ 完成后显示 `FishingGameController`
+- `FishingGameController` 绑定 fish/coin/bubble Prefab、`SpineFishController`、`DrawCallMonitor`
+
+## 生产构建、混淆与 Brotli
 
 ```bash
-# 1. Cocos Creator: 项目 -> 构建 -> Web Mobile -> 构建
-# 2. 混淆导出产物
-cd client
-npm install
-chmod +x scripts/obfuscate-build.sh
-./scripts/obfuscate-build.sh build/web-mobile
+# 1. Cocos Creator: 构建 -> Web Mobile
+# 2. 一键部署到 Gateway（混淆 + Brotli 预压缩 + 拷贝到 web/game）
+make deploy-client
+# 3. 重建带 Brotli 模块的 Gateway
+docker compose build gateway && docker compose up -d gateway
 ```
 
-混淆目标：`assets/main/index.js`、`assets/internal/index.js`、`src/chunks/*.js`  
-**不会**混淆 Cocos 引擎 (`cocos-js/`)，避免破坏 runtime。
+访问：`http://localhost:18000/game/`
+
+单独步骤：
+
+```bash
+cd client && ./scripts/obfuscate-build.sh build/web-mobile
+cd client && ./scripts/compress-brotli.sh build/web-mobile
+```
+
+Nginx 开启 `brotli` + `brotli_static`，较 gzip 额外节省 15%~25% 传输体积。
 
 配置见 `obfuscator.config.json`，也可通过 `make obfuscate-client` 执行。
 

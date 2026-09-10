@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>FastGame · 深海钓鱼</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #0a1628 0%, #1a3a5c 100%);
+      color: #e0f7fa;
+      font-family: system-ui, sans-serif;
+    }
+    .card {
+      text-align: center;
+      padding: 2rem;
+      max-width: 420px;
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 0.75rem; }
+    p { opacity: 0.85; line-height: 1.6; font-size: 0.95rem; }
+    code {
+      display: block;
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: rgba(0,0,0,0.35);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      text-align: left;
+      white-space: pre-wrap;
+    }
+    .loader {
+      width: 48px; height: 48px;
+      border: 3px solid rgba(255,255,255,0.2);
+      border-top-color: #4fc3f7;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1.25rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="loader" aria-hidden="true"></div>
+    <h1>游戏客户端待部署</h1>
+    <p>Cocos Creator 导出 Web Mobile 后，执行以下命令将产物部署到 Gateway：</p>
+    <code>make deploy-client</code>
+    <p style="margin-top:1rem;font-size:0.85rem;opacity:0.7">部署后访问 /game/ 即可加载 H5 游戏</p>
+  </div>
+</body>
+</html>
