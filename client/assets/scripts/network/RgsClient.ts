@@ -1,5 +1,6 @@
 import { GameConfig } from '../config/GameConfig';
 import { RequestSigner } from './RequestSigner';
+import { SecureEnvelope } from './SecureEnvelope';
 import { GameSession, SessionInfo } from './GameSession';
 
 /** 客户端仅上报：action(cast) + betAmount(minor) + roundId + sequenceId */
@@ -107,7 +108,30 @@ export class RgsClient {
     async bet(req: BetRequest): Promise<BetResponse> {
         const path = '/api/v1/game/bet';
         const body = JSON.stringify(req);
-        return this.signedPost(path, body);
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Timestamp': timestamp };
+
+        if (this.merchantSecret) {
+            const nonce = crypto.randomUUID();
+            const payload = RequestSigner.buildPayload('POST', path, body, timestamp, nonce);
+            headers['X-Nonce'] = nonce;
+            headers['X-Signature'] = await RequestSigner.sign(this.merchantSecret, payload);
+        }
+
+        const sessionSign = await SecureEnvelope.sign(
+            this.session.dynamicSessionKey,
+            req.roundId,
+            req.action,
+            timestamp,
+        );
+        headers['X-Session-Sign'] = sessionSign;
+
+        const resp = await fetch(`${this.baseUrl}${path}`, { method: 'POST', headers, body });
+        if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(`request failed: ${resp.status} ${text}`);
+        }
+        return resp.json();
     }
 
     async fetchReplay(roundId: string): Promise<ReplayResponse> {

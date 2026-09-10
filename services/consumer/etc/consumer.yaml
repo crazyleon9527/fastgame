@@ -13,6 +13,15 @@ ClickHouse:
 MySQL:
   DataSource: fastgame:fastgame_pass@tcp(localhost:13306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC
 
+Redis:
+  Addr: localhost:16379
+
+RtpWatch:
+  Enabled: true
+  GlobalMax: 10000
+  PlayerMax: 200
+  ThresholdPPM: 1800000
+
 Batch:
   MaxSize: 2000
   Interval: 1s

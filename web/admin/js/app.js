@@ -1,6 +1,6 @@
 (() => {
   const TYPE_LABELS = { ip: 'IP', user_id: '用户 ID', merchant: '商户' };
-  const TAB_TITLES = { blacklist: '风控黑名单', merchants: '商户密钥轮换', whitelist: 'IP 白名单', trace: 'Trace 追踪' };
+  const TAB_TITLES = { blacklist: '风控黑名单', merchants: '商户密钥轮换', whitelist: 'IP 白名单', trace: 'Trace 追踪', alerts: 'RTP 风控告警' };
 
   let activeTab = 'blacklist';
 
@@ -41,11 +41,36 @@
     $('#panel-merchants').classList.toggle('hidden', tab !== 'merchants');
     $('#panel-whitelist').classList.toggle('hidden', tab !== 'whitelist');
     $('#panel-trace').classList.toggle('hidden', tab !== 'trace');
+    $('#panel-alerts').classList.toggle('hidden', tab !== 'alerts');
     $('#page-subtitle').textContent = TAB_TITLES[tab] || '';
 
     if (tab === 'blacklist') loadBlacklist();
     if (tab === 'merchants') loadMerchants();
     if (tab === 'whitelist') loadWhitelist();
+    if (tab === 'alerts') loadRiskAlerts();
+  }
+
+  async function loadRiskAlerts() {
+    const tbody = $('#alerts-tbody');
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">加载中…</td></tr>';
+    try {
+      const data = await AdminAPI.listRiskAlerts(50);
+      const list = data.list || [];
+      tbody.innerHTML = list.length ? list.map((a) => `
+        <tr>
+          <td>${formatTime(a.createdAt)}</td>
+          <td>${escapeHtml(a.scopeType)}</td>
+          <td><code>${escapeHtml(a.scopeValue)}</code></td>
+          <td>${escapeHtml(a.gameCode || '—')}</td>
+          <td>${(a.rtpPpm / 10000).toFixed(1)}%</td>
+          <td>${a.sampleSize}</td>
+          <td>${escapeHtml(a.actionTaken)}</td>
+          <td><span class="badge inactive">${escapeHtml(a.status)}</span></td>
+        </tr>`).join('') : '<tr><td colspan="8" class="empty">暂无 open 告警</td></tr>';
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="8" class="empty error">${escapeHtml(err.message)}</td></tr>`;
+      handleAuthError(err);
+    }
   }
 
   async function lookupTrace() {
@@ -325,7 +350,7 @@
     const errEl = $('#login-error');
     errEl.classList.add('hidden');
     try {
-      const resp = await AdminAPI.login($('#username').value, $('#password').value);
+      const resp = await AdminAPI.login($('#username').value, $('#password').value, $('#totp-code').value.trim());
       AdminAPI.setToken(resp.accessToken);
       $('#user-label').textContent = $('#username').value;
       show('main');

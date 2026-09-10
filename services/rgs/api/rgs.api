@@ -15,11 +15,12 @@ type (
 		ClientSeed string `json:"clientSeed,optional"`
 	}
 	SessionResp {
-		SessionToken   string `json:"sessionToken"`
-		ServerSeedHash string `json:"serverSeedHash"`
-		ClientSeed     string `json:"clientSeed"`
-		NextSequenceId uint64 `json:"nextSequenceId"`
-		ExpiresAt      int64  `json:"expiresAt"`
+		SessionToken      string `json:"sessionToken"`
+		ServerSeedHash    string `json:"serverSeedHash"`
+		ClientSeed        string `json:"clientSeed"`
+		DynamicSessionKey string `json:"dynamicSessionKey"`
+		NextSequenceId    uint64 `json:"nextSequenceId"`
+		ExpiresAt         int64  `json:"expiresAt"`
 	}
 	// 客户端仅上报：action(cast) + betAmount + roundId + sequenceId
 	BetReq {

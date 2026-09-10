@@ -5,6 +5,7 @@ export interface SessionInfo {
     sessionToken: string;
     serverSeedHash: string;
     clientSeed: string;
+    dynamicSessionKey: string;
     nextSequenceId: number;
     expiresAt: number;
 }
@@ -35,6 +36,11 @@ export class GameSession {
 
     get clientSeed(): string {
         return this.info?.clientSeed ?? '';
+    }
+
+    get dynamicSessionKey(): string {
+        if (!this.info?.dynamicSessionKey) throw new Error('dynamic session key missing');
+        return this.info.dynamicSessionKey;
     }
 
     isExpired(): boolean {

@@ -28,12 +28,21 @@ func NewLoginLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginLogic 
 }
 
 func (l *LoginLogic) Login(req *types.LoginReq) (*types.LoginResp, error) {
-	user, err := l.svcCtx.AdminUsers.FindOneByUsername(l.ctx, req.Username)
+	user, err := l.svcCtx.AdminAuth.FindByUsername(l.ctx, req.Username)
 	if err != nil {
 		return nil, errors.New("invalid username or password")
 	}
 	if user.Status != 1 || !auth.CheckPassword(user.PasswordHash, req.Password) {
 		return nil, errors.New("invalid username or password")
+	}
+
+	if user.TotpEnabled == 1 {
+		if req.TotpCode == "" {
+			return nil, errors.New("totp code required")
+		}
+		if !user.TotpSecret.Valid || !auth.VerifyTOTP(user.TotpSecret.String, req.TotpCode) {
+			return nil, errors.New("invalid totp code")
+		}
 	}
 
 	now := time.Now().Unix()

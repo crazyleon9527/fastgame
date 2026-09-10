@@ -21,11 +21,12 @@ type SessionReq struct {
 }
 
 type SessionResp struct {
-	SessionToken   string `json:"sessionToken"`
-	ServerSeedHash string `json:"serverSeedHash"`
-	ClientSeed     string `json:"clientSeed"`
-	NextSequenceId uint64 `json:"nextSequenceId"`
-	ExpiresAt      int64  `json:"expiresAt"`
+	SessionToken      string `json:"sessionToken"`
+	ServerSeedHash    string `json:"serverSeedHash"`
+	ClientSeed        string `json:"clientSeed"`
+	DynamicSessionKey string `json:"dynamicSessionKey"`
+	NextSequenceId    uint64 `json:"nextSequenceId"`
+	ExpiresAt         int64  `json:"expiresAt"`
 }
 
 type BetReq struct {

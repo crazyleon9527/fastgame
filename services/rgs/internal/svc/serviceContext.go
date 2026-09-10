@@ -62,6 +62,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Guard: security.NewGuard(security.Config{
 			SkipSignVerify:   c.Security.SkipSignVerify,
 			TimestampWindow:  c.Security.TimestampWindow(),
+			MaxClockSkew:     c.Security.MaxClockSkew(),
 			MinResponseDelay: c.Security.MinResponseDelay(),
 		}, merchants, rdb),
 		RateLimit: ratelimit.NewGateway(

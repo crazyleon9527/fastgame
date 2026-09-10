@@ -23,6 +23,7 @@ const (
 type Config struct {
 	SkipSignVerify   bool
 	TimestampWindow  time.Duration
+	MaxClockSkew     time.Duration
 	MinResponseDelay time.Duration
 }
 
@@ -31,6 +32,7 @@ type Guard struct {
 	merchants model.MerchantsModel
 	replay    *ReplayGuard
 	blacklist *Blacklist
+	suspend   *SuspendStore
 	whitelist *IPWhitelist
 	waf       *WAF
 }
@@ -39,11 +41,16 @@ func NewGuard(cfg Config, merchants model.MerchantsModel, redis *redis.Client) *
 	if cfg.TimestampWindow <= 0 {
 		cfg.TimestampWindow = 60 * time.Second
 	}
+	maxSkew := cfg.MaxClockSkew
+	if maxSkew <= 0 {
+		maxSkew = 5 * time.Second
+	}
 	return &Guard{
 		cfg:       cfg,
 		merchants: merchants,
-		replay:    NewReplayGuard(redis, cfg.TimestampWindow, 5*time.Minute),
+		replay:    NewReplayGuard(redis, cfg.TimestampWindow, maxSkew, 5*time.Minute),
 		blacklist: NewBlacklist(redis),
+		suspend:   NewSuspendStore(redis),
 		whitelist: NewIPWhitelist(merchants, redis),
 		waf:       NewWAF(),
 	}
@@ -67,7 +74,32 @@ func (g *Guard) CheckAccess(ctx context.Context, clientIP, merchantID string, us
 	if err := g.blacklist.CheckAccess(ctx, clientIP, merchantID, userID); err != nil {
 		return err
 	}
+	suspended, err := g.suspend.IsUserSuspended(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if suspended {
+		return fmt.Errorf("user suspended pending audit")
+	}
 	return g.whitelist.Check(ctx, merchantID, clientIP)
+}
+
+func (g *Guard) CheckGameFlagged(ctx context.Context, merchantID, gameCode string) error {
+	flagged, err := g.suspend.IsGameFlagged(ctx, merchantID, gameCode)
+	if err != nil {
+		return err
+	}
+	if flagged {
+		return fmt.Errorf("game flagged pending audit")
+	}
+	return nil
+}
+
+func (g *Guard) VerifySessionEnvelope(dynamicKey, roundID, action, timestamp, signature string) error {
+	if g.cfg.SkipSignVerify {
+		return nil
+	}
+	return VerifyEnvelope(dynamicKey, roundID, action, timestamp, signature)
 }
 
 func (g *Guard) CheckBet(ctx context.Context, in BetCheckInput, limits validator.BetLimits, betAmountMinor int64) error {

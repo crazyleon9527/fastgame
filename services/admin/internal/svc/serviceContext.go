@@ -20,7 +20,9 @@ type ServiceContext struct {
 	Config         config.Config
 	AuthMiddleware rest.Middleware
 	AdminUsers     model.AdminUsersModel
+	AdminAuth      model.AdminAuthModel
 	Merchants      model.MerchantsModel
+	RiskAlerts     model.RiskAlertsModel
 	GameConfigs    model.GameConfigsModel
 	RiskBlacklist  model.RiskBlacklistModel
 	Blacklist      *security.Blacklist
@@ -45,7 +47,9 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		Config:         c,
 		AuthMiddleware: middleware.NewAuthMiddleware().Handle,
 		AdminUsers:     model.NewAdminUsersModel(conn),
+		AdminAuth:      model.NewAdminAuthModel(conn),
 		Merchants:      merchantsModel,
+		RiskAlerts:     model.NewRiskAlertsModel(conn),
 		GameConfigs:    model.NewGameConfigsModel(conn),
 		RiskBlacklist:  blacklistModel,
 		Blacklist:      blacklist,

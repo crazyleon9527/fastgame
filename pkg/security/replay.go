@@ -10,25 +10,23 @@ import (
 )
 
 type ReplayGuard struct {
-	client *redis.Client
-	window time.Duration
-	ttl    time.Duration
+	client   *redis.Client
+	window   time.Duration
+	maxSkew  time.Duration
+	ttl      time.Duration
 }
 
-func NewReplayGuard(client *redis.Client, window, ttl time.Duration) *ReplayGuard {
+func NewReplayGuard(client *redis.Client, window, maxSkew, ttl time.Duration) *ReplayGuard {
 	if window <= 0 {
 		window = 60 * time.Second
 	}
-	if window < 30*time.Second {
-		window = 30 * time.Second
-	}
-	if window > 60*time.Second {
-		window = 60 * time.Second
+	if maxSkew <= 0 {
+		maxSkew = 5 * time.Second
 	}
 	if ttl <= 0 {
 		ttl = 5 * time.Minute
 	}
-	return &ReplayGuard{client: client, window: window, ttl: ttl}
+	return &ReplayGuard{client: client, window: window, maxSkew: maxSkew, ttl: ttl}
 }
 
 func (g *ReplayGuard) Validate(ctx context.Context, timestamp, nonce string) error {
@@ -42,7 +40,14 @@ func (g *ReplayGuard) Validate(ctx context.Context, timestamp, nonce string) err
 	}
 
 	now := time.Now().Unix()
-	if ts < now-int64(g.window.Seconds()) || ts > now+30 {
+	delta := ts - now
+	if delta < 0 {
+		delta = -delta
+	}
+	if delta > int64(g.maxSkew.Seconds()) {
+		return fmt.Errorf("clock skew exceeded")
+	}
+	if ts < now-int64(g.window.Seconds()) || ts > now+int64(g.maxSkew.Seconds()) {
 		return fmt.Errorf("timestamp expired")
 	}
 

@@ -1,4 +1,4 @@
-.PHONY: up down restart ps logs init clean run-rgs run-consumer run-rollback run-admin run-broadcast build install-goctl codegen seed seed-admin migrate-security migrate-wallet migrate-replay migrate-orphan-trace obfuscate-client compress-client-brotli deploy-client fetch-cf-ips
+.PHONY: up down restart ps logs init clean run-rgs run-consumer run-rollback run-admin run-broadcast build install-goctl codegen seed seed-admin migrate-security migrate-wallet migrate-replay migrate-orphan-trace migrate-antiabuse obfuscate-client compress-client-brotli deploy-client fetch-cf-ips
 
 seed:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/02-seed.sql
@@ -11,6 +11,9 @@ migrate-wallet:
 
 migrate-replay:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/05-replay-migration.sql
+
+migrate-antiabuse:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/07-antiabuse-migration.sql
 
 migrate-orphan-trace:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/06-orphan-trace-migration.sql

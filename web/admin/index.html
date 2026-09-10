@@ -22,6 +22,10 @@
             密码
             <input type="password" id="password" value="admin123" autocomplete="current-password" required />
           </label>
+          <label>
+            Google Authenticator (TOTP)
+            <input type="text" id="totp-code" inputmode="numeric" autocomplete="one-time-code" placeholder="启用 2FA 时必填" />
+          </label>
           <button type="submit" class="btn primary">登录</button>
           <p id="login-error" class="error hidden"></p>
         </form>
@@ -50,6 +54,7 @@
           <button class="nav-item" data-tab="merchants">商户密钥轮换</button>
           <button class="nav-item" data-tab="whitelist">IP 白名单</button>
           <button class="nav-item" data-tab="trace">Trace 追踪</button>
+          <button class="nav-item" data-tab="alerts">RTP 告警</button>
           <a class="nav-item nav-link" href="/verify/" target="_blank" rel="noopener">Provably Fair 验算 ↗</a>
           <a class="nav-item nav-link" href="/replay/" target="_blank" rel="noopener">确定性回放 ↗</a>
         </nav>
@@ -189,6 +194,20 @@
               <button id="whitelist-prev-page" class="btn" disabled>上一页</button>
               <span id="whitelist-page-info">第 1 页</span>
               <button id="whitelist-next-page" class="btn">下一页</button>
+            </div>
+          </section>
+
+          <!-- RTP 风控告警 -->
+          <section id="panel-alerts" class="panel hidden">
+            <div class="alert info">
+              <strong>RTP 看门狗</strong>
+              <p>最近 10,000 局 / 单玩家 200 局窗口 RTP 超过 180% 时自动挂起并写入告警。</p>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>时间</th><th>范围</th><th>对象</th><th>游戏</th><th>RTP</th><th>样本</th><th>动作</th><th>状态</th></tr></thead>
+                <tbody id="alerts-tbody"></tbody>
+              </table>
             </div>
           </section>
 

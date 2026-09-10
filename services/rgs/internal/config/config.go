@@ -76,9 +76,17 @@ type GameConf struct {
 type SecurityConf struct {
 	SkipSignVerify     bool
 	TimestampWindowSec int
+	MaxClockSkewSec    int
 	UserLimitPerSec    int
 	IPLimitPerSec      int
 	MinResponseDelayMs int
+}
+
+func (c SecurityConf) MaxClockSkew() time.Duration {
+	if c.MaxClockSkewSec <= 0 {
+		return 5 * time.Second
+	}
+	return time.Duration(c.MaxClockSkewSec) * time.Second
 }
 
 func (c SecurityConf) TimestampWindow() time.Duration {

@@ -4,6 +4,8 @@ type Config struct {
 	Kafka      KafkaConf
 	ClickHouse ClickHouseConf
 	MySQL      MySQLConf
+	Redis      RedisConf
+	RtpWatch   RtpWatchConf
 	Batch      BatchConf
 }
 
@@ -22,6 +24,17 @@ type ClickHouseConf struct {
 
 type MySQLConf struct {
 	DataSource string
+}
+
+type RedisConf struct {
+	Addr string
+}
+
+type RtpWatchConf struct {
+	Enabled      bool
+	GlobalMax    int
+	PlayerMax    int
+	ThresholdPPM int64
 }
 
 type BatchConf struct {

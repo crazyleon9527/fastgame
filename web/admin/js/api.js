@@ -46,8 +46,12 @@ const AdminAPI = (() => {
     clearToken,
     isLoggedIn: () => !!getToken(),
 
-    login(username, password) {
-      return request('POST', '/api/v1/admin/login', { username, password });
+    login(username, password, totpCode = '') {
+      return request('POST', '/api/v1/admin/login', { username, password, totpCode: totpCode || undefined });
+    },
+
+    listRiskAlerts(limit = 50) {
+      return request('GET', `/api/v1/admin/risk-alerts?limit=${limit}`);
     },
 
     listBlacklist({ listType = '', page = 1, pageSize = 20 } = {}) {

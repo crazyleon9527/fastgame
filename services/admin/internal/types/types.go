@@ -31,6 +31,31 @@ type GameConfigListResp struct {
 type LoginReq struct {
 	Username string `json:"username" validate:"required"`
 	Password string `json:"password" validate:"required"`
+	TotpCode string `json:"totpCode,optional"`
+}
+
+type RiskAlertsReq struct {
+	Limit int `form:"limit,default=50"`
+}
+
+type RiskAlertItem struct {
+	Id           uint64 `json:"id"`
+	AlertType    string `json:"alertType"`
+	ScopeType    string `json:"scopeType"`
+	ScopeValue   string `json:"scopeValue"`
+	MerchantCode string `json:"merchantCode"`
+	GameCode     string `json:"gameCode"`
+	RtpPPM       int64  `json:"rtpPpm"`
+	TotalBet     int64  `json:"totalBet"`
+	TotalWin     int64  `json:"totalWin"`
+	SampleSize   int64  `json:"sampleSize"`
+	ActionTaken  string `json:"actionTaken"`
+	Status       string `json:"status"`
+	CreatedAt    int64  `json:"createdAt"`
+}
+
+type RiskAlertsResp struct {
+	List []RiskAlertItem `json:"list"`
 }
 
 type LoginResp struct {

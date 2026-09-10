@@ -15,14 +15,15 @@ import (
 const defaultTTL = 24 * time.Hour
 
 type Data struct {
-	Token          string `json:"token"`
-	UserID         uint64 `json:"userId"`
-	MerchantID     string `json:"merchantId"`
-	GameCode       string `json:"gameCode"`
-	ServerSeed     string `json:"serverSeed"`
-	ServerSeedHash string `json:"serverSeedHash"`
-	ClientSeed     string `json:"clientSeed"`
-	NextSequence   uint64 `json:"nextSequence"`
+	Token             string `json:"token"`
+	UserID            uint64 `json:"userId"`
+	MerchantID        string `json:"merchantId"`
+	GameCode          string `json:"gameCode"`
+	ServerSeed        string `json:"serverSeed"`
+	ServerSeedHash    string `json:"serverSeedHash"`
+	ClientSeed        string `json:"clientSeed"`
+	NextSequence      uint64 `json:"nextSequence"`
+	DynamicSessionKey string `json:"dynamicSessionKey"`
 }
 
 type Store struct {
@@ -78,15 +79,21 @@ func (s *Store) Create(ctx context.Context, merchantID string, userID uint64, ga
 		}
 	}
 
+	dynamicKey, err := GenerateToken()
+	if err != nil {
+		return nil, err
+	}
+
 	data := &Data{
-		Token:          token,
-		UserID:         userID,
-		MerchantID:     merchantID,
-		GameCode:       gameCode,
-		ServerSeed:     serverSeed,
-		ServerSeedHash: HashSeed(serverSeed),
-		ClientSeed:     clientSeed,
-		NextSequence:   1,
+		Token:             token,
+		UserID:            userID,
+		MerchantID:        merchantID,
+		GameCode:          gameCode,
+		ServerSeed:        serverSeed,
+		ServerSeedHash:    HashSeed(serverSeed),
+		ClientSeed:        clientSeed,
+		NextSequence:      1,
+		DynamicSessionKey: dynamicKey,
 	}
 
 	raw, err := json.Marshal(data)

@@ -9,6 +9,7 @@ import (
 	"fastgame/pkg/batch"
 	"fastgame/pkg/clickhouse"
 	"fastgame/pkg/kafka"
+	"fastgame/pkg/rtpwatchdog"
 	"fastgame/services/consumer/internal/svc"
 
 	kafkago "github.com/segmentio/kafka-go"
@@ -49,11 +50,15 @@ func (w *Worker) Run(ctx context.Context) error {
 			continue
 		}
 
-		row, err := w.parseMessage(msg.Value)
+		row, evt, err := w.parseMessage(msg.Value)
 		if err != nil {
 			logx.Errorf("parse message: %v", err)
 			_ = w.reader.CommitMessages(ctx, msg)
 			continue
+		}
+
+		if w.svcCtx.Config.RtpWatch.Enabled {
+			w.evaluateRtp(ctx, evt)
 		}
 
 		if err := w.batch.Add(ctx, row); err != nil {
@@ -67,15 +72,30 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 }
 
-func (w *Worker) parseMessage(raw []byte) (clickhouse.RoundSettledRow, error) {
+func (w *Worker) evaluateRtp(ctx context.Context, evt kafka.RoundSettledEvent) {
+	alerts := w.svcCtx.Watchdog.Record(rtpwatchdog.RecordInput{
+		MerchantCode: evt.MerchantID,
+		GameCode:     evt.GameCode,
+		UserID:       evt.UserID,
+		BetMinor:     evt.BetAmount,
+		WinMinor:     evt.WinAmount,
+	})
+	for _, alert := range alerts {
+		if err := w.svcCtx.Enforcer.Handle(ctx, alert); err != nil {
+			logx.Errorf("rtp enforcer: %v", err)
+		}
+	}
+}
+
+func (w *Worker) parseMessage(raw []byte) (clickhouse.RoundSettledRow, kafka.RoundSettledEvent, error) {
 	var evt kafka.RoundSettledEvent
 	if err := json.Unmarshal(raw, &evt); err != nil {
-		return clickhouse.RoundSettledRow{}, err
+		return clickhouse.RoundSettledRow{}, evt, err
 	}
 
 	merchantID, err := w.resolveMerchantID(evt.MerchantID)
 	if err != nil {
-		return clickhouse.RoundSettledRow{}, err
+		return clickhouse.RoundSettledRow{}, evt, err
 	}
 
 	return clickhouse.RoundSettledRow{
@@ -91,7 +111,7 @@ func (w *Worker) parseMessage(raw []byte) (clickhouse.RoundSettledRow, error) {
 		RtpTier:      evt.RtpTier,
 		BalanceAfter: evt.Balance,
 		SettledAt:    evt.SettledAt,
-	}, nil
+	}, evt, nil
 }
 
 func (w *Worker) resolveMerchantID(merchantIDOrCode string) (uint64, error) {

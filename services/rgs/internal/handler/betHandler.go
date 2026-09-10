@@ -49,6 +49,28 @@ func BetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 
+		if err := svcCtx.Guard.CheckGameFlagged(r.Context(), req.MerchantId, req.GameCode); err != nil {
+			writeSecurityError(w, r, err)
+			return
+		}
+
+		sessionData, err := svcCtx.Session.Get(r.Context(), req.SessionToken)
+		if err != nil {
+			writeBetError(w, r, http.StatusUnauthorized, xerr.ErrInvalidSession)
+			return
+		}
+		ts := r.Header.Get(security.HeaderTimestamp)
+		if err := svcCtx.Guard.VerifySessionEnvelope(
+			sessionData.DynamicSessionKey,
+			req.RoundId,
+			req.Action,
+			ts,
+			r.Header.Get(security.HeaderSessionSign),
+		); err != nil {
+			writeSecurityError(w, r, err)
+			return
+		}
+
 		limits := security.ParseBetLimits(gameCfg.Raw)
 		if err := svcCtx.Guard.CheckBet(r.Context(), security.BetCheckInput{
 			Method:     r.Method,
@@ -113,8 +135,12 @@ func writeSecurityError(w http.ResponseWriter, r *http.Request, err error) {
 		writeBetError(w, r, http.StatusForbidden, xerr.ErrBlocked)
 	case strings.Contains(err.Error(), "rate limit"):
 		writeBetError(w, r, http.StatusTooManyRequests, xerr.ErrRateLimited)
-	case strings.Contains(err.Error(), "signature"), strings.Contains(err.Error(), "nonce"), strings.Contains(err.Error(), "timestamp"):
+	case strings.Contains(err.Error(), "signature"), strings.Contains(err.Error(), "nonce"),
+		strings.Contains(err.Error(), "timestamp"), strings.Contains(err.Error(), "clock skew"),
+		strings.Contains(err.Error(), "envelope"):
 		writeBetError(w, r, http.StatusUnauthorized, xerr.ErrUnauthorized)
+	case strings.Contains(err.Error(), "suspended"), strings.Contains(err.Error(), "flagged"):
+		writeBetError(w, r, http.StatusForbidden, xerr.ErrBlocked)
 	default:
 		writeBetError(w, r, http.StatusBadRequest, xerr.ErrInvalidRequest)
 	}

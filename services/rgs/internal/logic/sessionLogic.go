@@ -31,10 +31,11 @@ func (l *SessionLogic) CreateSession(req *types.SessionReq) (*types.SessionResp,
 	}
 
 	return &types.SessionResp{
-		SessionToken:   data.Token,
-		ServerSeedHash: data.ServerSeedHash,
-		ClientSeed:     data.ClientSeed,
-		NextSequenceId: data.NextSequence,
-		ExpiresAt:      time.Now().UTC().Add(l.svcCtx.Config.Session.TTL()).Unix(),
+		SessionToken:      data.Token,
+		ServerSeedHash:    data.ServerSeedHash,
+		ClientSeed:        data.ClientSeed,
+		DynamicSessionKey: data.DynamicSessionKey,
+		NextSequenceId:    data.NextSequence,
+		ExpiresAt:         time.Now().UTC().Add(l.svcCtx.Config.Session.TTL()).Unix(),
 	}, nil
 }

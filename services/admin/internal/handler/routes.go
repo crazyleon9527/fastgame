@@ -92,6 +92,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Path:    "/traces/:traceId",
 					Handler: GetTraceHandler(serverCtx),
 				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/risk-alerts",
+					Handler: RiskAlertsHandler(serverCtx),
+				},
 			}...,
 		),
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
