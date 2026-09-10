@@ -148,6 +148,14 @@ input:focus, select:focus {
   font-weight: 600;
 }
 
+a.nav-link {
+  display: block;
+  text-decoration: none;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
 .panel.hidden { display: none; }
 
 .content {

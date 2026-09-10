@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FastGame Provably Fair 验算</title>
+  <link rel="stylesheet" href="/verify/css/style.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="brand">
+      <span class="logo">FG</span>
+      <div>
+        <strong>Provably Fair 验算工具</strong>
+        <small>玩家 / 运营均可独立验证每一局结果</small>
+      </div>
+    </div>
+    <nav>
+      <a href="/admin/">Admin 后台</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="intro card">
+      <h2>如何验证？</h2>
+      <ol>
+        <li>游戏开始前，服务端下发 <code>serverSeedHash</code>（SHA-256 承诺）</li>
+        <li>每局结束后，下注响应中的 <code>provablyFair</code> 会公开 <code>serverSeed</code></li>
+        <li>在本页填入种子与 <code>nonce</code>（即 roundId），点击验算</li>
+        <li>若 Hash 与 Roll 均匹配，则证明结果未被篡改</li>
+      </ol>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>验算参数</h2>
+        <form id="verify-form">
+          <label>
+            Server Seed *
+            <textarea id="server-seed" rows="2" placeholder="结算后从 provablyFair.serverSeed 获取" required></textarea>
+          </label>
+          <label>
+            Server Seed Hash (可选，用于校验 Seed 真实性)
+            <input type="text" id="server-seed-hash" placeholder="开局时下发的 serverSeedHash" />
+          </label>
+          <label>
+            Client Seed *
+            <input type="text" id="client-seed" placeholder="provablyFair.clientSeed" required />
+          </label>
+          <label>
+            Nonce / Round ID *
+            <input type="text" id="nonce" placeholder="provablyFair.nonce 或 roundId" required />
+          </label>
+          <label>
+            期望 Roll (可选，来自服务端返回值)
+            <input type="text" id="expected-roll" placeholder="如 0.7234123456789012" />
+          </label>
+          <label>
+            下注金额 (可选，用于推导派彩)
+            <input type="number" id="bet-amount" min="0" step="0.01" placeholder="10" />
+          </label>
+          <div class="actions">
+            <button type="submit" class="btn primary">验算</button>
+            <button type="button" id="clear-btn" class="btn">清空</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>验算结果</h2>
+        <div id="verify-result" class="result-card muted">
+          <p>填写参数后点击「验算」</p>
+        </div>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>从 API 响应导入</h2>
+      <p class="muted">粘贴 <code>/game/bet</code> 返回的 JSON（或其中的 <code>provablyFair</code> 对象）</p>
+      <textarea id="json-import" rows="6" placeholder='{"roundId":"...","betAmount":10,"provablyFair":{...}}'></textarea>
+      <button type="button" id="import-json-btn" class="btn">导入 JSON</button>
+    </section>
+  </main>
+
+  <footer class="footer">
+    FastGame · 算法与 RGS <code>pkg/prng/provably_fair.go</code> 完全一致 · 纯浏览器本地计算，不上传任何数据
+  </footer>
+
+  <script type="module" src="/verify/js/app.js"></script>
+</body>
+</html>

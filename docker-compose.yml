@@ -178,6 +178,7 @@ services:
       - ./docker/nginx/waf.conf:/etc/nginx/waf.conf:ro
       - ./docker/nginx/waf-blocks.conf:/etc/nginx/waf-blocks.conf:ro
       - ./web/admin:/usr/share/nginx/admin:ro
+      - ./web/verify:/usr/share/nginx/verify:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

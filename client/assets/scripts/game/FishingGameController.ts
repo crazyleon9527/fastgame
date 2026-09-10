@@ -71,7 +71,7 @@ export class FishingGameController extends Component {
             this.hud?.setBalance(result.balance);
             this.hud?.setWin(result.winAmount, result.multiplier);
             this.hud?.setStatus(this.statusText(result));
-            console.info('[ProvablyFair]', result.provablyFair);
+            this.logVerifyLink(result);
         } catch (err) {
             console.error('[FishingGame]', err);
             this.hud?.setStatus(`请求失败: ${(err as Error).message}`);
@@ -148,5 +148,21 @@ export class FishingGameController extends Component {
 
     private wait(seconds: number): Promise<void> {
         return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+    }
+
+    /** 控制台输出验算链接，玩家可复制到浏览器验证 */
+    private logVerifyLink(result: BetResponse): void {
+        const pf = result.provablyFair;
+        if (!pf) return;
+        const base = GameConfig.gatewayUrl.replace(/\/$/, '');
+        const params = new URLSearchParams({
+            serverSeed: pf.serverSeed,
+            serverSeedHash: pf.serverSeedHash,
+            clientSeed: pf.clientSeed,
+            nonce: pf.nonce,
+            roll: String(pf.roll),
+            betAmount: String(GameConfig.defaultBet),
+        });
+        console.info(`[ProvablyFair] 验算: ${base}/verify/?${params.toString()}`);
     }
 }
