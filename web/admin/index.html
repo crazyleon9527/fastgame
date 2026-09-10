@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FastGame 风控黑名单</title>
+  <link rel="stylesheet" href="/admin/css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 登录 -->
+    <section id="login-view" class="view">
+      <div class="login-card">
+        <h1>FastGame Admin</h1>
+        <p class="subtitle">风控黑名单管理</p>
+        <form id="login-form">
+          <label>
+            用户名
+            <input type="text" id="username" value="admin" autocomplete="username" required />
+          </label>
+          <label>
+            密码
+            <input type="password" id="password" value="admin123" autocomplete="current-password" required />
+          </label>
+          <button type="submit" class="btn primary">登录</button>
+          <p id="login-error" class="error hidden"></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- 主界面 -->
+    <section id="main-view" class="view hidden">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo">FG</span>
+          <div>
+            <strong>风控黑名单</strong>
+            <small>Risk Blacklist</small>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span id="user-label"></span>
+          <button id="logout-btn" class="btn ghost">退出</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="toolbar">
+          <div class="filters">
+            <label>
+              类型
+              <select id="filter-type">
+                <option value="">全部</option>
+                <option value="ip">IP</option>
+                <option value="user_id">用户 ID</option>
+                <option value="merchant">商户</option>
+              </select>
+            </label>
+            <button id="refresh-btn" class="btn">刷新</button>
+          </div>
+          <button id="add-btn" class="btn primary">+ 添加封禁</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat-card">
+            <span class="stat-label">当前页记录</span>
+            <span id="stat-count" class="stat-value">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">总计</span>
+            <span id="stat-total" class="stat-value">0</span>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>类型</th>
+                <th>值</th>
+                <th>原因</th>
+                <th>状态</th>
+                <th>过期时间</th>
+                <th>创建时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="blacklist-body">
+              <tr><td colspan="8" class="empty">加载中…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <button id="prev-page" class="btn" disabled>上一页</button>
+          <span id="page-info">第 1 页</span>
+          <button id="next-page" class="btn">下一页</button>
+        </div>
+      </main>
+    </section>
+
+    <!-- 添加弹窗 -->
+    <dialog id="add-dialog">
+      <form id="add-form" method="dialog">
+        <h2>添加封禁</h2>
+        <label>
+          类型 *
+          <select id="add-type" required>
+            <option value="ip">IP 地址</option>
+            <option value="user_id">用户 ID</option>
+            <option value="merchant">商户编码</option>
+          </select>
+        </label>
+        <label>
+          值 *
+          <input type="text" id="add-value" placeholder="如 203.0.113.50 或 10001 或 m001" required />
+        </label>
+        <label>
+          原因
+          <input type="text" id="add-reason" placeholder="CC 攻击 / 刷钱 / 恶意脚本" />
+        </label>
+        <label>
+          过期时间 (可选, UTC)
+          <input type="datetime-local" id="add-expires" />
+          <small>留空表示永久封禁</small>
+        </label>
+        <p id="add-error" class="error hidden"></p>
+        <div class="dialog-actions">
+          <button type="button" id="cancel-add" class="btn">取消</button>
+          <button type="submit" class="btn primary">确认封禁</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- 删除确认 -->
+    <dialog id="confirm-dialog">
+      <p id="confirm-text">确定解除该封禁？</p>
+      <div class="dialog-actions">
+        <button type="button" id="cancel-delete" class="btn">取消</button>
+        <button type="button" id="confirm-delete" class="btn danger">解除封禁</button>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="/admin/js/api.js"></script>
+  <script src="/admin/js/app.js"></script>
+</body>
+</html>
