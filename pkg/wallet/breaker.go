@@ -8,13 +8,14 @@ import (
 
 	"fastgame/pkg/money"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/breaker"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
-// BreakerConfig 商户级熔断：慢调用 (>500ms) 视为失败，快速熔断保护协程池
 type BreakerConfig struct {
 	SlowThreshold time.Duration
+	Redis         *redis.Client
 }
 
 func DefaultBreakerConfig() BreakerConfig {
@@ -28,7 +29,7 @@ type breakerClient struct {
 
 func NewBreakerClient(inner Client, cfg BreakerConfig) Client {
 	if cfg.SlowThreshold <= 0 {
-		cfg = DefaultBreakerConfig()
+		cfg.SlowThreshold = DefaultBreakerConfig().SlowThreshold
 	}
 	return &breakerClient{inner: inner, cfg: cfg}
 }
@@ -37,7 +38,49 @@ func (c *breakerClient) breakerKey(merchantID string) string {
 	return "wallet:" + merchantID
 }
 
+func (c *breakerClient) overrideKey(merchantID string) string {
+	return "wallet:breaker:override:" + merchantID
+}
+
+func (c *breakerClient) stateKey(merchantID string) string {
+	return "wallet:breaker:open:" + merchantID
+}
+
+// ResetBreaker 运维手动解除熔断（设置 override + 清除 open 标记）
+func ResetBreaker(ctx context.Context, rdb *redis.Client, merchantID string, ttl time.Duration) error {
+	if rdb == nil || merchantID == "" {
+		return nil
+	}
+	if ttl <= 0 {
+		ttl = 10 * time.Minute
+	}
+	pipe := rdb.Pipeline()
+	pipe.Set(ctx, fmt.Sprintf("wallet:breaker:override:%s", merchantID), "1", ttl)
+	pipe.Del(ctx, fmt.Sprintf("wallet:breaker:open:%s", merchantID))
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+func (c *breakerClient) isOverridden(ctx context.Context, merchantID string) bool {
+	if c.cfg.Redis == nil {
+		return false
+	}
+	n, err := c.cfg.Redis.Exists(ctx, c.overrideKey(merchantID)).Result()
+	return err == nil && n > 0
+}
+
+func (c *breakerClient) markOpen(ctx context.Context, merchantID string) {
+	if c.cfg.Redis == nil {
+		return
+	}
+	_ = c.cfg.Redis.Set(ctx, c.stateKey(merchantID), time.Now().Unix(), 30*time.Minute).Err()
+}
+
 func (c *breakerClient) run(ctx context.Context, merchantID string, op string, fn func() error) error {
+	if c.isOverridden(ctx, merchantID) {
+		return fn()
+	}
+
 	brk := breaker.GetBreaker(c.breakerKey(merchantID))
 	start := time.Now()
 	err := brk.Do(func() error {
@@ -52,6 +95,7 @@ func (c *breakerClient) run(ctx context.Context, merchantID string, op string, f
 	})
 	if err != nil {
 		if errors.Is(err, breaker.ErrServiceUnavailable) {
+			c.markOpen(ctx, merchantID)
 			return ErrCircuitOpen
 		}
 		return err

@@ -1,6 +1,8 @@
 package svc
 
 import (
+	"context"
+
 	"fastgame/internal/model"
 	"fastgame/pkg/clickhouse"
 	"fastgame/pkg/rtpwatchdog"
@@ -11,11 +13,15 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
+type RtpRecorder interface {
+	Record(ctx context.Context, in rtpwatchdog.RecordInput) ([]rtpwatchdog.Alert, error)
+}
+
 type ServiceContext struct {
 	Config    config.Config
 	Writer    *clickhouse.Writer
 	Merchants model.MerchantsModel
-	Watchdog  *rtpwatchdog.Watchdog
+	Recorder  RtpRecorder
 	Enforcer  *rtpwatchdog.Enforcer
 }
 
@@ -46,11 +52,24 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		watchCfg.ThresholdPPM = c.RtpWatch.ThresholdPPM
 	}
 
+	var recorder RtpRecorder = rtpwatchdog.NewRedis(rdb, watchCfg)
+	if !c.RtpWatch.UseRedis {
+		recorder = &memoryRtpAdapter{wd: rtpwatchdog.New(watchCfg)}
+	}
+
 	return &ServiceContext{
 		Config:    c,
 		Writer:    writer,
 		Merchants: model.NewMerchantsModel(conn),
-		Watchdog:  rtpwatchdog.New(watchCfg),
+		Recorder:  recorder,
 		Enforcer:  rtpwatchdog.NewEnforcer(rdb, blacklistModel, blacklist, model.NewRiskAlertsModel(conn)),
 	}, nil
+}
+
+type memoryRtpAdapter struct {
+	wd *rtpwatchdog.Watchdog
+}
+
+func (m *memoryRtpAdapter) Record(ctx context.Context, in rtpwatchdog.RecordInput) ([]rtpwatchdog.Alert, error) {
+	return m.wd.RecordCtx(ctx, in)
 }

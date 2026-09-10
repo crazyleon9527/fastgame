@@ -53,17 +53,19 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Redis:      rdb,
 		Lock:       lock.NewRedisLock(rdb),
 		Idempotent: idempotent.NewStore(rdb, 24*time.Hour),
-		Wallet:     newWalletClient(c.Wallet),
+		Wallet:     newWalletClient(c.Wallet, rdb),
 		GameConfig: gameconfig.NewLoader(
 			merchants,
 			model.NewGameConfigsModel(conn),
 		),
 		Kafka: kafka.NewProducer(c.Kafka.Brokers),
 		Guard: security.NewGuard(security.Config{
-			SkipSignVerify:   c.Security.SkipSignVerify,
-			TimestampWindow:  c.Security.TimestampWindow(),
-			MaxClockSkew:     c.Security.MaxClockSkew(),
-			MinResponseDelay: c.Security.MinResponseDelay(),
+			SkipSignVerify:      c.Security.SkipSignVerify,
+			SkipMerchantSign:    c.Security.SkipMerchantSign,
+			SkipSessionEnvelope: c.Security.SkipSessionEnvelope,
+			TimestampWindow:     c.Security.TimestampWindow(),
+			MaxClockSkew:        c.Security.MaxClockSkew(),
+			MinResponseDelay:    c.Security.MinResponseDelay(),
 		}, merchants, rdb),
 		RateLimit: ratelimit.NewGateway(
 			zeroRedis,
@@ -103,7 +105,7 @@ func bootstrapBlacklist(rdb *goredis.Client, blacklistModel model.RiskBlacklistM
 	}
 }
 
-func newWalletClient(cfg config.WalletConf) wallet.Client {
+func newWalletClient(cfg config.WalletConf, rdb *goredis.Client) wallet.Client {
 	var inner wallet.Client
 	if cfg.Mock || cfg.BaseURL == "" {
 		inner = wallet.NewMockClient(money.FromMajor(10000))
@@ -124,5 +126,6 @@ func newWalletClient(cfg config.WalletConf) wallet.Client {
 	}
 	return wallet.NewBreakerClient(inner, wallet.BreakerConfig{
 		SlowThreshold: cfg.SlowThreshold(),
+		Redis:         rdb,
 	})
 }

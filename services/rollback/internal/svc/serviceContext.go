@@ -9,6 +9,7 @@ import (
 	"fastgame/pkg/wallet"
 	"fastgame/services/rollback/internal/config"
 
+	goredis "github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
@@ -39,11 +40,11 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		Merchants:  model.NewMerchantsModel(conn),
 		PendingOps: model.NewWalletPendingOpsModel(conn),
 		PendingTx:  model.NewPendingTransactionsModel(conn),
-		Wallet:     newWalletClient(c.Wallet),
+		Wallet:     newWalletClient(c.Wallet, nil),
 	}, nil
 }
 
-func newWalletClient(cfg config.WalletConf) wallet.Client {
+func newWalletClient(cfg config.WalletConf, _ *goredis.Client) wallet.Client {
 	var inner wallet.Client
 	if cfg.Mock || cfg.BaseURL == "" {
 		inner = wallet.NewMockClient(money.FromMajor(10000))

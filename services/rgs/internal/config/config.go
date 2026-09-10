@@ -74,12 +74,14 @@ type GameConf struct {
 }
 
 type SecurityConf struct {
-	SkipSignVerify     bool
-	TimestampWindowSec int
-	MaxClockSkewSec    int
-	UserLimitPerSec    int
-	IPLimitPerSec      int
-	MinResponseDelayMs int
+	SkipSignVerify      bool `json:",optional"`
+	SkipMerchantSign    bool `json:",optional"`
+	SkipSessionEnvelope bool `json:",optional"`
+	TimestampWindowSec  int
+	MaxClockSkewSec     int
+	UserLimitPerSec     int
+	IPLimitPerSec       int
+	MinResponseDelayMs  int
 }
 
 func (c SecurityConf) MaxClockSkew() time.Duration {

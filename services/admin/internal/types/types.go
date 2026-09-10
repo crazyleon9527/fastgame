@@ -204,6 +204,28 @@ type PendingTxItem struct {
 
 type TraceLookupResp struct {
 	TraceId             string          `json:"traceId"`
+	RoundId             string          `json:"roundId,omitempty"`
 	Spans               []TraceSpanItem `json:"spans"`
 	PendingTransactions []PendingTxItem `json:"pendingTransactions"`
+}
+
+type TraceByRoundReq struct {
+	RoundId string `path:"roundId"`
+}
+
+type TotpSetupResp struct {
+	ProvisioningUri string `json:"provisioningUri"`
+	Secret          string `json:"secret"`
+}
+
+type TotpConfirmReq struct {
+	TotpCode string `json:"totpCode" validate:"required"`
+}
+
+type AckRiskAlertReq struct {
+	Id uint64 `path:"id"`
+}
+
+type ResetWalletBreakerReq struct {
+	MerchantCode string `json:"merchantCode" validate:"required"`
 }

@@ -19,6 +19,7 @@ import (
 type ServiceContext struct {
 	Config         config.Config
 	AuthMiddleware rest.Middleware
+	Redis          *redis.Client
 	AdminUsers     model.AdminUsersModel
 	AdminAuth      model.AdminAuthModel
 	Merchants      model.MerchantsModel
@@ -26,6 +27,7 @@ type ServiceContext struct {
 	GameConfigs    model.GameConfigsModel
 	RiskBlacklist  model.RiskBlacklistModel
 	Blacklist      *security.Blacklist
+	Suspend        *security.SuspendStore
 	IPWhitelist    *security.IPWhitelist
 	Reporter       *clickhouse.Writer
 	PendingTx      model.PendingTransactionsModel
@@ -46,6 +48,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	svcCtx := &ServiceContext{
 		Config:         c,
 		AuthMiddleware: middleware.NewAuthMiddleware().Handle,
+		Redis:          rdb,
 		AdminUsers:     model.NewAdminUsersModel(conn),
 		AdminAuth:      model.NewAdminAuthModel(conn),
 		Merchants:      merchantsModel,
@@ -53,9 +56,10 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		GameConfigs:    model.NewGameConfigsModel(conn),
 		RiskBlacklist:  blacklistModel,
 		Blacklist:      blacklist,
+		Suspend:        security.NewSuspendStore(rdb),
 		IPWhitelist:    security.NewIPWhitelist(merchantsModel, rdb),
-		Reporter:  reporter,
-		PendingTx: model.NewPendingTransactionsModel(conn),
+		Reporter:       reporter,
+		PendingTx:      model.NewPendingTransactionsModel(conn),
 	}
 
 	bootstrapBlacklist(rdb, blacklistModel)

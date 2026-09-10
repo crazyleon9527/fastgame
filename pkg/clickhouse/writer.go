@@ -241,6 +241,33 @@ func (w *Writer) BatchInsertTraceSpans(ctx context.Context, rows []TraceSpanRow)
 	return batch.Send()
 }
 
+func (w *Writer) QueryTraceSpansByRoundID(ctx context.Context, roundID string) ([]TraceSpanRow, error) {
+	rows, err := w.conn.Query(ctx, `
+		SELECT trace_id, span_id, service, operation, round_id, status, detail, duration_ms, occurred_at
+		FROM fastgame.trace_spans
+		WHERE round_id = ?
+		ORDER BY occurred_at ASC
+		LIMIT 500
+	`, roundID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []TraceSpanRow
+	for rows.Next() {
+		var row TraceSpanRow
+		if err := rows.Scan(
+			&row.TraceID, &row.SpanID, &row.Service, &row.Operation, &row.RoundID,
+			&row.Status, &row.Detail, &row.DurationMs, &row.OccurredAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 func (w *Writer) QueryTraceSpans(ctx context.Context, traceID string) ([]TraceSpanRow, error) {
 	rows, err := w.conn.Query(ctx, `
 		SELECT trace_id, span_id, service, operation, round_id, status, detail, duration_ms, occurred_at

@@ -1,12 +1,13 @@
 /**
- * 确定性回放引擎 — 与 pkg/prng/replay.go 算法一致
- * 仅依赖种子 + 基础输入，100% 复现场景参数
+ * 确定性回放引擎 — 与 pkg/prng/replay.go + engine.go 算法一致
+ * 金额使用 int64 定点数（Scale=10000），与后端 money.Amount 对齐
  */
 
 export interface ReplayInputs {
     serverSeed: string;
     clientSeed: string;
     nonce: string;
+    /** major 或 minor units；>=10000 的整数视为 minor */
     betAmount: number;
 }
 
@@ -30,14 +31,45 @@ export interface ReplayOutcome {
     multiplier: number;
     winAmount: number;
     roll: number;
+    betAmountMinor: number;
+    winAmountMinor: number;
+    multiplierMinor: number;
 }
 
+const MONEY_SCALE = 10000;
 const WEATHER = ['clear', 'cloudy', 'rain', 'storm'];
 const SPECIES = ['bass', 'trout', 'tuna', 'salmon', 'shark', 'marlin'];
 const PROPS = ['worm', 'lure', 'fly', 'jig'];
 const MAX_UINT64 = 18446744073709551615n;
 
-async function rollIndex(serverSeed: string, clientSeed: string, nonce: string, index = 0): Promise<number> {
+function betToMinor(betAmount: number): number {
+    if (Number.isInteger(betAmount) && betAmount >= MONEY_SCALE) return betAmount;
+    return Math.round(betAmount * MONEY_SCALE);
+}
+
+function minorToMajor(minor: number): number {
+    return minor / MONEY_SCALE;
+}
+
+function rollToFloat(n: bigint): number {
+    return Number(n) / Number(MAX_UINT64);
+}
+
+function rollBelow(n: bigint, num: number, den: number): boolean {
+    return n < (MAX_UINT64 / BigInt(den)) * BigInt(num);
+}
+
+function multiplierFromRange(multiRoll: bigint, minMult: number, maxMult: number): number {
+    const span = BigInt(maxMult - minMult);
+    return Number(BigInt(minMult) + (multiRoll * span) / MAX_UINT64);
+}
+
+function applyMultiplier(betMinor: number, multMinor: number): number {
+    if (betMinor <= 0 || multMinor <= 0) return 0;
+    return Number((BigInt(betMinor) * BigInt(multMinor)) / BigInt(MONEY_SCALE));
+}
+
+async function rollIndexUint64(serverSeed: string, clientSeed: string, nonce: string, index = 0): Promise<bigint> {
     const payload = `${clientSeed}:${nonce}:${index}`;
     const enc = new TextEncoder();
     const key = await crypto.subtle.importKey(
@@ -53,7 +85,11 @@ async function rollIndex(serverSeed: string, clientSeed: string, nonce: string, 
     for (let i = 0; i < 8; i++) {
         n = (n << 8n) | BigInt(bytes[i]);
     }
-    return Number(n) / Number(MAX_UINT64);
+    return n;
+}
+
+async function rollIndex(serverSeed: string, clientSeed: string, nonce: string, index = 0): Promise<number> {
+    return rollToFloat(await rollIndexUint64(serverSeed, clientSeed, nonce, index));
 }
 
 function pickIndex(r: number, n: number): number {
@@ -66,18 +102,43 @@ function round2(v: number): number {
 }
 
 async function computeOutcome(serverSeed: string, clientSeed: string, nonce: string, betAmount: number): Promise<ReplayOutcome> {
-    const roll = await rollIndex(serverSeed, clientSeed, nonce, 0);
-    const multiRoll = await rollIndex(serverSeed, clientSeed, nonce, 1);
+    const betMinor = betToMinor(betAmount);
+    const rollU = await rollIndexUint64(serverSeed, clientSeed, nonce, 0);
+    const roll = rollToFloat(rollU);
 
-    if (roll < 0.55) {
-        return { roll, fishState: 'miss', animationKey: 'fish_miss', multiplier: 0, winAmount: 0 };
+    if (rollBelow(rollU, 55, 100)) {
+        return { roll, fishState: 'miss', animationKey: 'fish_miss', multiplier: 0, winAmount: 0, betAmountMinor: betMinor, winAmountMinor: 0, multiplierMinor: 0 };
     }
-    if (roll < 0.9) {
-        const multiplier = round2(1.5 + multiRoll * 3.5);
-        return { roll, fishState: 'bite', animationKey: 'fish_bite_normal', multiplier, winAmount: round2(betAmount * multiplier) };
+
+    const multiRoll = await rollIndexUint64(serverSeed, clientSeed, nonce, 1);
+
+    if (rollBelow(rollU, 90, 100)) {
+        const multMinor = multiplierFromRange(multiRoll, 15000, 50000);
+        const winMinor = applyMultiplier(betMinor, multMinor);
+        return {
+            roll,
+            fishState: 'bite',
+            animationKey: 'fish_bite_normal',
+            multiplier: minorToMajor(multMinor),
+            winAmount: minorToMajor(winMinor),
+            betAmountMinor: betMinor,
+            winAmountMinor: winMinor,
+            multiplierMinor: multMinor,
+        };
     }
-    const multiplier = round2(50 + multiRoll * 50);
-    return { roll, fishState: 'big_win', animationKey: 'fish_bite_bigwin', multiplier, winAmount: round2(betAmount * multiplier) };
+
+    const multMinor = multiplierFromRange(multiRoll, 500000, 1000000);
+    const winMinor = applyMultiplier(betMinor, multMinor);
+    return {
+        roll,
+        fishState: 'big_win',
+        animationKey: 'fish_bite_bigwin',
+        multiplier: minorToMajor(multMinor),
+        winAmount: minorToMajor(winMinor),
+        betAmountMinor: betMinor,
+        winAmountMinor: winMinor,
+        multiplierMinor: multMinor,
+    };
 }
 
 export async function computeReplayScene(inputs: ReplayInputs): Promise<{ scene: ReplayScene; outcome: ReplayOutcome }> {

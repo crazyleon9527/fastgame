@@ -1,6 +1,7 @@
 package rtpwatchdog
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -76,6 +77,10 @@ type RecordInput struct {
 	UserID       uint64
 	BetMinor     int64
 	WinMinor     int64
+}
+
+func (w *Watchdog) RecordCtx(_ context.Context, in RecordInput) ([]Alert, error) {
+	return w.Record(in), nil
 }
 
 func (w *Watchdog) Record(in RecordInput) []Alert {

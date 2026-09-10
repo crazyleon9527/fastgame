@@ -32,6 +32,7 @@ type RedisConf struct {
 
 type RtpWatchConf struct {
 	Enabled      bool
+	UseRedis     bool
 	GlobalMax    int
 	PlayerMax    int
 	ThresholdPPM int64

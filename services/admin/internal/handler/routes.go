@@ -97,6 +97,31 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Path:    "/risk-alerts",
 					Handler: RiskAlertsHandler(serverCtx),
 				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/risk-alerts/:id/ack",
+					Handler: AckRiskAlertHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/traces/by-round/:roundId",
+					Handler: GetTraceByRoundHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/totp/setup",
+					Handler: TotpSetupHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/totp/confirm",
+					Handler: TotpConfirmHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/wallet/breaker/reset",
+					Handler: ResetWalletBreakerHandler(serverCtx),
+				},
 			}...,
 		),
 		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),

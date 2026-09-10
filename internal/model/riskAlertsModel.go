@@ -27,6 +27,8 @@ type RiskAlert struct {
 type RiskAlertsModel interface {
 	Insert(ctx context.Context, data *RiskAlert) error
 	ListOpen(ctx context.Context, limit int) ([]*RiskAlert, error)
+	MarkAcknowledged(ctx context.Context, id uint64) error
+	FindOne(ctx context.Context, id uint64) (*RiskAlert, error)
 }
 
 type defaultRiskAlertsModel struct {
@@ -54,6 +56,26 @@ insert into %s (
 		data.RtpPPM, data.TotalBet, data.TotalWin, data.SampleSize, data.ActionTaken, status,
 	)
 	return err
+}
+
+func (m *defaultRiskAlertsModel) MarkAcknowledged(ctx context.Context, id uint64) error {
+	query := fmt.Sprintf("update %s set status = 'acked' where id = ? and status = 'open'", m.table)
+	_, err := m.conn.ExecCtx(ctx, query, id)
+	return err
+}
+
+func (m *defaultRiskAlertsModel) FindOne(ctx context.Context, id uint64) (*RiskAlert, error) {
+	query := fmt.Sprintf("select * from %s where id = ? limit 1", m.table)
+	var row RiskAlert
+	err := m.conn.QueryRowCtx(ctx, &row, query, id)
+	switch err {
+	case nil:
+		return &row, nil
+	case sqlx.ErrNotFound:
+		return nil, ErrNotFound
+	default:
+		return nil, err
+	}
 }
 
 func (m *defaultRiskAlertsModel) ListOpen(ctx context.Context, limit int) ([]*RiskAlert, error) {

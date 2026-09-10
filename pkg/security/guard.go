@@ -21,10 +21,21 @@ const (
 )
 
 type Config struct {
-	SkipSignVerify   bool
-	TimestampWindow  time.Duration
-	MaxClockSkew     time.Duration
-	MinResponseDelay time.Duration
+	SkipMerchantSign    bool
+	SkipSessionEnvelope bool
+	// SkipSignVerify 兼容旧配置：为 true 时同时跳过商户签名与会话 Envelope
+	SkipSignVerify      bool
+	TimestampWindow     time.Duration
+	MaxClockSkew        time.Duration
+	MinResponseDelay    time.Duration
+}
+
+func (c Config) skipMerchant() bool {
+	return c.SkipMerchantSign || c.SkipSignVerify
+}
+
+func (c Config) skipEnvelope() bool {
+	return c.SkipSessionEnvelope || c.SkipSignVerify
 }
 
 type Guard struct {
@@ -96,7 +107,7 @@ func (g *Guard) CheckGameFlagged(ctx context.Context, merchantID, gameCode strin
 }
 
 func (g *Guard) VerifySessionEnvelope(dynamicKey, roundID, action, timestamp, signature string) error {
-	if g.cfg.SkipSignVerify {
+	if g.cfg.skipEnvelope() {
 		return nil
 	}
 	return VerifyEnvelope(dynamicKey, roundID, action, timestamp, signature)
@@ -111,7 +122,7 @@ func (g *Guard) CheckBet(ctx context.Context, in BetCheckInput, limits validator
 		return err
 	}
 
-	if g.cfg.SkipSignVerify {
+	if g.cfg.skipMerchant() {
 		return nil
 	}
 

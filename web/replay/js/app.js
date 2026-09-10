@@ -1,4 +1,4 @@
-import { computeReplayScene } from './fair.js';
+import { computeReplayScene, betAmountFromReplay } from './fair.js';
 
 const $ = (sel) => document.querySelector(sel);
 const canvas = $('#stage');
@@ -117,7 +117,7 @@ async function runReplay() {
             serverSeed = data.replay.inputs.serverSeed;
             clientSeed = data.replay.inputs.clientSeed;
             nonce = data.replay.inputs.nonce;
-            betAmount = data.replay.inputs.betAmount;
+            betAmount = betAmountFromReplay(data);
             $('#server-seed').value = serverSeed;
             $('#client-seed').value = clientSeed;
             $('#nonce').value = nonce;

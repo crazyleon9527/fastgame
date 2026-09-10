@@ -73,13 +73,17 @@ func (w *Worker) Run(ctx context.Context) error {
 }
 
 func (w *Worker) evaluateRtp(ctx context.Context, evt kafka.RoundSettledEvent) {
-	alerts := w.svcCtx.Watchdog.Record(rtpwatchdog.RecordInput{
+	alerts, err := w.svcCtx.Recorder.Record(ctx, rtpwatchdog.RecordInput{
 		MerchantCode: evt.MerchantID,
 		GameCode:     evt.GameCode,
 		UserID:       evt.UserID,
 		BetMinor:     evt.BetAmount,
 		WinMinor:     evt.WinAmount,
 	})
+	if err != nil {
+		logx.Errorf("rtp recorder: %v", err)
+		return
+	}
 	for _, alert := range alerts {
 		if err := w.svcCtx.Enforcer.Handle(ctx, alert); err != nil {
 			logx.Errorf("rtp enforcer: %v", err)

@@ -32,8 +32,10 @@ Game:
   DefaultRtpTier: default
 
 Security:
-  SkipSignVerify: false
+  SkipMerchantSign: false
+  SkipSessionEnvelope: false
   TimestampWindowSec: 60
+  MaxClockSkewSec: 5
   UserLimitPerSec: 5
   IPLimitPerSec: 20
   MinResponseDelayMs: 150

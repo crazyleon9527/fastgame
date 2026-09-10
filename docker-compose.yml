@@ -188,6 +188,7 @@ services:
       - ./docker/nginx/waf-blocks.conf:/etc/nginx/waf-blocks.conf:ro
       - ./docker/nginx/merchant-whitelist.conf:/etc/nginx/merchant-whitelist.conf:ro
       - ./web/admin:/usr/share/nginx/admin:ro
+      - ./web/shared:/usr/share/nginx/shared:ro
       - ./web/verify:/usr/share/nginx/verify:ro
       - ./web/replay:/usr/share/nginx/replay:ro
       - ./web/game:/usr/share/nginx/game:ro

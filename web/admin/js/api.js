@@ -88,5 +88,25 @@ const AdminAPI = (() => {
     lookupTrace(traceId) {
       return request('GET', `/api/v1/admin/traces/${encodeURIComponent(traceId)}`);
     },
+
+    lookupTraceByRound(roundId) {
+      return request('GET', `/api/v1/admin/traces/by-round/${encodeURIComponent(roundId)}`);
+    },
+
+    ackRiskAlert(id) {
+      return request('POST', `/api/v1/admin/risk-alerts/${id}/ack`);
+    },
+
+    totpSetup() {
+      return request('POST', '/api/v1/admin/totp/setup');
+    },
+
+    totpConfirm(totpCode) {
+      return request('POST', '/api/v1/admin/totp/confirm', { totpCode });
+    },
+
+    resetWalletBreaker(merchantCode) {
+      return request('POST', '/api/v1/admin/wallet/breaker/reset', { merchantCode });
+    },
   };
 })();

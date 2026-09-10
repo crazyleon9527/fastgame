@@ -18,6 +18,7 @@ Redis:
 
 RtpWatch:
   Enabled: true
+  UseRedis: true
   GlobalMax: 10000
   PlayerMax: 200
   ThresholdPPM: 1800000

@@ -44,6 +44,7 @@
         </div>
         <div class="topbar-actions">
           <span id="user-label"></span>
+          <button id="totp-setup-btn" class="btn ghost" type="button">2FA 设置</button>
           <button id="logout-btn" class="btn ghost">退出</button>
         </div>
       </header>
@@ -205,7 +206,7 @@
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>时间</th><th>范围</th><th>对象</th><th>游戏</th><th>RTP</th><th>样本</th><th>动作</th><th>状态</th></tr></thead>
+                <thead><tr><th>时间</th><th>范围</th><th>对象</th><th>游戏</th><th>RTP</th><th>样本</th><th>动作</th><th>状态</th><th>操作</th></tr></thead>
                 <tbody id="alerts-tbody"></tbody>
               </table>
             </div>
@@ -222,7 +223,14 @@
                 Trace ID
                 <input type="text" id="trace-id-input" placeholder="X-Trace-Id / 响应头 TraceID" />
               </label>
-              <button id="trace-search-btn" class="btn primary">查询</button>
+              <button id="trace-search-btn" class="btn primary">按 Trace 查询</button>
+            </div>
+            <div class="toolbar">
+              <label style="flex:1">
+                Round ID
+                <input type="text" id="trace-round-input" placeholder="roundId / 客诉局号" />
+              </label>
+              <button id="trace-round-search-btn" class="btn">按 Round 查询</button>
             </div>
             <div id="trace-result" class="trace-result">
               <p class="empty">输入 Trace ID 后查询</p>
@@ -325,6 +333,25 @@
       <div class="dialog-actions">
         <button type="button" id="close-key-result" class="btn primary">我已保存，关闭</button>
       </div>
+    </dialog>
+
+    <!-- TOTP 2FA 绑定 -->
+    <dialog id="totp-dialog">
+      <form id="totp-form" method="dialog">
+        <h2>Google Authenticator 绑定</h2>
+        <p class="muted-text">扫描下方 URI 或手动输入 Secret，然后在 Authenticator 中输入 6 位验证码确认。</p>
+        <div class="key-box"><code id="totp-uri"></code></div>
+        <p class="muted-text">Secret: <code id="totp-secret"></code></p>
+        <label>
+          验证码
+          <input type="text" id="totp-confirm-code" inputmode="numeric" autocomplete="one-time-code" required />
+        </label>
+        <p id="totp-error" class="error hidden"></p>
+        <div class="dialog-actions">
+          <button type="button" id="cancel-totp" class="btn">取消</button>
+          <button type="submit" class="btn primary">确认绑定</button>
+        </div>
+      </form>
     </dialog>
 
     <div id="toast" class="toast hidden"></div>

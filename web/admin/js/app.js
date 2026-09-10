@@ -50,9 +50,18 @@
     if (tab === 'alerts') loadRiskAlerts();
   }
 
+  function formatMoneyMinor(minor) {
+    if (minor == null || minor === '') return '—';
+    const n = Number(minor);
+    if (!Number.isFinite(n)) return String(minor);
+    const whole = Math.trunc(n / 10000);
+    const frac = Math.abs(n % 10000);
+    return `${whole}.${String(frac).padStart(4, '0')}`;
+  }
+
   async function loadRiskAlerts() {
     const tbody = $('#alerts-tbody');
-    tbody.innerHTML = '<tr><td colspan="8" class="empty">加载中…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">加载中…</td></tr>';
     try {
       const data = await AdminAPI.listRiskAlerts(50);
       const list = data.list || [];
@@ -66,27 +75,32 @@
           <td>${a.sampleSize}</td>
           <td>${escapeHtml(a.actionTaken)}</td>
           <td><span class="badge inactive">${escapeHtml(a.status)}</span></td>
-        </tr>`).join('') : '<tr><td colspan="8" class="empty">暂无 open 告警</td></tr>';
+          <td><button class="btn btn-sm" data-ack-alert="${a.id}">确认处理</button></td>
+        </tr>`).join('') : '<tr><td colspan="9" class="empty">暂无 open 告警</td></tr>';
+
+      tbody.querySelectorAll('[data-ack-alert]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          try {
+            await AdminAPI.ackRiskAlert(btn.dataset.ackAlert);
+            toast('告警已确认，挂起/标记已清除');
+            await loadRiskAlerts();
+          } catch (err) {
+            toast(err.message, 'error');
+          }
+        });
+      });
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="8" class="empty error">${escapeHtml(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="empty error">${escapeHtml(err.message)}</td></tr>`;
       handleAuthError(err);
     }
   }
 
-  async function lookupTrace() {
-    const traceId = $('#trace-id-input').value.trim();
-    const box = $('#trace-result');
-    if (!traceId) {
-      box.innerHTML = '<p class="empty error">请输入 Trace ID</p>';
-      return;
-    }
-    box.innerHTML = '<p class="empty">查询中…</p>';
-    try {
-      const data = await AdminAPI.lookupTrace(traceId);
-      const spans = data.spans || [];
-      const txs = data.pendingTransactions || [];
-      box.innerHTML = `
-        <h3>Trace: <code>${escapeHtml(traceId)}</code></h3>
+  function renderTraceResult(data, label) {
+    const spans = data.spans || [];
+    const txs = data.pendingTransactions || [];
+    const traceId = data.traceId || label;
+    return `
+        <h3>${escapeHtml(label)} · Trace: <code>${escapeHtml(traceId)}</code>${data.roundId ? ` · Round: <code>${escapeHtml(data.roundId)}</code>` : ''}</h3>
         <h4>网络 I/O Spans (${spans.length})</h4>
         <div class="table-wrap"><table>
           <thead><tr><th>时间</th><th>服务</th><th>操作</th><th>Round</th><th>状态</th><th>耗时</th><th>详情</th></tr></thead>
@@ -110,13 +124,43 @@
               <td><code>${escapeHtml(t.roundId)}</code></td>
               <td>${escapeHtml(t.phase)}</td>
               <td>${escapeHtml(t.status)}</td>
-              <td>${t.betAmount}</td>
-              <td>${t.winAmount}</td>
+              <td>${formatMoneyMinor(t.betAmount)}</td>
+              <td>${formatMoneyMinor(t.winAmount)}</td>
               <td>${escapeHtml(t.expectedAction)}</td>
               <td>${t.retryCount}</td>
             </tr>`).join('') : '<tr><td colspan="7" class="empty">无 pending_transactions</td></tr>'}
           </tbody>
         </table></div>`;
+  }
+
+  async function lookupTrace() {
+    const traceId = $('#trace-id-input').value.trim();
+    const box = $('#trace-result');
+    if (!traceId) {
+      box.innerHTML = '<p class="empty error">请输入 Trace ID</p>';
+      return;
+    }
+    box.innerHTML = '<p class="empty">查询中…</p>';
+    try {
+      const data = await AdminAPI.lookupTrace(traceId);
+      box.innerHTML = renderTraceResult(data, `Trace 查询`);
+    } catch (err) {
+      box.innerHTML = `<p class="empty error">${escapeHtml(err.message)}</p>`;
+      handleAuthError(err);
+    }
+  }
+
+  async function lookupTraceByRound() {
+    const roundId = $('#trace-round-input').value.trim();
+    const box = $('#trace-result');
+    if (!roundId) {
+      box.innerHTML = '<p class="empty error">请输入 Round ID</p>';
+      return;
+    }
+    box.innerHTML = '<p class="empty">查询中…</p>';
+    try {
+      const data = await AdminAPI.lookupTraceByRound(roundId);
+      box.innerHTML = renderTraceResult(data, `Round 查询`);
     } catch (err) {
       box.innerHTML = `<p class="empty error">${escapeHtml(err.message)}</p>`;
       handleAuthError(err);
@@ -235,6 +279,7 @@
             <button class="btn btn-sm" data-rotate="${m.id}" data-code="${escapeAttr(m.merchantCode)}" data-name="${escapeAttr(m.name)}" ${m.status !== 1 ? 'disabled' : ''}>
               轮换密钥
             </button>
+            <button class="btn btn-sm" data-reset-breaker="${escapeAttr(m.merchantCode)}">解除熔断</button>
           </td>
         </tr>
       `).join('');
@@ -247,6 +292,19 @@
           $('#rotate-grace-hours').value = '24';
           $('#rotate-error').classList.add('hidden');
           $('#rotate-dialog').showModal();
+        });
+      });
+
+      tbody.querySelectorAll('[data-reset-breaker]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const code = btn.dataset.resetBreaker;
+          if (!confirm(`确定解除商户 ${code} 的钱包熔断？`)) return;
+          try {
+            await AdminAPI.resetWalletBreaker(code);
+            toast(`已解除 ${code} 熔断（10 分钟 override）`);
+          } catch (err) {
+            toast(err.message, 'error');
+          }
         });
       });
     } catch (err) {
@@ -463,6 +521,35 @@
 
   $('#trace-search-btn').addEventListener('click', lookupTrace);
   $('#trace-id-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') lookupTrace(); });
+  $('#trace-round-search-btn').addEventListener('click', lookupTraceByRound);
+  $('#trace-round-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') lookupTraceByRound(); });
+
+  $('#totp-setup-btn').addEventListener('click', async () => {
+    $('#totp-error').classList.add('hidden');
+    $('#totp-confirm-code').value = '';
+    try {
+      const resp = await AdminAPI.totpSetup();
+      $('#totp-uri').textContent = resp.provisioningUri || '';
+      $('#totp-secret').textContent = resp.secret || '';
+      $('#totp-dialog').showModal();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+  $('#cancel-totp').addEventListener('click', () => $('#totp-dialog').close());
+  $('#totp-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = $('#totp-error');
+    errEl.classList.add('hidden');
+    try {
+      await AdminAPI.totpConfirm($('#totp-confirm-code').value.trim());
+      $('#totp-dialog').close();
+      toast('2FA 已绑定，下次登录需输入验证码');
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+    }
+  });
 
   $('#cancel-whitelist').addEventListener('click', () => $('#whitelist-dialog').close());
   $('#whitelist-form').addEventListener('submit', async (e) => {

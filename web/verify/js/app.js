@@ -1,4 +1,4 @@
-import { hashServerSeed, roll, computeOutcome, parseProvablyFairJson } from './fair.js';
+import { hashServerSeed, roll, computeOutcome, parseProvablyFairJson, formatMinor } from './fair.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -110,11 +110,11 @@ async function verify() {
         const outcome = await computeOutcome(serverSeed, clientSeed, nonce, betAmount);
         outcomeHtml = `
       <div class="outcome-box">
-        <h3>推导结果 (Bet ${betAmount})</h3>
+        <h3>推导结果 (Bet ${betAmount}, minor=${formatMinor(outcome.betAmountMinor)})</h3>
         <dl>
           <dt>状态</dt><dd>${STATE_LABELS[outcome.fishState] || outcome.fishState}</dd>
-          <dt>倍率</dt><dd>${outcome.multiplier}x</dd>
-          <dt>派彩</dt><dd>${outcome.winAmount}</dd>
+          <dt>倍率</dt><dd>${outcome.multiplier}x (${outcome.multiplierMinor} minor)</dd>
+          <dt>派彩</dt><dd>${outcome.winAmount} (${formatMinor(outcome.winAmountMinor)} minor)</dd>
           <dt>动画 Key</dt><dd><code>${outcome.animationKey}</code></dd>
         </dl>
       </div>`;
@@ -144,9 +144,11 @@ async function verify() {
       <pre>HMAC-SHA256(key=serverSeed, msg=clientSeed:nonce:0)
 Roll = BigEndianUint64(first 8 bytes) / (2⁶⁴−1)
 
-miss:  roll &lt; 0.55
-bite:  0.55 ≤ roll &lt; 0.90  → multiplier = 1.5 + RollIndex(1) × 3.5
-big:   roll ≥ 0.90          → multiplier = 50 + RollIndex(1) × 50</pre>
+阈值与 pkg/prng/engine.go 一致（uint64 整数 roll + Scale=10000 定点倍率）
+miss: roll &lt; 55%
+bite: 55%–90% → multiplier 15000–50000 minor (1.5x–5.0x)
+big:  roll ≥ 90% → multiplier 500000–1000000 minor (50x–100x)
+win = betMinor × multMinor / 10000</pre>
     </details>
   `, hashOk && rollOk !== false ? 'success' : rollOk === false || !hashOk ? 'error' : 'success');
 }
