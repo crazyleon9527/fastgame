@@ -182,6 +182,7 @@ services:
       - ./docker/nginx/merchant-whitelist.conf:/etc/nginx/merchant-whitelist.conf:ro
       - ./web/admin:/usr/share/nginx/admin:ro
       - ./web/verify:/usr/share/nginx/verify:ro
+      - ./web/replay:/usr/share/nginx/replay:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

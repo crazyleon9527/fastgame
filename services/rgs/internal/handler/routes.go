@@ -35,6 +35,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/game/bet",
 				Handler: BetHandler(serverCtx),
 			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/game/replay/:roundId",
+				Handler: ReplayHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/game/replay/compute",
+				Handler: ReplayComputeHandler(serverCtx),
+			},
 			}...,
 		),
 		rest.WithPrefix("/api/v1"),

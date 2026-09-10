@@ -40,6 +40,19 @@ chmod +x scripts/obfuscate-build.sh
 | 抛竿/下注 | `POST /api/v1/game/bet` |
 | 大奖广播 | `WS /ws/bigwin` |
 
+## 确定性回放 (Deterministic Replay)
+
+每局仅持久化 **种子 + 基础输入**（`serverSeed`, `clientSeed`, `nonce/roundId`, `betAmount`），
+天气、鱼群轨迹、咬钩道具、派彩均由 PRNG 确定性派生：
+
+```typescript
+// 从历史 roundId 100% 复现
+await fishingController.replayRound('round-xxx');
+```
+
+- 浏览器回放：`http://localhost:18000/replay/?roundId=round-xxx`
+- API：`GET /api/v1/game/replay/:roundId`
+
 ## 动画映射（服务端驱动）
 
 | fishState | animationKey | 表现 |

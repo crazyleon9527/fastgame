@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FastGame 确定性回放</title>
+  <link rel="stylesheet" href="/replay/css/style.css" />
+</head>
+<body>
+  <header>
+    <h1>确定性回放 (Deterministic Replay)</h1>
+    <p>仅种子 + 基础输入 → 100% 复现天气、鱼群轨迹、咬钩道具与派彩</p>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <label>
+        Round ID（从服务端加载）
+        <input type="text" id="round-id" placeholder="round-xxx" />
+      </label>
+      <p class="muted">或手动输入种子：</p>
+      <label>
+        Server Seed
+        <textarea id="server-seed" rows="2"></textarea>
+      </label>
+      <label>
+        Client Seed
+        <input type="text" id="client-seed" />
+      </label>
+      <label>
+        Nonce / Round ID
+        <input type="text" id="nonce" />
+      </label>
+      <label>
+        Bet Amount
+        <input type="number" id="bet-amount" value="10" min="0.01" step="0.01" />
+      </label>
+      <button id="replay-btn" class="btn primary">开始回放</button>
+      <p id="replay-error" class="error hidden"></p>
+    </section>
+
+    <section class="stage-wrap">
+      <canvas id="stage" width="640" height="360"></canvas>
+      <p class="muted">动画由 HMAC-SHA256 种子链确定性派生，与 Cocos 客户端算法一致</p>
+    </section>
+  </main>
+
+  <footer>
+    <a href="/verify/">Provably Fair 验算 ↗</a>
+  </footer>
+
+  <script type="module" src="/replay/js/app.js"></script>
+</body>
+</html>

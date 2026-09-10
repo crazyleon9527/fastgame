@@ -33,6 +33,7 @@ type ServiceContext struct {
 	RateLimit   *ratelimit.Gateway
 	Session     *session.Store
 	PendingOps  model.WalletPendingOpsModel
+	ReplayStore model.GameRoundReplayModel
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -64,7 +65,8 @@ func NewServiceContext(c config.Config) *ServiceContext {
 			c.Security.UserLimitPerSec, c.Security.UserLimitPerSec,
 		),
 		Session:    session.NewStore(rdb, c.Session.TTL()),
-		PendingOps: model.NewWalletPendingOpsModel(conn),
+		PendingOps:  model.NewWalletPendingOpsModel(conn),
+		ReplayStore: model.NewGameRoundReplayModel(conn),
 	}
 
 	bootstrapBlacklist(rdb, model.NewRiskBlacklistModel(conn))

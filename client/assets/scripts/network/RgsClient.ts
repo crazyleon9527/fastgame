@@ -23,6 +23,30 @@ export interface ProvablyFairProof {
     roll: number;
 }
 
+export interface ReplayPoint {
+    x: number;
+    y: number;
+}
+
+export interface ReplayScenePayload {
+    weather: string;
+    fishSpecies: string;
+    fishPath: ReplayPoint[];
+    biteProp: string;
+    castDurationMs: number;
+    fishSpeed: number;
+}
+
+export interface ReplayPayload {
+    inputs: {
+        serverSeed: string;
+        clientSeed: string;
+        nonce: string;
+        betAmount: number;
+    };
+    scene: ReplayScenePayload;
+}
+
 /** RGS 结算响应 — 客户端严禁自行计算，只消费此结构 */
 export interface BetResponse {
     roundId: string;
@@ -34,10 +58,22 @@ export interface BetResponse {
     animationKey: string;
     sequenceId: number;
     provablyFair: ProvablyFairProof;
+    replay?: ReplayPayload;
 }
 
 export interface BalanceResponse {
     balance: number;
+}
+
+export interface ReplayResponse {
+    roundId: string;
+    sequenceId: number;
+    replay: ReplayPayload;
+    provablyFair: ProvablyFairProof;
+    winAmount: number;
+    multiplier: number;
+    fishState: string;
+    animationKey: string;
 }
 
 export class RgsClient {
@@ -72,6 +108,15 @@ export class RgsClient {
         const path = '/api/v1/game/bet';
         const body = JSON.stringify(req);
         return this.signedPost(path, body);
+    }
+
+    async fetchReplay(roundId: string): Promise<ReplayResponse> {
+        const url = `${this.baseUrl}/api/v1/game/replay/${encodeURIComponent(roundId)}`;
+        const resp = await fetch(url);
+        if (!resp.ok) {
+            throw new Error(`replay failed: ${resp.status}`);
+        }
+        return resp.json();
     }
 
     private async signedPost(path: string, body: string): Promise<any> {

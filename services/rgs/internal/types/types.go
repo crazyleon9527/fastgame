@@ -49,6 +49,32 @@ type ProvablyFairProof struct {
 	Roll           float64 `json:"roll"`
 }
 
+type ReplayInputs struct {
+	ServerSeed string  `json:"serverSeed"`
+	ClientSeed string  `json:"clientSeed"`
+	Nonce      string  `json:"nonce"`
+	BetAmount  float64 `json:"betAmount"`
+}
+
+type ReplayPoint struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type ReplayScene struct {
+	Weather        string      `json:"weather"`
+	FishSpecies    string      `json:"fishSpecies"`
+	FishPath       []ReplayPoint `json:"fishPath"`
+	BiteProp       string      `json:"biteProp"`
+	CastDurationMs int         `json:"castDurationMs"`
+	FishSpeed      float64     `json:"fishSpeed"`
+}
+
+type ReplayPayload struct {
+	Inputs ReplayInputs `json:"inputs"`
+	Scene  ReplayScene  `json:"scene"`
+}
+
 type BetResp struct {
 	RoundId          string            `json:"roundId"`
 	WinAmount        float64           `json:"winAmount"`
@@ -60,4 +86,28 @@ type BetResp struct {
 	SequenceId       uint64            `json:"sequenceId"`
 	SettlementStatus string            `json:"settlementStatus"` // settled / pending
 	ProvablyFair     ProvablyFairProof `json:"provablyFair"`
+	Replay           ReplayPayload     `json:"replay"`
+}
+
+type ReplayReq struct {
+	RoundId string `path:"roundId"`
+}
+
+type ReplayComputeReq struct {
+	ServerSeed string  `json:"serverSeed" validate:"required"`
+	ClientSeed string  `json:"clientSeed" validate:"required"`
+	Nonce      string  `json:"nonce" validate:"required"`
+	BetAmount  float64 `json:"betAmount" validate:"required,gt=0"`
+	RtpTier    string  `json:"rtpTier,optional"`
+}
+
+type ReplayResp struct {
+	RoundId      string            `json:"roundId,omitempty"`
+	SequenceId   uint64            `json:"sequenceId,omitempty"`
+	Replay       ReplayPayload     `json:"replay"`
+	ProvablyFair ProvablyFairProof `json:"provablyFair"`
+	WinAmount    float64           `json:"winAmount"`
+	Multiplier   float64           `json:"multiplier"`
+	FishState    string            `json:"fishState"`
+	AnimationKey string            `json:"animationKey"`
 }

@@ -1,14 +1,15 @@
-import { _decorator, Component, Animation, tween, Vec3 } from 'cc';
+import { _decorator, Component, Animation, tween, Vec3, UITransform } from 'cc';
 import { GameConfig } from '../config/GameConfig';
-import { RgsClient, BetResponse } from '../network/RgsClient';
+import { RgsClient, BetResponse, ReplayPayload, ReplayResponse } from '../network/RgsClient';
 import { GameHud } from '../ui/GameHud';
 import { generateId } from '../util/Uuid';
+import { ReplayScene } from './ReplayEngine';
 
 const { ccclass, property } = _decorator;
 
 /**
  * 钓鱼游戏主控制器
- * 胖服务端瘦客户端：仅上报 cast 动作 + betAmount，严禁本地计算任何游戏结果
+ * 确定性回放：抛竿时长、鱼群轨迹、咬钩道具均由种子派生，与服务器 100% 一致
  */
 @ccclass('FishingGameController')
 export class FishingGameController extends Component {
@@ -54,8 +55,9 @@ export class FishingGameController extends Component {
         this.hud?.setStatus('抛竿中...');
 
         try {
-            await this.playCastAnimation();
             const sequenceId = this.client.session.consumeSequence();
+            const roundId = generateId('round');
+
             const result = await this.client.bet({
                 merchantId: GameConfig.merchantId,
                 userId: GameConfig.userId,
@@ -63,11 +65,17 @@ export class FishingGameController extends Component {
                 gameCode: GameConfig.gameCode,
                 action: 'cast',
                 betAmount: GameConfig.defaultBet,
-                roundId: generateId('round'),
+                roundId,
                 sequenceId,
                 clientSeed: this.client.session.clientSeed,
             });
-            await this.playResultAnimation(result);
+
+            if (result.replay?.inputs.serverSeed) {
+                await this.playDeterministicRound(result.replay, result);
+            } else {
+                await this.playResultAnimation(result);
+            }
+
             this.hud?.setBalance(result.balance);
             this.hud?.setWin(result.winAmount, result.multiplier);
             this.hud?.setStatus(this.statusText(result));
@@ -81,12 +89,62 @@ export class FishingGameController extends Component {
         }
     }
 
+    /** 从历史 roundId 100% 复现整局（确定性回放） */
+    async replayRound(roundId: string): Promise<void> {
+        this.casting = true;
+        this.hud?.setInteractable(false);
+        try {
+            const data = await this.client.fetchReplay(roundId);
+            const replay = data.replay;
+            if (!replay) {
+                throw new Error('replay payload missing');
+            }
+            await this.playDeterministicRound(replay, {
+                fishState: data.fishState,
+                animationKey: data.animationKey,
+            } as BetResponse);
+            this.hud?.setStatus(`回放 ${roundId} | ${data.fishState}`);
+        } finally {
+            this.casting = false;
+            this.hud?.setInteractable(true);
+        }
+    }
+
+    private async playDeterministicRound(replay: ReplayPayload, result: BetResponse): Promise<void> {
+        const { scene } = replay;
+        this.hud?.setStatus(`天气: ${scene.weather} | ${scene.fishSpecies} | 饵: ${scene.biteProp}`);
+        await this.playCastAnimation(scene.castDurationMs);
+        await this.playFishPath(scene);
+        await this.playResultAnimation(result);
+    }
+
+    private async playFishPath(scene: ReplayScene | ReplayPayload['scene']): Promise<void> {
+        const node = this.fishAnimation?.node;
+        if (!node || !scene.fishPath?.length) {
+            return;
+        }
+
+        const transform = node.getComponent(UITransform);
+        const width = transform?.contentSize.width ?? 800;
+        const height = transform?.contentSize.height ?? 400;
+
+        return new Promise((resolve) => {
+            let chain = tween(node);
+            const stepMs = 300 / scene.fishSpeed;
+            scene.fishPath.forEach((pt) => {
+                const x = (pt.x - 0.5) * width;
+                const y = (pt.y - 0.5) * height;
+                chain = chain.to(stepMs / 1000, { position: new Vec3(x, y, 0) });
+            });
+            chain.call(resolve).start();
+        });
+    }
+
     private async refreshBalance(): Promise<void> {
         const balance = await this.client.getBalance(GameConfig.merchantId, GameConfig.userId);
         this.hud?.setBalance(balance);
     }
 
-    /** 根据服务端 animationKey 驱动表现层 — 不做任何概率计算 */
     private async playResultAnimation(result: BetResponse): Promise<void> {
         const clip = result.animationKey || result.fishState;
         if (this.fishAnimation) {
@@ -124,15 +182,14 @@ export class FishingGameController extends Component {
         });
     }
 
-    private playCastAnimation(): Promise<void> {
+    private playCastAnimation(durationMs: number): Promise<void> {
         if (this.rodAnimation) {
             const state = this.rodAnimation.getState('cast');
             if (state) {
                 this.rodAnimation.play('cast');
-                return this.wait(state.duration || 0.8);
             }
         }
-        return this.wait(0.8);
+        return this.wait(durationMs / 1000);
     }
 
     private statusText(result: BetResponse): string {
@@ -150,7 +207,6 @@ export class FishingGameController extends Component {
         return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
     }
 
-    /** 控制台输出验算链接，玩家可复制到浏览器验证 */
     private logVerifyLink(result: BetResponse): void {
         const pf = result.provablyFair;
         if (!pf) return;
@@ -164,5 +220,6 @@ export class FishingGameController extends Component {
             betAmount: String(GameConfig.defaultBet),
         });
         console.info(`[ProvablyFair] 验算: ${base}/verify/?${params.toString()}`);
+        console.info(`[Replay] 回放: ${base}/replay/?roundId=${result.roundId}`);
     }
 }

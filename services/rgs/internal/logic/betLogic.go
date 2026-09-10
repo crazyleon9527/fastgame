@@ -100,7 +100,7 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			return xerr.ErrWalletBetFailed
 		}
 
-		outcome, proof, err := prng.NewEngine(gameCfg.RtpTier).Spin(
+		scene, proof, err := prng.NewEngine(gameCfg.RtpTier).ComputeReplay(
 			sessionData.ServerSeed,
 			sessionData.ClientSeed,
 			req.RoundId,
@@ -109,6 +109,7 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 		if err != nil {
 			return err
 		}
+		outcome := scene.Outcome
 
 		balance := betResult.Balance
 		settlementStatus := "settled"
@@ -144,13 +145,24 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			AnimationKey:     outcome.AnimationKey,
 			SequenceId:       req.SequenceId,
 			SettlementStatus: settlementStatus,
-			ProvablyFair: types.ProvablyFairProof{
-				ServerSeedHash: proof.ServerSeedHash,
-				ServerSeed:     proof.ServerSeed,
-				ClientSeed:     proof.ClientSeed,
-				Nonce:          proof.Nonce,
-				Roll:           proof.Roll,
-			},
+			ProvablyFair:     proofToTypes(proof),
+			Replay: SceneToPayload(scene, sessionData.ServerSeed, sessionData.ClientSeed, req.RoundId, req.BetAmount),
+		}
+
+		if settlementStatus == "settled" {
+			if err := l.svcCtx.ReplayStore.Insert(l.ctx, &model.GameRoundReplay{
+				RoundID:      req.RoundId,
+				MerchantCode: req.MerchantId,
+				UserID:       req.UserId,
+				GameCode:     req.GameCode,
+				ServerSeed:   sessionData.ServerSeed,
+				ClientSeed:   sessionData.ClientSeed,
+				Nonce:        req.RoundId,
+				BetAmount:    req.BetAmount,
+				SequenceID:   req.SequenceId,
+			}); err != nil {
+				logx.Errorf("save replay record failed: roundId=%s err=%v", req.RoundId, err)
+			}
 		}
 
 		if err := l.svcCtx.Idempotent.SaveResult(l.ctx, req.RoundId, resp); err != nil {

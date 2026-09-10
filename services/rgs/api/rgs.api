@@ -41,6 +41,28 @@ type (
 		Nonce          string  `json:"nonce"`
 		Roll           float64 `json:"roll"`
 	}
+	ReplayInputs {
+		ServerSeed string  `json:"serverSeed"`
+		ClientSeed string  `json:"clientSeed"`
+		Nonce      string  `json:"nonce"`
+		BetAmount  float64 `json:"betAmount"`
+	}
+	ReplayPoint {
+		X float64 `json:"x"`
+		Y float64 `json:"y"`
+	}
+	ReplayScene {
+		Weather        string        `json:"weather"`
+		FishSpecies    string        `json:"fishSpecies"`
+		FishPath       []ReplayPoint `json:"fishPath"`
+		BiteProp       string        `json:"biteProp"`
+		CastDurationMs int           `json:"castDurationMs"`
+		FishSpeed      float64       `json:"fishSpeed"`
+	}
+	ReplayPayload {
+		Inputs ReplayInputs `json:"inputs"`
+		Scene  ReplayScene  `json:"scene"`
+	}
 	BetResp {
 		RoundId      string            `json:"roundId"`
 		WinAmount    float64           `json:"winAmount"`
@@ -51,6 +73,27 @@ type (
 		AnimationKey string            `json:"animationKey"`
 		SequenceId   uint64            `json:"sequenceId"`
 		ProvablyFair ProvablyFairProof `json:"provablyFair"`
+		Replay       ReplayPayload     `json:"replay"`
+	}
+	ReplayReq {
+		RoundId string `path:"roundId"`
+	}
+	ReplayComputeReq {
+		ServerSeed string  `json:"serverSeed" validate:"required"`
+		ClientSeed string  `json:"clientSeed" validate:"required"`
+		Nonce      string  `json:"nonce" validate:"required"`
+		BetAmount  float64 `json:"betAmount" validate:"required,gt=0"`
+		RtpTier    string  `json:"rtpTier,optional"`
+	}
+	ReplayResp {
+		RoundId      string            `json:"roundId,omitempty"`
+		SequenceId   uint64            `json:"sequenceId,omitempty"`
+		Replay       ReplayPayload     `json:"replay"`
+		ProvablyFair ProvablyFairProof `json:"provablyFair"`
+		WinAmount    float64           `json:"winAmount"`
+		Multiplier   float64           `json:"multiplier"`
+		FishState    string            `json:"fishState"`
+		AnimationKey string            `json:"animationKey"`
 	}
 	BalanceReq {
 		MerchantId string `form:"merchantId" validate:"required"`
@@ -76,4 +119,12 @@ service rgs-api {
 	@doc "查询玩家余额"
 	@handler Balance
 	get /game/balance (BalanceReq) returns (BalanceResp)
+
+	@doc "按 Round ID 获取确定性回放数据"
+	@handler Replay
+	get /game/replay/:roundId (ReplayReq) returns (ReplayResp)
+
+	@doc "从种子计算确定性回放（无需 DB）"
+	@handler ReplayCompute
+	post /game/replay/compute (ReplayComputeReq) returns (ReplayResp)
 }
