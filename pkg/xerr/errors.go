@@ -11,4 +11,5 @@ var (
 	ErrInvalidRequest  = errors.New("invalid request")
 	ErrUnauthorized    = errors.New("unauthorized")
 	ErrRateLimited     = errors.New("too many requests")
+	ErrBlocked         = errors.New("access denied")
 )

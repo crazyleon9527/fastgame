@@ -1,6 +1,7 @@
 package svc
 
 import (
+	"context"
 	"time"
 
 	"fastgame/internal/model"
@@ -13,6 +14,7 @@ import (
 	"fastgame/services/rgs/internal/config"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
@@ -32,7 +34,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	conn := sqlx.NewMysql(c.MySQL.DataSource)
 	merchants := model.NewMerchantsModel(conn)
 
-	return &ServiceContext{
+	svcCtx := &ServiceContext{
 		Config:     c,
 		Redis:      rdb,
 		Lock:       lock.NewRedisLock(rdb),
@@ -50,6 +52,23 @@ func NewServiceContext(c config.Config) *ServiceContext {
 			IPLimitPerSec:      c.Security.IPLimitPerSec,
 			MinResponseDelay:   c.Security.MinResponseDelay(),
 		}, merchants, rdb),
+	}
+
+	bootstrapBlacklist(rdb, model.NewRiskBlacklistModel(conn))
+	return svcCtx
+}
+
+func bootstrapBlacklist(rdb *redis.Client, blacklistModel model.RiskBlacklistModel) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	items, err := blacklistModel.ListAllActive(ctx)
+	if err != nil {
+		logx.Errorf("bootstrap blacklist failed: %v", err)
+		return
+	}
+	if err := security.NewBlacklist(rdb).SyncAll(ctx, items); err != nil {
+		logx.Errorf("sync blacklist to redis failed: %v", err)
 	}
 }
 

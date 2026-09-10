@@ -33,6 +33,11 @@ func BetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 
+		if err := svcCtx.Guard.CheckRequest(r, string(bodyBytes)); err != nil {
+			writeSecurityError(w, r, err)
+			return
+		}
+
 		var req types.BetReq
 		if err := json.Unmarshal(bodyBytes, &req); err != nil {
 			httpx.ErrorCtx(r.Context(), w, xerr.ErrInvalidRequest)
@@ -71,6 +76,8 @@ func BetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 func writeSecurityError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
+	case strings.Contains(err.Error(), "blocked"), strings.Contains(err.Error(), "suspicious"), strings.Contains(err.Error(), "not allowed"):
+		httpx.ErrorCtx(r.Context(), w, xerr.ErrBlocked)
 	case strings.Contains(err.Error(), "rate limit"):
 		httpx.ErrorCtx(r.Context(), w, xerr.ErrRateLimited)
 	case strings.Contains(err.Error(), "signature"), strings.Contains(err.Error(), "nonce"), strings.Contains(err.Error(), "timestamp"):

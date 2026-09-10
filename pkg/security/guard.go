@@ -29,10 +29,12 @@ type Config struct {
 }
 
 type Guard struct {
-	cfg      Config
+	cfg       Config
 	merchants model.MerchantsModel
-	replay   *ReplayGuard
-	limiter  *ratelimit.Limiter
+	replay    *ReplayGuard
+	limiter   *ratelimit.Limiter
+	blacklist *Blacklist
+	waf       *WAF
 }
 
 func NewGuard(cfg Config, merchants model.MerchantsModel, redis *redis.Client) *Guard {
@@ -50,6 +52,8 @@ func NewGuard(cfg Config, merchants model.MerchantsModel, redis *redis.Client) *
 		merchants: merchants,
 		replay:    NewReplayGuard(redis, cfg.TimestampWindow, 5*time.Minute),
 		limiter:   ratelimit.NewLimiter(redis),
+		blacklist: NewBlacklist(redis),
+		waf:       NewWAF(),
 	}
 }
 
@@ -63,7 +67,19 @@ type BetCheckInput struct {
 	Headers    http.Header
 }
 
+func (g *Guard) CheckRequest(r *http.Request, body string) error {
+	return g.waf.InspectRequest(r, body)
+}
+
+func (g *Guard) CheckAccess(ctx context.Context, clientIP, merchantID string, userID uint64) error {
+	return g.blacklist.CheckAccess(ctx, clientIP, merchantID, userID)
+}
+
 func (g *Guard) CheckBet(ctx context.Context, in BetCheckInput, limits validator.BetLimits, betAmount float64) error {
+	if err := g.blacklist.CheckAccess(ctx, in.ClientIP, in.MerchantID, in.UserID); err != nil {
+		return err
+	}
+
 	if err := validator.BetLimits(limits).Validate(betAmount); err != nil {
 		return err
 	}
@@ -97,16 +113,13 @@ func (g *Guard) CheckBet(ctx context.Context, in BetCheckInput, limits validator
 		return err
 	}
 
-	merchant, err := g.merchants.FindOneByMerchantCode(ctx, in.MerchantID)
+	secrets, err := g.merchants.FindSecretsByMerchantCode(ctx, in.MerchantID)
 	if err != nil {
 		return fmt.Errorf("merchant not found")
 	}
-	if !merchant.PrivateKey.Valid || merchant.PrivateKey.String == "" {
-		return fmt.Errorf("merchant secret not configured")
-	}
 
 	payload := BuildSignPayload(in.Method, in.Path, in.Body, ts, nonce)
-	return VerifySign(merchant.PrivateKey.String, payload, sig)
+	return VerifyMerchantSign(secrets, payload, sig)
 }
 
 func ParseBetLimits(raw map[string]json.RawMessage) validator.BetLimits {

@@ -89,3 +89,48 @@ type UpsertGameConfigReq struct {
 	RtpTier     string `json:"rtpTier,optional"`
 	Status      int64  `json:"status,default=1"`
 }
+
+type RotateMerchantKeyReq struct {
+	Id               uint64 `path:"id"`
+	GracePeriodHours int64  `json:"gracePeriodHours,optional"`
+}
+
+type RotateMerchantKeyResp struct {
+	MerchantId       uint64 `json:"merchantId"`
+	MerchantCode     string `json:"merchantCode"`
+	NewPrivateKey    string `json:"newPrivateKey"`
+	GracePeriodHours int64  `json:"gracePeriodHours"`
+	RotatedAt        int64  `json:"rotatedAt"`
+}
+
+type BlacklistItem struct {
+	Id        uint64 `json:"id"`
+	ListType  string `json:"listType"`
+	ListValue string `json:"listValue"`
+	Reason    string `json:"reason"`
+	Status    int64  `json:"status"`
+	ExpiresAt string `json:"expiresAt,omitempty"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+type BlacklistListReq struct {
+	ListType string `form:"listType,optional"`
+	Page     int    `form:"page,default=1"`
+	PageSize int    `form:"pageSize,default=20"`
+}
+
+type BlacklistListResp struct {
+	Total int64           `json:"total"`
+	List  []BlacklistItem `json:"list"`
+}
+
+type CreateBlacklistReq struct {
+	ListType  string `json:"listType" validate:"required"`
+	ListValue string `json:"listValue" validate:"required"`
+	Reason    string `json:"reason,optional"`
+	ExpiresAt string `json:"expiresAt,optional"`
+}
+
+type DeleteBlacklistReq struct {
+	Id uint64 `path:"id"`
+}

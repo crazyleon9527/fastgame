@@ -53,6 +53,26 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Handler: UpdateMerchantHandler(serverCtx),
 				},
 				{
+					Method:  http.MethodPost,
+					Path:    "/merchants/:id/rotate-key",
+					Handler: RotateMerchantKeyHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/risk-blacklist",
+					Handler: BlacklistListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/risk-blacklist",
+					Handler: CreateBlacklistHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodDelete,
+					Path:    "/risk-blacklist/:id",
+					Handler: DeleteBlacklistHandler(serverCtx),
+				},
+				{
 					Method:  http.MethodGet,
 					Path:    "/reports/rtp",
 					Handler: RtpReportHandler(serverCtx),

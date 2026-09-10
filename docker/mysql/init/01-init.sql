@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS merchants (
   name          VARCHAR(128)    NOT NULL COMMENT '商户名称',
   public_key    TEXT            NULL     COMMENT 'API 公钥',
   private_key   TEXT            NULL     COMMENT 'API 私钥 (加密存储)',
+  private_key_prev TEXT         NULL     COMMENT '轮换过渡期旧私钥',
+  private_key_prev_expires_at DATETIME(3) NULL COMMENT '旧私钥失效时间',
   status        TINYINT         NOT NULL DEFAULT 1 COMMENT '1=启用 0=禁用',
   created_at    DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at    DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -79,3 +81,18 @@ CREATE TABLE IF NOT EXISTS daily_settlements (
   PRIMARY KEY (id),
   UNIQUE KEY uk_merchant_date (merchant_id, settle_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日结算对账单';
+
+-- 风控黑名单 (IP / 用户 / 商户)
+CREATE TABLE IF NOT EXISTS risk_blacklist (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  list_type    VARCHAR(32)     NOT NULL COMMENT 'ip / user_id / merchant',
+  list_value   VARCHAR(128)    NOT NULL COMMENT '黑名单值',
+  reason       VARCHAR(256)    NULL     COMMENT '封禁原因',
+  status       TINYINT         NOT NULL DEFAULT 1 COMMENT '1=生效 0=解除',
+  expires_at   DATETIME(3)     NULL     COMMENT 'NULL=永久',
+  created_at   DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at   DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_type_value (list_type, list_value),
+  KEY idx_status_expires (status, expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='风控黑名单';

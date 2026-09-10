@@ -40,6 +40,44 @@ type (
 		Name   string `json:"name,optional"`
 		Status int64  `json:"status,optional"`
 	}
+	RotateMerchantKeyReq {
+		Id               uint64 `path:"id"`
+		GracePeriodHours int64  `json:"gracePeriodHours,optional"`
+	}
+	RotateMerchantKeyResp {
+		MerchantId       uint64 `json:"merchantId"`
+		MerchantCode     string `json:"merchantCode"`
+		NewPrivateKey    string `json:"newPrivateKey"`
+		GracePeriodHours int64  `json:"gracePeriodHours"`
+		RotatedAt        int64  `json:"rotatedAt"`
+	}
+	BlacklistItem {
+		Id        uint64 `json:"id"`
+		ListType  string `json:"listType"`
+		ListValue string `json:"listValue"`
+		Reason    string `json:"reason"`
+		Status    int64  `json:"status"`
+		ExpiresAt string `json:"expiresAt,optional"`
+		CreatedAt int64  `json:"createdAt"`
+	}
+	BlacklistListReq {
+		ListType string `form:"listType,optional"`
+		Page     int    `form:"page,default=1"`
+		PageSize int    `form:"pageSize,default=20"`
+	}
+	BlacklistListResp {
+		Total int64           `json:"total"`
+		List  []BlacklistItem `json:"list"`
+	}
+	CreateBlacklistReq {
+		ListType  string `json:"listType" validate:"required"`
+		ListValue string `json:"listValue" validate:"required"`
+		Reason    string `json:"reason,optional"`
+		ExpiresAt string `json:"expiresAt,optional"`
+	}
+	DeleteBlacklistReq {
+		Id uint64 `path:"id"`
+	}
 	GameConfigItem {
 		Id          uint64 `json:"id"`
 		MerchantId  uint64 `json:"merchantId"`
@@ -105,6 +143,18 @@ service admin-api {
 
 	@handler UpdateMerchant
 	put /merchants/:id (UpdateMerchantReq) returns (MerchantItem)
+
+	@handler RotateMerchantKey
+	post /merchants/:id/rotate-key (RotateMerchantKeyReq) returns (RotateMerchantKeyResp)
+
+	@handler BlacklistList
+	get /risk-blacklist (BlacklistListReq) returns (BlacklistListResp)
+
+	@handler CreateBlacklist
+	post /risk-blacklist (CreateBlacklistReq) returns (BlacklistItem)
+
+	@handler DeleteBlacklist
+	delete /risk-blacklist/:id (DeleteBlacklistReq)
 
 	@handler GameConfigList
 	get /game-configs (GameConfigListReq) returns (GameConfigListResp)

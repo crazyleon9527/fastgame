@@ -9,7 +9,12 @@ type Config struct {
 		AccessExpire int64
 	}
 	MySQL MySQLConf
+	Redis RedisConf
 	CH    ClickHouseConf
+}
+
+type RedisConf struct {
+	Addr string
 }
 
 type MySQLConf struct {
