@@ -1,0 +1,21 @@
+Name: admin-api
+Host: 0.0.0.0
+Port: 18889
+Timeout: 30000
+
+Log:
+  Mode: console
+  Level: info
+
+Auth:
+  AccessSecret: fastgame-admin-jwt-secret-change-me
+  AccessExpire: 86400
+
+MySQL:
+  DataSource: fastgame:fastgame_pass@tcp(localhost:13306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC
+
+CH:
+  Addr: localhost:19000
+  Database: fastgame
+  User: fastgame
+  Password: fastgame_pass

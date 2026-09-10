@@ -1,0 +1,118 @@
+syntax = "v1"
+
+info (
+	title:   "FastGame Admin API"
+	desc:    "运营管理后台 - 商户管理、游戏配置、对账报表"
+	author:  "leon"
+	version: "v1"
+)
+
+type (
+	LoginReq {
+		Username string `json:"username" validate:"required"`
+		Password string `json:"password" validate:"required"`
+	}
+	LoginResp {
+		AccessToken string `json:"accessToken"`
+		ExpireAt    int64  `json:"expireAt"`
+	}
+	MerchantItem {
+		Id           uint64 `json:"id"`
+		MerchantCode string `json:"merchantCode"`
+		Name         string `json:"name"`
+		Status       int64  `json:"status"`
+	}
+	MerchantListReq {
+		Page     int `form:"page,default=1"`
+		PageSize int `form:"pageSize,default=20"`
+	}
+	MerchantListResp {
+		Total int64          `json:"total"`
+		List  []MerchantItem `json:"list"`
+	}
+	CreateMerchantReq {
+		MerchantCode string `json:"merchantCode" validate:"required"`
+		Name         string `json:"name" validate:"required"`
+		Status       int64  `json:"status,default=1"`
+	}
+	UpdateMerchantReq {
+		Id     uint64 `path:"id"`
+		Name   string `json:"name,optional"`
+		Status int64  `json:"status,optional"`
+	}
+	GameConfigItem {
+		Id          uint64 `json:"id"`
+		MerchantId  uint64 `json:"merchantId"`
+		GameCode    string `json:"gameCode"`
+		ConfigKey   string `json:"configKey"`
+		ConfigValue string `json:"configValue"`
+		RtpTier     string `json:"rtpTier"`
+		Status      int64  `json:"status"`
+	}
+	GameConfigListReq {
+		MerchantId uint64 `form:"merchantId" validate:"required"`
+		GameCode   string `form:"gameCode,optional"`
+	}
+	GameConfigListResp {
+		List []GameConfigItem `json:"list"`
+	}
+	UpsertGameConfigReq {
+		MerchantId  uint64 `json:"merchantId" validate:"required"`
+		GameCode    string `json:"gameCode" validate:"required"`
+		ConfigKey   string `json:"configKey" validate:"required"`
+		ConfigValue string `json:"configValue" validate:"required"`
+		RtpTier     string `json:"rtpTier,optional"`
+		Status      int64  `json:"status,default=1"`
+	}
+	RtpReportReq {
+		MerchantId uint64 `form:"merchantId,optional"`
+		GameCode   string `form:"gameCode,optional"`
+		Hours      int    `form:"hours,default=24"`
+	}
+	RtpReportItem {
+		MerchantId  uint64  `json:"merchantId"`
+		GameCode    string  `json:"gameCode"`
+		Hour        string  `json:"hour"`
+		TotalBet    float64 `json:"totalBet"`
+		TotalWin    float64 `json:"totalWin"`
+		TotalRounds uint64  `json:"totalRounds"`
+		ActualRtp   float64 `json:"actualRtp"`
+	}
+	RtpReportResp {
+		List []RtpReportItem `json:"list"`
+	}
+)
+
+@server (
+	prefix: /api/v1/admin
+)
+service admin-api {
+	@handler Login
+	post /login (LoginReq) returns (LoginResp)
+}
+
+@server (
+	prefix:     /api/v1/admin
+	jwt:        Auth
+	middleware: AuthMiddleware
+)
+service admin-api {
+	@handler MerchantList
+	get /merchants (MerchantListReq) returns (MerchantListResp)
+
+	@handler CreateMerchant
+	post /merchants (CreateMerchantReq) returns (MerchantItem)
+
+	@handler UpdateMerchant
+	put /merchants/:id (UpdateMerchantReq) returns (MerchantItem)
+
+	@handler GameConfigList
+	get /game-configs (GameConfigListReq) returns (GameConfigListResp)
+
+	@handler UpsertGameConfig
+	post /game-configs (UpsertGameConfigReq) returns (GameConfigItem)
+
+	@handler RtpReport
+	get /reports/rtp (RtpReportReq) returns (RtpReportResp)
+}
+

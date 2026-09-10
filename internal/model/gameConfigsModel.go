@@ -14,6 +14,7 @@ type (
 		gameConfigsModel
 		withSession(session sqlx.Session) GameConfigsModel
 		FindActiveByMerchantGame(ctx context.Context, merchantId uint64, gameCode string) ([]*GameConfigs, error)
+		FindByMerchant(ctx context.Context, merchantId uint64, gameCode string) ([]*GameConfigs, error)
 	}
 
 	customGameConfigsModel struct {
@@ -35,5 +36,15 @@ func (m *customGameConfigsModel) FindActiveByMerchantGame(ctx context.Context, m
 	query := fmt.Sprintf("select %s from %s where `merchant_id` = ? and `game_code` = ? and `status` = 1", gameConfigsRows, m.table)
 	var resp []*GameConfigs
 	err := m.conn.QueryRowsCtx(ctx, &resp, query, merchantId, gameCode)
+	return resp, err
+}
+
+func (m *customGameConfigsModel) FindByMerchant(ctx context.Context, merchantId uint64, gameCode string) ([]*GameConfigs, error) {
+	if gameCode != "" {
+		return m.FindActiveByMerchantGame(ctx, merchantId, gameCode)
+	}
+	query := fmt.Sprintf("select %s from %s where `merchant_id` = ? and `status` = 1 order by game_code, config_key", gameConfigsRows, m.table)
+	var resp []*GameConfigs
+	err := m.conn.QueryRowsCtx(ctx, &resp, query, merchantId)
 	return resp, err
 }
