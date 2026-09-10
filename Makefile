@@ -23,8 +23,19 @@ migrate-money:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/08-money-migration.sql
 	docker compose run --rm clickhouse-init
 
+migrate-ch-money:
+	chmod +x scripts/migrate_ch_money.sh
+	./scripts/migrate_ch_money.sh
+
 migrate-totp:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/09-totp-recovery-migration.sql
+
+migrate-all:
+	$(MAKE) migrate-security migrate-wallet migrate-replay migrate-orphan-trace migrate-antiabuse migrate-totp migrate-money
+
+verify-staging-money:
+	chmod +x scripts/verify_staging_money.sh
+	./scripts/verify_staging_money.sh
 
 seed-admin:
 	go run scripts/seed_admin.go | docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame

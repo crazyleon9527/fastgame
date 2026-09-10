@@ -83,7 +83,9 @@ func (stubGameConfig) Load(_ context.Context, _, _ string) (*gameconfig.Config, 
 	}, nil
 }
 
-func newIntegrationSvcCtx(t *testing.T) *svc.ServiceContext {
+const testMerchantSecret = "dev-secret-m001-change-in-prod"
+
+func newIntegrationSvcCtx(t *testing.T, prodSecurity bool) *svc.ServiceContext {
 	t.Helper()
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
@@ -92,10 +94,20 @@ func newIntegrationSvcCtx(t *testing.T) *svc.ServiceContext {
 
 	zeroRedis := zeroredis.MustNewRedis(zeroredis.RedisConf{Host: mr.Addr(), Type: "node"})
 
+	skipMerchant := !prodSecurity
+	var merchants model.MerchantsModel
+	if prodSecurity {
+		merchants = model.StubMerchantsModel{
+			Secrets: &model.MerchantSecrets{
+				PrivateKey: sql.NullString{String: testMerchantSecret, Valid: true},
+			},
+		}
+	}
+
 	return &svc.ServiceContext{
 		Config: config.Config{
 			Security: config.SecurityConf{
-				SkipMerchantSign:    true,
+				SkipMerchantSign:    skipMerchant,
 				SkipSessionEnvelope: false,
 				TimestampWindowSec:  120,
 				MaxClockSkewSec:     5,
@@ -111,11 +123,11 @@ func newIntegrationSvcCtx(t *testing.T) *svc.ServiceContext {
 		GameConfig: stubGameConfig{},
 		Kafka:      kafka.NewProducer([]string{"127.0.0.1:1"}),
 		Guard: security.NewGuard(security.Config{
-			SkipMerchantSign:    true,
+			SkipMerchantSign:    skipMerchant,
 			SkipSessionEnvelope: false,
 			TimestampWindow:     120 * time.Second,
 			MaxClockSkew:        5 * time.Second,
-		}, nil, rdb),
+		}, merchants, rdb),
 		RateLimit:   ratelimit.NewGateway(zeroRedis, 1000, 1000, 1000, 1000),
 		Session:     session.NewStore(rdb, time.Hour),
 		PendingTx:   noopPendingTx{},
@@ -124,8 +136,13 @@ func newIntegrationSvcCtx(t *testing.T) *svc.ServiceContext {
 	}
 }
 
+func signMerchantRequest(method, path, body, ts, nonce, secret string) string {
+	payload := security.BuildSignPayload(method, path, body, ts, nonce)
+	return security.Sign(secret, payload)
+}
+
 func TestBetGoldenPathSessionEnvelope(t *testing.T) {
-	svcCtx := newIntegrationSvcCtx(t)
+	svcCtx := newIntegrationSvcCtx(t, false)
 
 	// 1) Create session
 	sessionBody, _ := json.Marshal(types.SessionReq{
@@ -188,8 +205,105 @@ func TestBetGoldenPathSessionEnvelope(t *testing.T) {
 	}
 }
 
+func TestBetProdSecurityMerchantSignAndEnvelope(t *testing.T) {
+	svcCtx := newIntegrationSvcCtx(t, true)
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+
+	sessionBody, _ := json.Marshal(types.SessionReq{
+		MerchantId: "m001",
+		UserId:     10001,
+		GameCode:   "fishing",
+		ClientSeed: "client-prod-e2e",
+	})
+	sreq := httptest.NewRequest(http.MethodPost, "/api/v1/game/session", bytes.NewReader(sessionBody))
+	sreq.Header.Set("Content-Type", "application/json")
+	sreq.RemoteAddr = "127.0.0.1:1234"
+	sw := httptest.NewRecorder()
+	SessionHandler(svcCtx)(sw, sreq)
+	if sw.Code != http.StatusOK {
+		t.Fatalf("session status=%d body=%s", sw.Code, sw.Body.String())
+	}
+	var sessionResp types.SessionResp
+	if err := json.Unmarshal(sw.Body.Bytes(), &sessionResp); err != nil {
+		t.Fatal(err)
+	}
+
+	roundID := "prod-e2e-round-1"
+	betBody, _ := json.Marshal(types.BetReq{
+		MerchantId:   "m001",
+		UserId:       10001,
+		SessionToken: sessionResp.SessionToken,
+		GameCode:     "fishing",
+		Action:       "cast",
+		BetAmount:    100000,
+		RoundId:      roundID,
+		SequenceId:   sessionResp.NextSequenceId,
+	})
+	bBody := string(betBody)
+	bNonce := "nonce-prod-e2e-2"
+	envSig := security.SignEnvelope(sessionResp.DynamicSessionKey, roundID, "cast", ts)
+	breq := httptest.NewRequest(http.MethodPost, "/api/v1/game/bet", bytes.NewReader(betBody))
+	breq.Header.Set("Content-Type", "application/json")
+	breq.Header.Set(security.HeaderTimestamp, ts)
+	breq.Header.Set(security.HeaderNonce, bNonce)
+	breq.Header.Set(security.HeaderSignature, signMerchantRequest(http.MethodPost, "/api/v1/game/bet", bBody, ts, bNonce, testMerchantSecret))
+	breq.Header.Set(security.HeaderSessionSign, envSig)
+	breq.RemoteAddr = "127.0.0.1:1234"
+	bw := httptest.NewRecorder()
+	BetHandler(svcCtx)(bw, breq)
+	if bw.Code != http.StatusOK && bw.Code != http.StatusAccepted {
+		t.Fatalf("bet status=%d body=%s", bw.Code, bw.Body.String())
+	}
+}
+
+func TestBetRejectsBadMerchantSign(t *testing.T) {
+	svcCtx := newIntegrationSvcCtx(t, true)
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+
+	sessionBody, _ := json.Marshal(types.SessionReq{
+		MerchantId: "m001",
+		UserId:     10001,
+		GameCode:   "fishing",
+	})
+	sreq := httptest.NewRequest(http.MethodPost, "/api/v1/game/session", bytes.NewReader(sessionBody))
+	sreq.Header.Set("Content-Type", "application/json")
+	sreq.RemoteAddr = "127.0.0.1:1234"
+	sw := httptest.NewRecorder()
+	SessionHandler(svcCtx)(sw, sreq)
+	var sessionResp types.SessionResp
+	if err := json.Unmarshal(sw.Body.Bytes(), &sessionResp); err != nil {
+		t.Fatal(err)
+	}
+
+	roundID := "bad-sign-round"
+	betBody, _ := json.Marshal(types.BetReq{
+		MerchantId:   "m001",
+		UserId:       10001,
+		SessionToken: sessionResp.SessionToken,
+		GameCode:     "fishing",
+		Action:       "cast",
+		BetAmount:    100000,
+		RoundId:      roundID,
+		SequenceId:   sessionResp.NextSequenceId,
+	})
+	bNonce := "nonce-bad-sign"
+	envSig := security.SignEnvelope(sessionResp.DynamicSessionKey, roundID, "cast", ts)
+	breq := httptest.NewRequest(http.MethodPost, "/api/v1/game/bet", bytes.NewReader(betBody))
+	breq.Header.Set("Content-Type", "application/json")
+	breq.Header.Set(security.HeaderTimestamp, ts)
+	breq.Header.Set(security.HeaderNonce, bNonce)
+	breq.Header.Set(security.HeaderSignature, "deadbeef")
+	breq.Header.Set(security.HeaderSessionSign, envSig)
+	breq.RemoteAddr = "127.0.0.1:1234"
+	bw := httptest.NewRecorder()
+	BetHandler(svcCtx)(bw, breq)
+	if bw.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for bad merchant sign, got %d body=%s", bw.Code, bw.Body.String())
+	}
+}
+
 func TestBetRejectsInvalidEnvelope(t *testing.T) {
-	svcCtx := newIntegrationSvcCtx(t)
+	svcCtx := newIntegrationSvcCtx(t, false)
 
 	sessionBody, _ := json.Marshal(types.SessionReq{
 		MerchantId: "m001",

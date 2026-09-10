@@ -1,0 +1,75 @@
+[
+  {
+    "__type__": "cc.SceneAsset",
+    "_name": "FishingMinimal",
+    "_objFlags": 0,
+    "_native": "",
+    "scene": { "__id__": 1 }
+  },
+  {
+    "__type__": "cc.Scene",
+    "_name": "FishingMinimal",
+    "_children": [{ "__id__": 2 }],
+    "_globals": { "__id__": 8 }
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "Canvas",
+    "_children": [
+      { "__id__": 3 },
+      { "__id__": 4 },
+      { "__id__": 5 },
+      { "__id__": 6 }
+    ],
+    "_components": [{ "__id__": 7 }],
+    "_lpos": { "x": 640, "y": 360, "z": 0 }
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "Game",
+    "_parent": { "__id__": 2 },
+    "_components": [{ "__id__": 9 }]
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "FishLayer",
+    "_parent": { "__id__": 2 }
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "VfxLayer",
+    "_parent": { "__id__": 2 }
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "Hud",
+    "_parent": { "__id__": 2 }
+  },
+  {
+    "__type__": "cc.Canvas",
+    "_name": "",
+    "node": { "__id__": 2 },
+    "_designResolution": { "width": 1280, "height": 720 }
+  },
+  {
+    "__type__": "cc.SceneGlobals",
+    "ambient": { "__id__": 10 }
+  },
+  {
+    "__type__": "cc.AmbientInfo"
+  },
+  {
+    "__type__": "MinimalSceneBootstrap",
+    "_name": "",
+    "node": { "__id__": 3 },
+    "game": { "__id__": 11 }
+  },
+  {
+    "__type__": "FishingGameController",
+    "_name": "",
+    "node": { "__id__": 3 },
+    "fishLayer": { "__id__": 4 },
+    "vfxLayer": { "__id__": 5 },
+    "hud": { "__id__": 6 }
+  }
+]
