@@ -10,7 +10,10 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-const TopicRoundSettled = "game.round.settled"
+const (
+	TopicRoundSettled    = "game.round.settled"
+	TopicWalletRollback  = "game.wallet.rollback"
+)
 
 type RoundSettledEvent struct {
 	EventID    string    `json:"eventId"`
@@ -26,6 +29,17 @@ type RoundSettledEvent struct {
 	SettledAt  time.Time `json:"settledAt"`
 }
 
+type WalletRollbackEvent struct {
+	EventID      string    `json:"eventId"`
+	RoundID      string    `json:"roundId"`
+	UserID       uint64    `json:"userId"`
+	MerchantID   string    `json:"merchantId"`
+	RollbackType string    `json:"rollbackType"`
+	Amount       float64   `json:"amount"`
+	Reason       string    `json:"reason"`
+	OccurredAt   time.Time `json:"occurredAt"`
+}
+
 type Producer struct {
 	writer *kafka.Writer
 }
@@ -34,7 +48,6 @@ func NewProducer(brokers []string) *Producer {
 	return &Producer{
 		writer: &kafka.Writer{
 			Addr:     kafka.TCP(brokers...),
-			Topic:    TopicRoundSettled,
 			Balancer: &kafka.Hash{},
 		},
 	}
@@ -47,14 +60,27 @@ func (p *Producer) PublishRoundSettled(ctx context.Context, evt RoundSettledEven
 	if evt.SettledAt.IsZero() {
 		evt.SettledAt = time.Now().UTC()
 	}
+	return p.publish(ctx, TopicRoundSettled, fmt.Sprintf("%d", evt.UserID), evt)
+}
 
-	body, err := json.Marshal(evt)
+func (p *Producer) PublishWalletRollback(ctx context.Context, evt WalletRollbackEvent) error {
+	if evt.EventID == "" {
+		evt.EventID = uuid.NewString()
+	}
+	if evt.OccurredAt.IsZero() {
+		evt.OccurredAt = time.Now().UTC()
+	}
+	return p.publish(ctx, TopicWalletRollback, fmt.Sprintf("%d", evt.UserID), evt)
+}
+
+func (p *Producer) publish(ctx context.Context, topic, key string, payload any) error {
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-
 	return p.writer.WriteMessages(ctx, kafka.Message{
-		Key:   []byte(fmt.Sprintf("%d", evt.UserID)),
+		Topic: topic,
+		Key:   []byte(key),
 		Value: body,
 	})
 }

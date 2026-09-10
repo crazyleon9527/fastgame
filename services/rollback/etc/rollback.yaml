@@ -1,0 +1,20 @@
+Kafka:
+  Brokers:
+    - localhost:19092
+  GroupID: fastgame-rollback-consumer
+  Topic: game.wallet.rollback
+
+ClickHouse:
+  Addr: localhost:19000
+  Database: fastgame
+  User: fastgame
+  Password: fastgame_pass
+
+MySQL:
+  DataSource: fastgame:fastgame_pass@tcp(localhost:13306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC
+
+Wallet:
+  Mock: true
+  BaseURL: ""
+  APIKey: ""
+  Timeout: 5s

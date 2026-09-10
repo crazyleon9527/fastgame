@@ -29,23 +29,31 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	rdb := redis.NewClient(&redis.Options{Addr: c.Redis.Addr})
 	conn := sqlx.NewMysql(c.MySQL.DataSource)
 
-	var walletClient wallet.Client
-	if c.Wallet.Mock {
-		walletClient = wallet.NewMockClient(10000)
-	} else {
-		walletClient = wallet.NewMockClient(10000) // TODO: replace with real Seamless Wallet HTTP client
-	}
-
 	return &ServiceContext{
 		Config:     c,
 		Redis:      rdb,
 		Lock:       lock.NewRedisLock(rdb),
 		Idempotent: idempotent.NewStore(rdb, 24*time.Hour),
-		Wallet:     walletClient,
+		Wallet:     newWalletClient(c.Wallet),
 		GameConfig: gameconfig.NewLoader(
 			model.NewMerchantsModel(conn),
 			model.NewGameConfigsModel(conn),
 		),
 		Kafka: kafka.NewProducer(c.Kafka.Brokers),
 	}
+}
+
+func newWalletClient(cfg config.WalletConf) wallet.Client {
+	if cfg.Mock || cfg.BaseURL == "" {
+		return wallet.NewMockClient(10000)
+	}
+	timeout, err := time.ParseDuration(cfg.Timeout)
+	if err != nil {
+		timeout = 5 * time.Second
+	}
+	return wallet.NewHTTPClient(wallet.HTTPConfig{
+		BaseURL: cfg.BaseURL,
+		APIKey:  cfg.APIKey,
+		Timeout: timeout,
+	})
 }

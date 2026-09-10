@@ -32,15 +32,34 @@ func NewBetLogic(ctx context.Context, svcCtx *svc.ServiceContext) *BetLogic {
 }
 
 func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
-	var resp *types.BetResp
+	var cached types.BetResp
+	if ok, err := l.svcCtx.Idempotent.GetResult(l.ctx, req.RoundId, &cached); err != nil {
+		return nil, err
+	} else if ok {
+		return &cached, nil
+	}
 
+	var resp *types.BetResp
 	lockKey := fmt.Sprintf("lock:user:%d", req.UserId)
 	err := l.svcCtx.Lock.WithLock(l.ctx, lockKey, 10*time.Second, func() error {
+		if ok, err := l.svcCtx.Idempotent.GetResult(l.ctx, req.RoundId, &cached); err != nil {
+			return err
+		} else if ok {
+			resp = &cached
+			return nil
+		}
+
 		claimed, err := l.svcCtx.Idempotent.Claim(l.ctx, req.RoundId)
 		if err != nil {
 			return err
 		}
 		if !claimed {
+			if ok, err := l.svcCtx.Idempotent.GetResult(l.ctx, req.RoundId, &cached); err != nil {
+				return err
+			} else if ok {
+				resp = &cached
+				return nil
+			}
 			return xerr.ErrDuplicateRound
 		}
 
@@ -70,6 +89,7 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 				Amount:     outcome.WinAmount,
 			})
 			if err != nil {
+				l.handleWinFailure(req, req.BetAmount)
 				return xerr.ErrWalletWinFailed
 			}
 			balance = winResult.Balance
@@ -85,6 +105,10 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			AnimationKey: outcome.AnimationKey,
 		}
 
+		if err := l.svcCtx.Idempotent.SaveResult(l.ctx, req.RoundId, resp); err != nil {
+			logx.Errorf("save idempotent result failed: roundId=%s err=%v", req.RoundId, err)
+		}
+
 		go l.publishSettledEvent(req, outcome, balance)
 		return nil
 	})
@@ -96,6 +120,24 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 	}
 
 	return resp, nil
+}
+
+func (l *BetLogic) handleWinFailure(req *types.BetReq, betAmount float64) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	rollbackReq := wallet.RollbackReq{
+		MerchantID: req.MerchantId,
+		UserID:     req.UserId,
+		RoundID:    req.RoundId,
+		Amount:     betAmount,
+		Reason:     "win_failed",
+	}
+	if err := l.svcCtx.Wallet.Rollback(ctx, rollbackReq); err != nil {
+		logx.Errorf("wallet rollback failed: roundId=%s err=%v", req.RoundId, err)
+	}
+
+	go l.publishRollbackEvent(req, betAmount, "win_failed")
 }
 
 func (l *BetLogic) publishSettledEvent(req *types.BetReq, outcome prng.Outcome, balance float64) {
@@ -115,5 +157,22 @@ func (l *BetLogic) publishSettledEvent(req *types.BetReq, outcome prng.Outcome, 
 	})
 	if err != nil {
 		logx.Errorf("publish round settled event failed: roundId=%s err=%v", req.RoundId, err)
+	}
+}
+
+func (l *BetLogic) publishRollbackEvent(req *types.BetReq, amount float64, reason string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := l.svcCtx.Kafka.PublishWalletRollback(ctx, kafka.WalletRollbackEvent{
+		RoundID:      req.RoundId,
+		UserID:       req.UserId,
+		MerchantID:   req.MerchantId,
+		RollbackType: "bet_refund",
+		Amount:       amount,
+		Reason:       reason,
+	})
+	if err != nil {
+		logx.Errorf("publish wallet rollback event failed: roundId=%s err=%v", req.RoundId, err)
 	}
 }

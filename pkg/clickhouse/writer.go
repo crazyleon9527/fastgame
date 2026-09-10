@@ -11,6 +11,18 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+type WalletRollbackRow struct {
+	EventID      string
+	RoundID      string
+	UserID       uint64
+	MerchantID   uint64
+	RollbackType string
+	Amount       float64
+	Reason       string
+	Status       string
+	OccurredAt   time.Time
+}
+
 type RoundSettledRow struct {
 	EventID      string
 	RoundID      string
@@ -121,6 +133,52 @@ func (w *Writer) BatchInsertRoundSettled(ctx context.Context, rows []RoundSettle
 			row.RtpTier,
 			decimal.NewFromFloat(row.BalanceAfter),
 			settledAt,
+		); err != nil {
+			return err
+		}
+	}
+
+	return batch.Send()
+}
+
+func (w *Writer) BatchInsertWalletRollback(ctx context.Context, rows []WalletRollbackRow) error {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	batch, err := w.conn.PrepareBatch(ctx, `
+		INSERT INTO fastgame.game_wallet_rollback (
+			event_id, round_id, user_id, merchant_id, rollback_type,
+			amount, reason, status, occurred_at
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	for _, row := range rows {
+		eventID, err := uuid.Parse(row.EventID)
+		if err != nil {
+			eventID = uuid.New()
+		}
+		occurredAt := row.OccurredAt
+		if occurredAt.IsZero() {
+			occurredAt = time.Now().UTC()
+		}
+		status := row.Status
+		if status == "" {
+			status = "done"
+		}
+		if err := batch.Append(
+			eventID,
+			row.RoundID,
+			row.UserID,
+			row.MerchantID,
+			row.RollbackType,
+			decimal.NewFromFloat(row.Amount),
+			row.Reason,
+			status,
+			occurredAt,
 		); err != nil {
 			return err
 		}

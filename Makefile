@@ -1,4 +1,4 @@
-.PHONY: up down restart ps logs init clean run-rgs run-consumer build install-goctl codegen seed
+.PHONY: up down restart ps logs init clean run-rgs run-consumer run-rollback build install-goctl codegen seed
 
 seed:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/02-seed.sql
@@ -40,9 +40,13 @@ clean:
 build:
 	go build -o bin/rgs-api ./services/rgs
 	go build -o bin/consumer ./services/consumer
+	go build -o bin/rollback ./services/rollback
 
 run-rgs: build
 	./bin/rgs-api -f services/rgs/etc/rgs-api.yaml
 
 run-consumer: build
 	./bin/consumer -f services/consumer/etc/consumer.yaml
+
+run-rollback: build
+	./bin/rollback -f services/rollback/etc/rollback.yaml

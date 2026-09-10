@@ -19,6 +19,9 @@ Kafka:
 
 Wallet:
   Mock: true
+  BaseURL: ""
+  APIKey: ""
+  Timeout: 5s
 
 Game:
   DefaultRtpTier: default

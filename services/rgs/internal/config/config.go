@@ -24,7 +24,10 @@ type KafkaConf struct {
 }
 
 type WalletConf struct {
-	Mock bool
+	Mock    bool
+	BaseURL string
+	APIKey  string
+	Timeout string
 }
 
 type GameConf struct {
