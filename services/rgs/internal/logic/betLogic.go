@@ -2,9 +2,11 @@ package logic
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
+	"fastgame/internal/model"
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/lock"
 	"fastgame/pkg/prng"
@@ -109,6 +111,8 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 		}
 
 		balance := betResult.Balance
+		settlementStatus := "settled"
+
 		if outcome.WinAmount > 0 {
 			winResult, err := l.svcCtx.Wallet.Win(l.ctx, wallet.WinReq{
 				MerchantID: req.MerchantId,
@@ -117,21 +121,29 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 				Amount:     outcome.WinAmount,
 			})
 			if err != nil {
-				l.handleWinFailure(req, req.BetAmount)
-				return xerr.ErrWalletWinFailed
+				opType := model.PendingOpWinFailed
+				if wallet.IsTimeoutErr(err) {
+					opType = model.PendingOpWinTimeout
+				}
+				l.recordPending(req, outcome, opType, err)
+				go l.handleWinFailure(req, req.BetAmount, opType)
+				settlementStatus = "pending"
+				balance = betResult.Balance
+			} else {
+				balance = winResult.Balance
 			}
-			balance = winResult.Balance
 		}
 
 		resp = &types.BetResp{
-			RoundId:      req.RoundId,
-			WinAmount:    outcome.WinAmount,
-			Multiplier:   outcome.Multiplier,
-			Balance:      balance,
-			RtpTier:      outcome.RtpTier,
-			FishState:    outcome.FishState,
-			AnimationKey: outcome.AnimationKey,
-			SequenceId:   req.SequenceId,
+			RoundId:          req.RoundId,
+			WinAmount:        outcome.WinAmount,
+			Multiplier:       outcome.Multiplier,
+			Balance:          balance,
+			RtpTier:          outcome.RtpTier,
+			FishState:        outcome.FishState,
+			AnimationKey:     outcome.AnimationKey,
+			SequenceId:       req.SequenceId,
+			SettlementStatus: settlementStatus,
 			ProvablyFair: types.ProvablyFairProof{
 				ServerSeedHash: proof.ServerSeedHash,
 				ServerSeed:     proof.ServerSeed,
@@ -145,9 +157,11 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			logx.Errorf("save idempotent result failed: roundId=%s err=%v", req.RoundId, err)
 		}
 
-		go l.publishSettledEvent(req, outcome, balance)
-		if outcome.Multiplier >= 50 {
-			go l.publishBigWinEvent(req, outcome)
+		if settlementStatus == "settled" {
+			go l.publishSettledEvent(req, outcome, balance)
+			if outcome.Multiplier >= 50 {
+				go l.publishBigWinEvent(req, outcome)
+			}
 		}
 		return nil
 	})
@@ -161,7 +175,26 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 	return resp, nil
 }
 
-func (l *BetLogic) handleWinFailure(req *types.BetReq, betAmount float64) {
+func (l *BetLogic) recordPending(req *types.BetReq, outcome prng.Outcome, opType string, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, insertErr := l.svcCtx.PendingOps.Insert(ctx, &model.WalletPendingOp{
+		RoundID:      req.RoundId,
+		MerchantCode: req.MerchantId,
+		UserID:       req.UserId,
+		OpType:       opType,
+		BetAmount:    req.BetAmount,
+		WinAmount:    outcome.WinAmount,
+		Status:       model.PendingStatusPending,
+		LastError:    sql.NullString{String: err.Error(), Valid: err != nil},
+	})
+	if insertErr != nil {
+		logx.Errorf("record pending op failed: roundId=%s err=%v", req.RoundId, insertErr)
+	}
+}
+
+func (l *BetLogic) handleWinFailure(req *types.BetReq, betAmount float64, reason string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -170,13 +203,14 @@ func (l *BetLogic) handleWinFailure(req *types.BetReq, betAmount float64) {
 		UserID:     req.UserId,
 		RoundID:    req.RoundId,
 		Amount:     betAmount,
-		Reason:     "win_failed",
+		Reason:     reason,
 	}
 	if err := l.svcCtx.Wallet.Rollback(ctx, rollbackReq); err != nil {
 		logx.Errorf("wallet rollback failed: roundId=%s err=%v", req.RoundId, err)
+		l.recordPending(req, prng.Outcome{WinAmount: 0}, model.PendingOpRollback, err)
 	}
 
-	go l.publishRollbackEvent(req, betAmount, "win_failed")
+	go l.publishRollbackEvent(req, betAmount, reason)
 }
 
 func (l *BetLogic) publishSettledEvent(req *types.BetReq, outcome prng.Outcome, balance float64) {

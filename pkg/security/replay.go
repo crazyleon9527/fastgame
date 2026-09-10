@@ -19,6 +19,12 @@ func NewReplayGuard(client *redis.Client, window, ttl time.Duration) *ReplayGuar
 	if window <= 0 {
 		window = 60 * time.Second
 	}
+	if window < 30*time.Second {
+		window = 30 * time.Second
+	}
+	if window > 60*time.Second {
+		window = 60 * time.Second
+	}
 	if ttl <= 0 {
 		ttl = 5 * time.Minute
 	}

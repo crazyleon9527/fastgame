@@ -30,10 +30,27 @@ type KafkaConf struct {
 }
 
 type WalletConf struct {
-	Mock    bool
-	BaseURL string
-	APIKey  string
-	Timeout string
+	Mock                 bool
+	BaseURL              string
+	APIKey               string
+	SignSecret           string
+	SignEnabled          bool
+	VerifyResponse       bool
+	ResponseTimestampSec int
+	Timeout              string
+}
+
+func (c WalletConf) ResponseTimestampWindow() time.Duration {
+	if c.ResponseTimestampSec <= 0 {
+		return 60 * time.Second
+	}
+	if c.ResponseTimestampSec < 30 {
+		return 30 * time.Second
+	}
+	if c.ResponseTimestampSec > 60 {
+		return 60 * time.Second
+	}
+	return time.Duration(c.ResponseTimestampSec) * time.Second
 }
 
 type GameConf struct {

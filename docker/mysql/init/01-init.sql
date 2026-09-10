@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS merchants (
   private_key   TEXT            NULL     COMMENT 'API 私钥 (加密存储)',
   private_key_prev TEXT         NULL     COMMENT '轮换过渡期旧私钥',
   private_key_prev_expires_at DATETIME(3) NULL COMMENT '旧私钥失效时间',
+  allowed_ips   JSON            NULL     COMMENT '聚合器报备公网 IP 白名单',
   status        TINYINT         NOT NULL DEFAULT 1 COMMENT '1=启用 0=禁用',
   created_at    DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at    DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -96,3 +97,22 @@ CREATE TABLE IF NOT EXISTS risk_blacklist (
   UNIQUE KEY uk_type_value (list_type, list_value),
   KEY idx_status_expires (status, expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='风控黑名单';
+
+-- 钱包待对账操作 (扣款成功/发奖超时/回滚重试)
+CREATE TABLE IF NOT EXISTS wallet_pending_ops (
+  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  round_id      VARCHAR(128)    NOT NULL,
+  merchant_code VARCHAR(64)     NOT NULL,
+  user_id       BIGINT UNSIGNED NOT NULL,
+  op_type       VARCHAR(32)     NOT NULL COMMENT 'win_failed / win_timeout / rollback',
+  bet_amount    DECIMAL(20, 4)  NOT NULL DEFAULT 0,
+  win_amount    DECIMAL(20, 4)  NOT NULL DEFAULT 0,
+  status        VARCHAR(16)     NOT NULL DEFAULT 'pending' COMMENT 'pending / done / failed',
+  retry_count   INT             NOT NULL DEFAULT 0,
+  last_error    TEXT            NULL,
+  created_at    DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at    DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_round_op (round_id, op_type),
+  KEY idx_status_updated (status, updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='钱包待对账';

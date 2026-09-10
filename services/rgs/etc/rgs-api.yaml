@@ -22,6 +22,10 @@ Wallet:
   Mock: true
   BaseURL: ""
   APIKey: ""
+  SignSecret: dev-wallet-hmac-secret
+  SignEnabled: false
+  VerifyResponse: false
+  ResponseTimestampSec: 60
   Timeout: 5s
 
 Game:

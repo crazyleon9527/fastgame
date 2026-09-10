@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -25,6 +26,7 @@ type (
 		withSession(session sqlx.Session) MerchantsModel
 		ListPage(ctx context.Context, page, pageSize int) ([]*Merchants, int64, error)
 		FindSecretsByMerchantCode(ctx context.Context, merchantCode string) (*MerchantSecrets, error)
+		FindAllowedIPs(ctx context.Context, merchantCode string) ([]string, error)
 		RotatePrivateKey(ctx context.Context, id uint64, newKey string, gracePeriod time.Duration) error
 	}
 
@@ -77,6 +79,27 @@ func (m *customMerchantsModel) FindSecretsByMerchantCode(ctx context.Context, me
 	switch err {
 	case nil:
 		return &resp, nil
+	case sqlx.ErrNotFound:
+		return nil, ErrNotFound
+	default:
+		return nil, err
+	}
+}
+
+func (m *customMerchantsModel) FindAllowedIPs(ctx context.Context, merchantCode string) ([]string, error) {
+	query := fmt.Sprintf("select `allowed_ips` from %s where `merchant_code` = ? limit 1", m.table)
+	var raw sql.NullString
+	err := m.conn.QueryRowCtx(ctx, &raw, query, merchantCode)
+	switch err {
+	case nil:
+		if !raw.Valid || raw.String == "" || raw.String == "null" {
+			return nil, nil
+		}
+		var ips []string
+		if err := json.Unmarshal([]byte(raw.String), &ips); err != nil {
+			return nil, err
+		}
+		return ips, nil
 	case sqlx.ErrNotFound:
 		return nil, ErrNotFound
 	default:

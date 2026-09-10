@@ -1,10 +1,11 @@
 USE fastgame;
 
-INSERT INTO merchants (merchant_code, name, private_key, status)
-VALUES ('m001', 'Demo Merchant', 'dev-secret-m001-change-in-prod', 1)
+INSERT INTO merchants (merchant_code, name, private_key, allowed_ips, status)
+VALUES ('m001', 'Demo Merchant', 'dev-secret-m001-change-in-prod', '["127.0.0.1","::1"]', 1)
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
-  private_key = VALUES(private_key);
+  private_key = VALUES(private_key),
+  allowed_ips = VALUES(allowed_ips);
 
 INSERT INTO game_configs (merchant_id, game_code, config_key, config_value, rtp_tier, status)
 SELECT m.id, 'fishing', 'rtp_tier', '{"tier":"high","target_rtp":0.96}', 'high', 1

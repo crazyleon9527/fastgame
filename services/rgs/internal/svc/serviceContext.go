@@ -20,15 +20,16 @@ import (
 )
 
 type ServiceContext struct {
-	Config     config.Config
-	Redis      *redis.Client
-	Lock       *lock.RedisLock
-	Idempotent *idempotent.Store
-	Wallet     wallet.Client
-	GameConfig *gameconfig.Loader
-	Kafka      *kafka.Producer
-	Guard      *security.Guard
-	Session    *session.Store
+	Config      config.Config
+	Redis       *redis.Client
+	Lock        *lock.RedisLock
+	Idempotent  *idempotent.Store
+	Wallet      wallet.Client
+	GameConfig  *gameconfig.Loader
+	Kafka       *kafka.Producer
+	Guard       *security.Guard
+	Session     *session.Store
+	PendingOps  model.WalletPendingOpsModel
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -54,7 +55,8 @@ func NewServiceContext(c config.Config) *ServiceContext {
 			IPLimitPerSec:      c.Security.IPLimitPerSec,
 			MinResponseDelay:   c.Security.MinResponseDelay(),
 		}, merchants, rdb),
-		Session: session.NewStore(rdb, c.Session.TTL()),
+		Session:    session.NewStore(rdb, c.Session.TTL()),
+		PendingOps: model.NewWalletPendingOpsModel(conn),
 	}
 
 	bootstrapBlacklist(rdb, model.NewRiskBlacklistModel(conn))
@@ -84,8 +86,12 @@ func newWalletClient(cfg config.WalletConf) wallet.Client {
 		timeout = 5 * time.Second
 	}
 	return wallet.NewHTTPClient(wallet.HTTPConfig{
-		BaseURL: cfg.BaseURL,
-		APIKey:  cfg.APIKey,
-		Timeout: timeout,
+		BaseURL:              cfg.BaseURL,
+		APIKey:               cfg.APIKey,
+		Secret:               cfg.SignSecret,
+		SignEnabled:          cfg.SignEnabled,
+		VerifyResponse:       cfg.VerifyResponse,
+		ResponseTimestampWin: cfg.ResponseTimestampWindow(),
+		Timeout:              timeout,
 	})
 }

@@ -12,10 +12,11 @@ import (
 )
 
 type ServiceContext struct {
-	Config    config.Config
-	Writer    *clickhouse.Writer
-	Merchants model.MerchantsModel
-	Wallet    wallet.Client
+	Config     config.Config
+	Writer     *clickhouse.Writer
+	Merchants  model.MerchantsModel
+	PendingOps model.WalletPendingOpsModel
+	Wallet     wallet.Client
 }
 
 func NewServiceContext(c config.Config) (*ServiceContext, error) {
@@ -29,11 +30,13 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		return nil, err
 	}
 
+	conn := sqlx.NewMysql(c.MySQL.DataSource)
 	return &ServiceContext{
-		Config:    c,
-		Writer:    writer,
-		Merchants: model.NewMerchantsModel(sqlx.NewMysql(c.MySQL.DataSource)),
-		Wallet:    newWalletClient(c.Wallet),
+		Config:     c,
+		Writer:     writer,
+		Merchants:  model.NewMerchantsModel(conn),
+		PendingOps: model.NewWalletPendingOpsModel(conn),
+		Wallet:     newWalletClient(c.Wallet),
 	}, nil
 }
 
@@ -46,8 +49,12 @@ func newWalletClient(cfg config.WalletConf) wallet.Client {
 		timeout = 5 * time.Second
 	}
 	return wallet.NewHTTPClient(wallet.HTTPConfig{
-		BaseURL: cfg.BaseURL,
-		APIKey:  cfg.APIKey,
-		Timeout: timeout,
+		BaseURL:              cfg.BaseURL,
+		APIKey:               cfg.APIKey,
+		Secret:               cfg.SignSecret,
+		SignEnabled:          cfg.SignEnabled,
+		VerifyResponse:       cfg.VerifyResponse,
+		ResponseTimestampWin: cfg.ResponseTimestampWindow(),
+		Timeout:              timeout,
 	})
 }

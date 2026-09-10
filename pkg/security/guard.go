@@ -34,6 +34,7 @@ type Guard struct {
 	replay    *ReplayGuard
 	limiter   *ratelimit.Limiter
 	blacklist *Blacklist
+	whitelist *IPWhitelist
 	waf       *WAF
 }
 
@@ -53,6 +54,7 @@ func NewGuard(cfg Config, merchants model.MerchantsModel, redis *redis.Client) *
 		replay:    NewReplayGuard(redis, cfg.TimestampWindow, 5*time.Minute),
 		limiter:   ratelimit.NewLimiter(redis),
 		blacklist: NewBlacklist(redis),
+		whitelist: NewIPWhitelist(merchants, redis),
 		waf:       NewWAF(),
 	}
 }
@@ -72,11 +74,14 @@ func (g *Guard) CheckRequest(r *http.Request, body string) error {
 }
 
 func (g *Guard) CheckAccess(ctx context.Context, clientIP, merchantID string, userID uint64) error {
-	return g.blacklist.CheckAccess(ctx, clientIP, merchantID, userID)
+	if err := g.blacklist.CheckAccess(ctx, clientIP, merchantID, userID); err != nil {
+		return err
+	}
+	return g.whitelist.Check(ctx, merchantID, clientIP)
 }
 
 func (g *Guard) CheckBet(ctx context.Context, in BetCheckInput, limits validator.BetLimits, betAmount float64) error {
-	if err := g.blacklist.CheckAccess(ctx, in.ClientIP, in.MerchantID, in.UserID); err != nil {
+	if err := g.CheckAccess(ctx, in.ClientIP, in.MerchantID, in.UserID); err != nil {
 		return err
 	}
 

@@ -35,6 +35,8 @@ func NewWorker(svcCtx *svc.ServiceContext) *Worker {
 }
 
 func (w *Worker) Run(ctx context.Context) error {
+	go NewReconciler(w.svcCtx).Run(ctx)
+
 	for {
 		msg, err := w.reader.FetchMessage(ctx)
 		if err != nil {
@@ -46,7 +48,8 @@ func (w *Worker) Run(ctx context.Context) error {
 		}
 
 		if err := w.handleMessage(ctx, msg.Value); err != nil {
-			logx.Errorf("handle rollback message failed: %v", err)
+			logx.Errorf("handle rollback message failed (will retry): %v", err)
+			continue
 		}
 
 		if err := w.reader.CommitMessages(ctx, msg); err != nil {
@@ -66,17 +69,20 @@ func (w *Worker) handleMessage(ctx context.Context, raw []byte) error {
 		return err
 	}
 
-	if err := w.svcCtx.Wallet.Rollback(ctx, wallet.RollbackReq{
+	status := "done"
+	rollbackErr := w.svcCtx.Wallet.Rollback(ctx, wallet.RollbackReq{
 		MerchantID: evt.MerchantID,
 		UserID:     evt.UserID,
 		RoundID:    evt.RoundID,
 		Amount:     evt.Amount,
 		Reason:     evt.Reason,
-	}); err != nil {
-		logx.Errorf("wallet rollback call failed: roundId=%s err=%v", evt.RoundID, err)
+	})
+	if rollbackErr != nil {
+		logx.Errorf("wallet rollback call failed: roundId=%s err=%v", evt.RoundID, rollbackErr)
+		status = "pending"
 	}
 
-	return w.svcCtx.Writer.BatchInsertWalletRollback(ctx, []clickhouse.WalletRollbackRow{{
+	chErr := w.svcCtx.Writer.BatchInsertWalletRollback(ctx, []clickhouse.WalletRollbackRow{{
 		EventID:      evt.EventID,
 		RoundID:      evt.RoundID,
 		UserID:       evt.UserID,
@@ -84,9 +90,13 @@ func (w *Worker) handleMessage(ctx context.Context, raw []byte) error {
 		RollbackType: evt.RollbackType,
 		Amount:       evt.Amount,
 		Reason:       evt.Reason,
-		Status:       "done",
+		Status:       status,
 		OccurredAt:   evt.OccurredAt,
 	}})
+	if chErr != nil {
+		return chErr
+	}
+	return rollbackErr
 }
 
 func (w *Worker) resolveMerchantID(merchantIDOrCode string) (uint64, error) {

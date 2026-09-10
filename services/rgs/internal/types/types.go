@@ -50,13 +50,14 @@ type ProvablyFairProof struct {
 }
 
 type BetResp struct {
-	RoundId      string            `json:"roundId"`
-	WinAmount    float64           `json:"winAmount"`
-	Multiplier   float64           `json:"multiplier"`
-	Balance      float64           `json:"balance"`
-	RtpTier      string            `json:"rtpTier"`
-	FishState    string            `json:"fishState"`
-	AnimationKey string            `json:"animationKey"`
-	SequenceId   uint64            `json:"sequenceId"`
-	ProvablyFair ProvablyFairProof `json:"provablyFair"`
+	RoundId          string            `json:"roundId"`
+	WinAmount        float64           `json:"winAmount"`
+	Multiplier       float64           `json:"multiplier"`
+	Balance          float64           `json:"balance"`
+	RtpTier          string            `json:"rtpTier"`
+	FishState        string            `json:"fishState"`
+	AnimationKey     string            `json:"animationKey"`
+	SequenceId       uint64            `json:"sequenceId"`
+	SettlementStatus string            `json:"settlementStatus"` // settled / pending
+	ProvablyFair     ProvablyFairProof `json:"provablyFair"`
 }

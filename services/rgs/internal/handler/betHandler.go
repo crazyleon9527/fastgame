@@ -69,6 +69,10 @@ func BetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			writeBetError(w, r, betErrorStatus(err), err)
 			return
 		}
+		if resp != nil && resp.SettlementStatus == "pending" {
+			httpx.WriteJsonCtx(r.Context(), w, http.StatusAccepted, resp)
+			return
+		}
 		httpx.OkJsonCtx(r.Context(), w, resp)
 	}
 }
@@ -98,6 +102,8 @@ func writeBetError(w http.ResponseWriter, r *http.Request, status int, err error
 
 func writeSecurityError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
+	case strings.Contains(err.Error(), "not whitelisted"):
+		writeBetError(w, r, http.StatusForbidden, xerr.ErrBlocked)
 	case strings.Contains(err.Error(), "blocked"), strings.Contains(err.Error(), "suspicious"), strings.Contains(err.Error(), "not allowed"):
 		writeBetError(w, r, http.StatusForbidden, xerr.ErrBlocked)
 	case strings.Contains(err.Error(), "rate limit"):

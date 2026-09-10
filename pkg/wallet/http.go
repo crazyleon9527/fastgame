@@ -8,12 +8,18 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"strconv"
 )
 
 type HTTPConfig struct {
-	BaseURL string
-	APIKey  string
-	Timeout time.Duration
+	BaseURL              string
+	APIKey               string
+	Secret               string
+	SignEnabled          bool
+	VerifyResponse       bool
+	ResponseTimestampWin time.Duration
+	Timeout              time.Duration
 }
 
 type HTTPClient struct {
@@ -24,6 +30,9 @@ type HTTPClient struct {
 func NewHTTPClient(cfg HTTPConfig) *HTTPClient {
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 5 * time.Second
+	}
+	if cfg.ResponseTimestampWin <= 0 {
+		cfg.ResponseTimestampWin = 60 * time.Second
 	}
 	return &HTTPClient{
 		cfg: cfg,
@@ -106,6 +115,7 @@ func (c *HTTPClient) post(ctx context.Context, path string, body any, dest any) 
 	if err != nil {
 		return err
 	}
+	bodyStr := string(raw)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.BaseURL+path, bytes.NewReader(raw))
 	if err != nil {
@@ -115,9 +125,17 @@ func (c *HTTPClient) post(ctx context.Context, path string, body any, dest any) 
 	if c.cfg.APIKey != "" {
 		req.Header.Set("X-API-Key", c.cfg.APIKey)
 	}
+	if c.cfg.SignEnabled {
+		if err := attachSignHeaders(req, c.cfg.Secret, bodyStr); err != nil {
+			return err
+		}
+	}
 
 	res, err := c.client.Do(req)
 	if err != nil {
+		if IsTimeoutErr(err) {
+			return fmt.Errorf("%w: %v", ErrTimeout, err)
+		}
 		return err
 	}
 	defer res.Body.Close()
@@ -129,8 +147,33 @@ func (c *HTTPClient) post(ctx context.Context, path string, body any, dest any) 
 	if res.StatusCode >= 300 {
 		return fmt.Errorf("wallet api %s: status=%d body=%s", path, res.StatusCode, string(respBody))
 	}
+
+	if c.cfg.SignEnabled && c.cfg.VerifyResponse {
+		if err := verifyResponseSign(c.cfg.Secret, res, respBody); err != nil {
+			return fmt.Errorf("wallet response signature invalid: %w", err)
+		}
+		if err := validateResponseTimestamp(res.Header.Get(HeaderTimestamp), c.cfg.ResponseTimestampWin); err != nil {
+			return err
+		}
+	}
+
 	if dest == nil {
 		return nil
 	}
 	return json.Unmarshal(respBody, dest)
+}
+
+func validateResponseTimestamp(tsHeader string, window time.Duration) error {
+	if tsHeader == "" {
+		return fmt.Errorf("missing response timestamp")
+	}
+	ts, err := strconv.ParseInt(tsHeader, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid response timestamp")
+	}
+	now := time.Now().Unix()
+	if ts < now-int64(window.Seconds()) || ts > now+30 {
+		return fmt.Errorf("response timestamp expired")
+	}
+	return nil
 }
