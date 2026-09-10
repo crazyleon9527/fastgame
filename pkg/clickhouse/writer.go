@@ -9,6 +9,8 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+
+	"fastgame/pkg/money"
 )
 
 type WalletRollbackRow struct {
@@ -18,7 +20,7 @@ type WalletRollbackRow struct {
 	UserID       uint64
 	MerchantID   uint64
 	RollbackType string
-	Amount       float64
+	Amount       int64
 	Reason       string
 	Status       string
 	OccurredAt   time.Time
@@ -43,11 +45,11 @@ type RoundSettledRow struct {
 	UserID       uint64
 	MerchantID   uint64
 	GameCode     string
-	BetAmount    float64
-	WinAmount    float64
-	Multiplier   float64
+	BetAmount    int64
+	WinAmount    int64
+	Multiplier   int64
 	RtpTier      string
-	BalanceAfter float64
+	BalanceAfter int64
 	SettledAt    time.Time
 }
 
@@ -142,11 +144,11 @@ func (w *Writer) BatchInsertRoundSettled(ctx context.Context, rows []RoundSettle
 			row.UserID,
 			row.MerchantID,
 			row.GameCode,
-			decimal.NewFromFloat(row.BetAmount),
-			decimal.NewFromFloat(row.WinAmount),
-			decimal.NewFromFloat(row.Multiplier),
+			minorDecimal(row.BetAmount),
+			minorDecimal(row.WinAmount),
+			minorDecimal(row.Multiplier),
 			row.RtpTier,
-			decimal.NewFromFloat(row.BalanceAfter),
+			minorDecimal(row.BalanceAfter),
 			settledAt,
 		); err != nil {
 			return err
@@ -191,7 +193,7 @@ func (w *Writer) BatchInsertWalletRollback(ctx context.Context, rows []WalletRol
 			row.UserID,
 			row.MerchantID,
 			row.RollbackType,
-			decimal.NewFromFloat(row.Amount),
+			minorDecimal(row.Amount),
 			row.Reason,
 			status,
 			occurredAt,
@@ -268,4 +270,8 @@ func (w *Writer) QueryTraceSpans(ctx context.Context, traceID string) ([]TraceSp
 
 func (w *Writer) Close() error {
 	return w.conn.Close()
+}
+
+func minorDecimal(v int64) decimal.Decimal {
+	return decimal.NewFromInt(v).Div(decimal.NewFromInt(money.Scale))
 }

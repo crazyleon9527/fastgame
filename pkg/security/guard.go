@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"fastgame/internal/model"
+	"fastgame/pkg/money"
 	"fastgame/pkg/validator"
 
 	"github.com/redis/go-redis/v9"
@@ -69,12 +70,12 @@ func (g *Guard) CheckAccess(ctx context.Context, clientIP, merchantID string, us
 	return g.whitelist.Check(ctx, merchantID, clientIP)
 }
 
-func (g *Guard) CheckBet(ctx context.Context, in BetCheckInput, limits validator.BetLimits, betAmount float64) error {
+func (g *Guard) CheckBet(ctx context.Context, in BetCheckInput, limits validator.BetLimits, betAmountMinor int64) error {
 	if err := g.CheckAccess(ctx, in.ClientIP, in.MerchantID, in.UserID); err != nil {
 		return err
 	}
 
-	if err := validator.BetLimits(limits).Validate(betAmount); err != nil {
+	if err := validator.BetLimits(limits).Validate(money.AmountFromMinor(betAmountMinor)); err != nil {
 		return err
 	}
 
@@ -99,7 +100,7 @@ func (g *Guard) CheckBet(ctx context.Context, in BetCheckInput, limits validator
 }
 
 func ParseBetLimits(raw map[string]json.RawMessage) validator.BetLimits {
-	limits := validator.BetLimits{Min: 0.01, Max: 10000}
+	limits := validator.BetLimits{Min: money.Scale / 100, Max: 10000 * money.Scale}
 	if raw == nil {
 		return limits
 	}
@@ -109,10 +110,10 @@ func ParseBetLimits(raw map[string]json.RawMessage) validator.BetLimits {
 	}
 	_ = json.Unmarshal(data, &limits)
 	if limits.Min <= 0 {
-		limits.Min = 0.01
+		limits.Min = money.Scale / 100
 	}
 	if limits.Max <= 0 {
-		limits.Max = 10000
+		limits.Max = 10000 * money.Scale
 	}
 	return limits
 }

@@ -25,11 +25,11 @@ type RoundSettledEvent struct {
 	UserID     uint64    `json:"userId"`
 	MerchantID string    `json:"merchantId"`
 	GameCode   string    `json:"gameCode"`
-	BetAmount  float64   `json:"betAmount"`
-	WinAmount  float64   `json:"winAmount"`
-	Multiplier float64   `json:"multiplier"`
+	BetAmount  int64     `json:"betAmount"`
+	WinAmount  int64     `json:"winAmount"`
+	Multiplier int64     `json:"multiplier"`
 	RtpTier    string    `json:"rtpTier"`
-	Balance    float64   `json:"balanceAfter"`
+	Balance    int64     `json:"balanceAfter"`
 	SettledAt  time.Time `json:"settledAt"`
 }
 
@@ -39,8 +39,8 @@ type BigWinEvent struct {
 	UserID     uint64    `json:"userId"`
 	MerchantID string    `json:"merchantId"`
 	GameCode   string    `json:"gameCode"`
-	WinAmount  float64   `json:"winAmount"`
-	Multiplier float64   `json:"multiplier"`
+	WinAmount  int64     `json:"winAmount"`
+	Multiplier int64     `json:"multiplier"`
 	OccurredAt time.Time `json:"occurredAt"`
 }
 
@@ -51,7 +51,7 @@ type WalletRollbackEvent struct {
 	UserID       uint64    `json:"userId"`
 	MerchantID   string    `json:"merchantId"`
 	RollbackType string    `json:"rollbackType"`
-	Amount       float64   `json:"amount"`
+	Amount       int64     `json:"amount"`
 	Reason       string    `json:"reason"`
 	OccurredAt   time.Time `json:"occurredAt"`
 }

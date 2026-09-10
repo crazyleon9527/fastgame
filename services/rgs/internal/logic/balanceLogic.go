@@ -2,7 +2,10 @@ package logic
 
 import (
 	"context"
+	"errors"
 
+	"fastgame/pkg/wallet"
+	"fastgame/pkg/xerr"
 	"fastgame/services/rgs/internal/svc"
 	"fastgame/services/rgs/internal/types"
 
@@ -26,8 +29,11 @@ func NewBalanceLogic(ctx context.Context, svcCtx *svc.ServiceContext) *BalanceLo
 func (l *BalanceLogic) Balance(req *types.BalanceReq) (*types.BalanceResp, error) {
 	balance, err := l.svcCtx.Wallet.GetBalance(l.ctx, req.MerchantId, req.UserId)
 	if err != nil {
+		if errors.Is(err, wallet.ErrCircuitOpen) || errors.Is(err, wallet.ErrSlowResponse) {
+			return nil, xerr.ErrWalletUnavailable
+		}
 		return nil, err
 	}
 
-	return &types.BalanceResp{Balance: balance}, nil
+	return &types.BalanceResp{Balance: balance.Minor()}, nil
 }

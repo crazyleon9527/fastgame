@@ -169,8 +169,8 @@ type PendingTxItem struct {
 	RoundId        string  `json:"roundId"`
 	Phase          string  `json:"phase"`
 	Status         string  `json:"status"`
-	BetAmount      float64 `json:"betAmount"`
-	WinAmount      float64 `json:"winAmount"`
+	BetAmount      int64   `json:"betAmount"`
+	WinAmount      int64   `json:"winAmount"`
 	ExpectedAction string  `json:"expectedAction"`
 	RetryCount     int64   `json:"retryCount"`
 	LastError      string  `json:"lastError,omitempty"`

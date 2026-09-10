@@ -1,4 +1,5 @@
 import { _decorator, Component, Label, Button } from 'cc';
+import { formatMinor, formatMultiplier } from '../util/Money';
 
 const { ccclass, property } = _decorator;
 
@@ -16,16 +17,17 @@ export class GameHud extends Component {
     @property(Button)
     castButton: Button | null = null;
 
+    /** value: minor units (Scale 10000) */
     setBalance(value: number): void {
         if (this.balanceLabel) {
-            this.balanceLabel.string = `余额: ${value.toFixed(2)}`;
+            this.balanceLabel.string = `余额: ${formatMinor(value)}`;
         }
     }
 
     setWin(value: number, multiplier: number): void {
         if (this.winLabel) {
             this.winLabel.string = value > 0
-                ? `赢得: ${value.toFixed(2)} (${multiplier.toFixed(2)}x)`
+                ? `赢得: ${formatMinor(value)} (${formatMultiplier(multiplier)}x)`
                 : '赢得: 0';
         }
     }

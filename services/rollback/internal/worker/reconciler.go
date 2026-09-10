@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"fastgame/internal/model"
+	"fastgame/pkg/money"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rollback/internal/svc"
 
@@ -66,7 +67,7 @@ func (r *Reconciler) retryWin(ctx context.Context, op *model.WalletPendingOp) {
 		MerchantID: op.MerchantCode,
 		UserID:     op.UserID,
 		RoundID:    op.RoundID,
-		Amount:     op.WinAmount,
+		Amount:     money.AmountFromMinor(op.WinAmount),
 	})
 	if err != nil {
 		if incErr := r.svcCtx.PendingOps.IncrementRetry(ctx, op.Id, err.Error()); incErr != nil {
@@ -85,7 +86,7 @@ func (r *Reconciler) retryRollback(ctx context.Context, op *model.WalletPendingO
 		MerchantID: op.MerchantCode,
 		UserID:     op.UserID,
 		RoundID:    op.RoundID,
-		Amount:     op.BetAmount,
+		Amount:     money.AmountFromMinor(op.BetAmount),
 		Reason:     op.OpType,
 	})
 	if err != nil {

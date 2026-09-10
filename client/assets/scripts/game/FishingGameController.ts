@@ -3,6 +3,7 @@ import { GameConfig } from '../config/GameConfig';
 import { RgsClient, BetResponse, ReplayPayload } from '../network/RgsClient';
 import { GameHud } from '../ui/GameHud';
 import { generateId } from '../util/Uuid';
+import { formatMultiplier } from '../util/Money';
 import { ReplayScene } from './ReplayEngine';
 import { FishPool } from '../pool/FishPool';
 import { CoinBurstPool } from '../pool/CoinBurstPool';
@@ -264,9 +265,9 @@ export class FishingGameController extends Component {
     private statusText(result: BetResponse): string {
         switch (result.fishState) {
             case 'big_win':
-                return `大奖! ${result.multiplier.toFixed(1)}x`;
+                return `大奖! ${formatMultiplier(result.multiplier, 1)}x`;
             case 'bite':
-                return `咬钩了! ${result.multiplier.toFixed(2)}x`;
+                return `咬钩了! ${formatMultiplier(result.multiplier)}x`;
             default:
                 return '鱼儿跑了，再试一次';
         }

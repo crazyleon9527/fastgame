@@ -33,8 +33,8 @@ type PendingTransaction struct {
 	GameCode        string         `db:"game_code"`
 	Phase           string         `db:"phase"`
 	Status          string         `db:"status"`
-	BetAmount       float64        `db:"bet_amount"`
-	WinAmount       float64        `db:"win_amount"`
+	BetAmount       int64          `db:"bet_amount"`
+	WinAmount       int64          `db:"win_amount"`
 	ExpectedAction  string         `db:"expected_action"`
 	WalletBetStatus string         `db:"wallet_bet_status"`
 	WalletWinStatus string         `db:"wallet_win_status"`
@@ -47,7 +47,7 @@ type PendingTransaction struct {
 type PendingTransactionsModel interface {
 	Insert(ctx context.Context, data *PendingTransaction) error
 	MarkSettled(ctx context.Context, roundID string) error
-	MarkWinPending(ctx context.Context, roundID string, winAmount float64, lastError string) error
+	MarkWinPending(ctx context.Context, roundID string, winAmount int64, lastError string) error
 	ListStalePending(ctx context.Context, olderThan time.Duration, limit int) ([]*PendingTransaction, error)
 	FindByTraceID(ctx context.Context, traceID string) ([]*PendingTransaction, error)
 	FindByRoundID(ctx context.Context, roundID string) (*PendingTransaction, error)
@@ -109,7 +109,7 @@ where round_id = ?
 	return err
 }
 
-func (m *defaultPendingTransactionsModel) MarkWinPending(ctx context.Context, roundID string, winAmount float64, lastError string) error {
+func (m *defaultPendingTransactionsModel) MarkWinPending(ctx context.Context, roundID string, winAmount int64, lastError string) error {
 	query := fmt.Sprintf(`
 update %s set phase = ?, status = ?, win_amount = ?, expected_action = ?, wallet_win_status = 'failed', last_error = ?
 where round_id = ?

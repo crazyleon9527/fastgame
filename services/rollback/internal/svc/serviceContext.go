@@ -5,6 +5,7 @@ import (
 
 	"fastgame/internal/model"
 	"fastgame/pkg/clickhouse"
+	"fastgame/pkg/money"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rollback/internal/config"
 
@@ -43,20 +44,25 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 }
 
 func newWalletClient(cfg config.WalletConf) wallet.Client {
+	var inner wallet.Client
 	if cfg.Mock || cfg.BaseURL == "" {
-		return wallet.NewMockClient(10000)
+		inner = wallet.NewMockClient(money.FromMajor(10000))
+	} else {
+		timeout, err := time.ParseDuration(cfg.Timeout)
+		if err != nil {
+			timeout = 5 * time.Second
+		}
+		inner = wallet.NewHTTPClient(wallet.HTTPConfig{
+			BaseURL:              cfg.BaseURL,
+			APIKey:               cfg.APIKey,
+			Secret:               cfg.SignSecret,
+			SignEnabled:          cfg.SignEnabled,
+			VerifyResponse:       cfg.VerifyResponse,
+			ResponseTimestampWin: cfg.ResponseTimestampWindow(),
+			Timeout:              timeout,
+		})
 	}
-	timeout, err := time.ParseDuration(cfg.Timeout)
-	if err != nil {
-		timeout = 5 * time.Second
-	}
-	return wallet.NewHTTPClient(wallet.HTTPConfig{
-		BaseURL:              cfg.BaseURL,
-		APIKey:               cfg.APIKey,
-		Secret:               cfg.SignSecret,
-		SignEnabled:          cfg.SignEnabled,
-		VerifyResponse:       cfg.VerifyResponse,
-		ResponseTimestampWin: cfg.ResponseTimestampWindow(),
-		Timeout:              timeout,
+	return wallet.NewBreakerClient(inner, wallet.BreakerConfig{
+		SlowThreshold: cfg.SlowThreshold(),
 	})
 }

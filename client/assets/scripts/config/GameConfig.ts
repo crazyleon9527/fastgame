@@ -20,5 +20,6 @@ export const GameConfig = {
     /** 演示用玩家 ID，生产环境由登录态注入 */
     userId: 10001,
 
-    defaultBet: 10,
+    /** 下注 minor units：10.00 = 100000（Scale 10000） */
+    defaultBet: 100000,
 };

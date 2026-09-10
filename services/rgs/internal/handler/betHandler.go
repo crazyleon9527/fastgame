@@ -58,7 +58,7 @@ func BetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			UserID:     req.UserId,
 			ClientIP:   httputil.ClientIP(r),
 			Headers:    r.Header,
-		}, limits, req.BetAmount); err != nil {
+		}, limits, req.BetAmount); err != nil { // betAmount: int64 minor units
 			writeSecurityError(w, r, err)
 			return
 		}
@@ -90,6 +90,8 @@ func betErrorStatus(err error) int {
 		return http.StatusUnauthorized
 	case errors.Is(err, xerr.ErrDuplicateRound):
 		return http.StatusConflict
+	case errors.Is(err, xerr.ErrWalletUnavailable):
+		return http.StatusServiceUnavailable
 	case errors.Is(err, xerr.ErrUnauthorized):
 		return http.StatusUnauthorized
 	default:

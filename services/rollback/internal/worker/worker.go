@@ -8,6 +8,7 @@ import (
 
 	"fastgame/pkg/clickhouse"
 	"fastgame/pkg/kafka"
+	"fastgame/pkg/money"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rollback/internal/svc"
 
@@ -75,7 +76,7 @@ func (w *Worker) handleMessage(ctx context.Context, raw []byte) error {
 		MerchantID: evt.MerchantID,
 		UserID:     evt.UserID,
 		RoundID:    evt.RoundID,
-		Amount:     evt.Amount,
+		Amount:     money.AmountFromMinor(evt.Amount),
 		Reason:     evt.Reason,
 	})
 	if rollbackErr != nil {

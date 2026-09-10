@@ -2,15 +2,18 @@ package prng
 
 import (
 	"math"
+	"sync"
+
+	"fastgame/pkg/money"
 )
 
 type Outcome struct {
-	Multiplier   float64
-	WinAmount    float64
+	Multiplier   money.Multiplier
+	WinAmount    money.Amount
 	FishState    string
 	AnimationKey string
 	RtpTier      string
-	Roll         float64
+	Roll         uint64
 }
 
 type FairProof struct {
@@ -18,23 +21,33 @@ type FairProof struct {
 	ServerSeed     string
 	ClientSeed     string
 	Nonce          string
-	Roll           float64
+	Roll           uint64
 }
 
 type Engine struct {
 	rtpTier string
 }
 
+var enginePool = sync.Pool{
+	New: func() any { return &Engine{rtpTier: "default"} },
+}
+
 func NewEngine(rtpTier string) *Engine {
+	e := enginePool.Get().(*Engine)
 	if rtpTier == "" {
 		rtpTier = "default"
 	}
-	return &Engine{rtpTier: rtpTier}
+	e.rtpTier = rtpTier
+	return e
 }
 
-// Spin computes outcome using provably fair HMAC-SHA256 roll (crypto/rand seeded server seed).
-func (e *Engine) Spin(serverSeed, clientSeed, nonce string, betAmount float64) (Outcome, FairProof, error) {
-	roll, err := Roll(serverSeed, clientSeed, nonce)
+func (e *Engine) Release() {
+	e.rtpTier = "default"
+	enginePool.Put(e)
+}
+
+func (e *Engine) Spin(serverSeed, clientSeed, nonce string, betAmount money.Amount) (Outcome, FairProof, error) {
+	roll, err := RollUint64(serverSeed, clientSeed, nonce)
 	if err != nil {
 		return Outcome{}, FairProof{}, err
 	}
@@ -52,9 +65,9 @@ func (e *Engine) Spin(serverSeed, clientSeed, nonce string, betAmount float64) (
 	return outcome, proof, nil
 }
 
-func (e *Engine) outcomeFromRoll(roll float64, serverSeed, clientSeed, nonce string, betAmount float64) Outcome {
+func (e *Engine) outcomeFromRoll(roll uint64, serverSeed, clientSeed, nonce string, betAmount money.Amount) Outcome {
 	switch {
-	case roll < 0.55:
+	case rollBelow(roll, 55, 100):
 		return Outcome{
 			Multiplier:   0,
 			WinAmount:    0,
@@ -62,22 +75,22 @@ func (e *Engine) outcomeFromRoll(roll float64, serverSeed, clientSeed, nonce str
 			AnimationKey: "fish_miss",
 			RtpTier:      e.rtpTier,
 		}
-	case roll < 0.90:
-		multiRoll, _ := RollIndex(serverSeed, clientSeed, nonce, 1)
-		multiplier := 1.5 + multiRoll*3.5
+	case rollBelow(roll, 90, 100):
+		multiRoll, _ := RollIndexUint64(serverSeed, clientSeed, nonce, 1)
+		mult := multiplierFromRange(multiRoll, 15000, 50000) // 1.5x ~ 5.0x
 		return Outcome{
-			Multiplier:   round2(multiplier),
-			WinAmount:    round2(betAmount * multiplier),
+			Multiplier:   mult,
+			WinAmount:    mult.Apply(betAmount),
 			FishState:    "bite",
 			AnimationKey: "fish_bite_normal",
 			RtpTier:      e.rtpTier,
 		}
 	default:
-		multiRoll, _ := RollIndex(serverSeed, clientSeed, nonce, 1)
-		multiplier := 50 + multiRoll*50
+		multiRoll, _ := RollIndexUint64(serverSeed, clientSeed, nonce, 1)
+		mult := multiplierFromRange(multiRoll, 500000, 1000000) // 50x ~ 100x
 		return Outcome{
-			Multiplier:   round2(multiplier),
-			WinAmount:    round2(betAmount * multiplier),
+			Multiplier:   mult,
+			WinAmount:    mult.Apply(betAmount),
 			FishState:    "big_win",
 			AnimationKey: "fish_bite_bigwin",
 			RtpTier:      e.rtpTier,
@@ -85,6 +98,11 @@ func (e *Engine) outcomeFromRoll(roll float64, serverSeed, clientSeed, nonce str
 	}
 }
 
-func round2(v float64) float64 {
-	return math.Round(v*100) / 100
+// multiplierFromRange 线性映射 multiRoll ∈ [0,MaxUint64] → [minMult, maxMult]（纯整数）
+func multiplierFromRange(multiRoll uint64, minMult, maxMult int64) money.Multiplier {
+	if maxMult <= minMult {
+		return money.Multiplier(minMult)
+	}
+	span := uint64(maxMult - minMult)
+	return money.Multiplier(minMult + int64(uint64(multiRoll)*span/math.MaxUint64))
 }

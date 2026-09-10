@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"fastgame/internal/model"
+	"fastgame/pkg/money"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rollback/internal/svc"
 
@@ -95,7 +96,7 @@ func (r *OrphanReconciler) retryWin(ctx context.Context, tx *model.PendingTransa
 		MerchantID: tx.MerchantCode,
 		UserID:     tx.UserID,
 		RoundID:    tx.RoundID,
-		Amount:     tx.WinAmount,
+		Amount:     money.AmountFromMinor(tx.WinAmount),
 	})
 	if err != nil {
 		r.bumpRetry(ctx, tx.Id, err.Error())
@@ -109,7 +110,7 @@ func (r *OrphanReconciler) rollbackBet(ctx context.Context, tx *model.PendingTra
 		MerchantID: tx.MerchantCode,
 		UserID:     tx.UserID,
 		RoundID:    tx.RoundID,
-		Amount:     tx.BetAmount,
+		Amount:     money.AmountFromMinor(tx.BetAmount),
 		Reason:     "orphan_reconcile",
 	})
 	if err != nil {

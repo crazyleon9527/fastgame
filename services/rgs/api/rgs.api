@@ -28,7 +28,7 @@ type (
 		SessionToken     string  `json:"sessionToken" validate:"required"`
 		GameCode         string  `json:"gameCode" validate:"required"`
 		Action           string  `json:"action" validate:"required"`
-		BetAmount        float64 `json:"betAmount" validate:"required,gt=0"`
+		BetAmount        int64   `json:"betAmount" validate:"required,gt=0"`
 		RoundId          string  `json:"roundId" validate:"required"`
 		SequenceId       uint64  `json:"sequenceId" validate:"required"`
 		IdempotencyToken string  `json:"idempotencyToken,optional"`
@@ -45,7 +45,7 @@ type (
 		ServerSeed string  `json:"serverSeed"`
 		ClientSeed string  `json:"clientSeed"`
 		Nonce      string  `json:"nonce"`
-		BetAmount  float64 `json:"betAmount"`
+		BetAmount  int64   `json:"betAmount"`
 	}
 	ReplayPoint {
 		X float64 `json:"x"`
@@ -65,9 +65,9 @@ type (
 	}
 	BetResp {
 		RoundId      string            `json:"roundId"`
-		WinAmount    float64           `json:"winAmount"`
-		Multiplier   float64           `json:"multiplier"`
-		Balance      float64           `json:"balance"`
+		WinAmount    int64             `json:"winAmount"`
+		Multiplier   int64             `json:"multiplier"`
+		Balance      int64             `json:"balance"`
 		RtpTier      string            `json:"rtpTier"`
 		FishState    string            `json:"fishState"`
 		AnimationKey string            `json:"animationKey"`
@@ -82,7 +82,7 @@ type (
 		ServerSeed string  `json:"serverSeed" validate:"required"`
 		ClientSeed string  `json:"clientSeed" validate:"required"`
 		Nonce      string  `json:"nonce" validate:"required"`
-		BetAmount  float64 `json:"betAmount" validate:"required,gt=0"`
+		BetAmount  int64   `json:"betAmount" validate:"required,gt=0"`
 		RtpTier    string  `json:"rtpTier,optional"`
 	}
 	ReplayResp {
@@ -90,8 +90,8 @@ type (
 		SequenceId   uint64            `json:"sequenceId,omitempty"`
 		Replay       ReplayPayload     `json:"replay"`
 		ProvablyFair ProvablyFairProof `json:"provablyFair"`
-		WinAmount    float64           `json:"winAmount"`
-		Multiplier   float64           `json:"multiplier"`
+		WinAmount    int64             `json:"winAmount"`
+		Multiplier   int64             `json:"multiplier"`
 		FishState    string            `json:"fishState"`
 		AnimationKey string            `json:"animationKey"`
 	}
@@ -100,7 +100,7 @@ type (
 		UserId     uint64 `form:"userId" validate:"required"`
 	}
 	BalanceResp {
-		Balance float64 `json:"balance"`
+		Balance int64   `json:"balance"`
 	}
 )
 

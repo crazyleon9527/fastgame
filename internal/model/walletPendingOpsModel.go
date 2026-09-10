@@ -24,8 +24,8 @@ type WalletPendingOp struct {
 	MerchantCode string         `db:"merchant_code"`
 	UserID       uint64         `db:"user_id"`
 	OpType       string         `db:"op_type"`
-	BetAmount    float64        `db:"bet_amount"`
-	WinAmount    float64        `db:"win_amount"`
+	BetAmount    int64          `db:"bet_amount"`
+	WinAmount    int64          `db:"win_amount"`
 	Status       string         `db:"status"`
 	RetryCount   int64          `db:"retry_count"`
 	LastError    sql.NullString `db:"last_error"`

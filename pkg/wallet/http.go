@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
-	"strconv"
+	"fastgame/pkg/money"
 )
 
 type HTTPConfig struct {
@@ -48,28 +49,28 @@ type balanceReq struct {
 }
 
 type balanceResp struct {
-	Balance float64 `json:"balance"`
+	Balance int64 `json:"balance"`
 }
 
 type txReq struct {
-	MerchantID string  `json:"merchantId"`
-	UserID     uint64  `json:"userId"`
-	RoundID    string  `json:"roundId"`
-	Amount     float64 `json:"amount"`
-	Reason     string  `json:"reason,omitempty"`
+	MerchantID string `json:"merchantId"`
+	UserID     uint64 `json:"userId"`
+	RoundID    string `json:"roundId"`
+	Amount     int64  `json:"amount"`
+	Reason     string `json:"reason,omitempty"`
 }
 
 type txResp struct {
-	Balance float64 `json:"balance"`
+	Balance int64 `json:"balance"`
 }
 
-func (c *HTTPClient) GetBalance(ctx context.Context, merchantID string, userID uint64) (float64, error) {
+func (c *HTTPClient) GetBalance(ctx context.Context, merchantID string, userID uint64) (money.Amount, error) {
 	var resp balanceResp
 	err := c.post(ctx, "/api/v1/wallet/balance", balanceReq{
 		MerchantID: merchantID,
 		UserID:     userID,
 	}, &resp)
-	return resp.Balance, err
+	return money.AmountFromMinor(resp.Balance), err
 }
 
 func (c *HTTPClient) Bet(ctx context.Context, req BetReq) (*Result, error) {
@@ -78,12 +79,12 @@ func (c *HTTPClient) Bet(ctx context.Context, req BetReq) (*Result, error) {
 		MerchantID: req.MerchantID,
 		UserID:     req.UserID,
 		RoundID:    req.RoundID,
-		Amount:     req.Amount,
+		Amount:     req.Amount.Minor(),
 	}, &resp)
 	if err != nil {
 		return nil, err
 	}
-	return &Result{Balance: resp.Balance}, nil
+	return &Result{Balance: money.AmountFromMinor(resp.Balance)}, nil
 }
 
 func (c *HTTPClient) Win(ctx context.Context, req WinReq) (*Result, error) {
@@ -92,12 +93,12 @@ func (c *HTTPClient) Win(ctx context.Context, req WinReq) (*Result, error) {
 		MerchantID: req.MerchantID,
 		UserID:     req.UserID,
 		RoundID:    req.RoundID,
-		Amount:     req.Amount,
+		Amount:     req.Amount.Minor(),
 	}, &resp)
 	if err != nil {
 		return nil, err
 	}
-	return &Result{Balance: resp.Balance}, nil
+	return &Result{Balance: money.AmountFromMinor(resp.Balance)}, nil
 }
 
 func (c *HTTPClient) Rollback(ctx context.Context, req RollbackReq) error {
@@ -105,7 +106,7 @@ func (c *HTTPClient) Rollback(ctx context.Context, req RollbackReq) error {
 		MerchantID: req.MerchantID,
 		UserID:     req.UserID,
 		RoundID:    req.RoundID,
-		Amount:     req.Amount,
+		Amount:     req.Amount.Minor(),
 		Reason:     req.Reason,
 	}, &txResp{})
 }
@@ -117,10 +118,10 @@ type checkTxReq struct {
 }
 
 type checkTxResp struct {
-	RoundID   string  `json:"roundId"`
-	Status    string  `json:"status"`
-	BetAmount float64 `json:"betAmount"`
-	WinAmount float64 `json:"winAmount"`
+	RoundID   string `json:"roundId"`
+	Status    string `json:"status"`
+	BetAmount int64  `json:"betAmount"`
+	WinAmount int64  `json:"winAmount"`
 }
 
 func (c *HTTPClient) CheckTransaction(ctx context.Context, merchantID string, userID uint64, roundID string) (*TxCheckResult, error) {
@@ -136,8 +137,8 @@ func (c *HTTPClient) CheckTransaction(ctx context.Context, merchantID string, us
 	return &TxCheckResult{
 		RoundID:   resp.RoundID,
 		Status:    resp.Status,
-		BetAmount: resp.BetAmount,
-		WinAmount: resp.WinAmount,
+		BetAmount: money.AmountFromMinor(resp.BetAmount),
+		WinAmount: money.AmountFromMinor(resp.WinAmount),
 	}, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"fastgame/internal/model"
+	"fastgame/pkg/money"
 	"fastgame/pkg/prng"
 	"fastgame/pkg/xerr"
 	"fastgame/services/rgs/internal/svc"
@@ -45,7 +46,7 @@ func (l *ReplayLogic) ComputeReplay(req *types.ReplayComputeReq) (*types.ReplayR
 	return buildReplayResp(req.ServerSeed, req.ClientSeed, req.Nonce, req.BetAmount, rtpTier, req.Nonce, 0)
 }
 
-func SceneToPayload(scene prng.ReplayScene, serverSeed, clientSeed, nonce string, betAmount float64) types.ReplayPayload {
+func SceneToPayload(scene prng.ReplayScene, serverSeed, clientSeed, nonce string, betAmount money.Amount) types.ReplayPayload {
 	path := make([]types.ReplayPoint, len(scene.FishPath))
 	for i, p := range scene.FishPath {
 		path[i] = types.ReplayPoint{X: p.X, Y: p.Y}
@@ -55,7 +56,7 @@ func SceneToPayload(scene prng.ReplayScene, serverSeed, clientSeed, nonce string
 			ServerSeed: serverSeed,
 			ClientSeed: clientSeed,
 			Nonce:      nonce,
-			BetAmount:  betAmount,
+			BetAmount:  betAmount.Minor(),
 		},
 		Scene: types.ReplayScene{
 			Weather:        scene.Weather,
@@ -68,8 +69,11 @@ func SceneToPayload(scene prng.ReplayScene, serverSeed, clientSeed, nonce string
 	}
 }
 
-func buildReplayResp(serverSeed, clientSeed, nonce string, betAmount float64, rtpTier, roundID string, sequenceID uint64) (*types.ReplayResp, error) {
-	scene, proof, err := prng.NewEngine(rtpTier).ComputeReplay(serverSeed, clientSeed, nonce, betAmount)
+func buildReplayResp(serverSeed, clientSeed, nonce string, betAmountMinor int64, rtpTier, roundID string, sequenceID uint64) (*types.ReplayResp, error) {
+	betAmount := money.AmountFromMinor(betAmountMinor)
+	engine := prng.NewEngine(rtpTier)
+	defer engine.Release()
+	scene, proof, err := engine.ComputeReplay(serverSeed, clientSeed, nonce, betAmount)
 	if err != nil {
 		return nil, err
 	}
@@ -79,8 +83,8 @@ func buildReplayResp(serverSeed, clientSeed, nonce string, betAmount float64, rt
 		SequenceId:   sequenceID,
 		Replay:       SceneToPayload(scene, serverSeed, clientSeed, nonce, betAmount),
 		ProvablyFair: proofToTypes(proof),
-		WinAmount:    scene.Outcome.WinAmount,
-		Multiplier:   scene.Outcome.Multiplier,
+		WinAmount:    scene.Outcome.WinAmount.Minor(),
+		Multiplier:   scene.Outcome.Multiplier.Minor(),
 		FishState:    scene.Outcome.FishState,
 		AnimationKey: scene.Outcome.AnimationKey,
 	}, nil
@@ -92,6 +96,6 @@ func proofToTypes(proof prng.FairProof) types.ProvablyFairProof {
 		ServerSeed:     proof.ServerSeed,
 		ClientSeed:     proof.ClientSeed,
 		Nonce:          proof.Nonce,
-		Roll:           proof.Roll,
+		Roll:           prng.RollFloat(proof.Roll),
 	}
 }

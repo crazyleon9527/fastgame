@@ -2,7 +2,7 @@ import { GameConfig } from '../config/GameConfig';
 import { RequestSigner } from './RequestSigner';
 import { GameSession, SessionInfo } from './GameSession';
 
-/** 客户端仅上报：action(cast) + betAmount + roundId + sequenceId */
+/** 客户端仅上报：action(cast) + betAmount(minor) + roundId + sequenceId */
 export interface BetRequest {
     merchantId: string;
     userId: number;
@@ -47,7 +47,7 @@ export interface ReplayPayload {
     scene: ReplayScenePayload;
 }
 
-/** RGS 结算响应 — 客户端严禁自行计算，只消费此结构 */
+/** RGS 结算响应 — winAmount/balance/multiplier 均为 minor units (Scale 10000) */
 export interface BetResponse {
     roundId: string;
     winAmount: number;

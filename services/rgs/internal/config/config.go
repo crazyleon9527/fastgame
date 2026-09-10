@@ -46,6 +46,14 @@ type WalletConf struct {
 	VerifyResponse       bool
 	ResponseTimestampSec int
 	Timeout              string
+	SlowThresholdMs      int
+}
+
+func (c WalletConf) SlowThreshold() time.Duration {
+	if c.SlowThresholdMs <= 0 {
+		return 500 * time.Millisecond
+	}
+	return time.Duration(c.SlowThresholdMs) * time.Millisecond
 }
 
 func (c WalletConf) ResponseTimestampWindow() time.Duration {

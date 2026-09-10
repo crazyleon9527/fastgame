@@ -10,7 +10,7 @@ type BalanceReq struct {
 }
 
 type BalanceResp struct {
-	Balance float64 `json:"balance"`
+	Balance int64 `json:"balance"`
 }
 
 type SessionReq struct {
@@ -29,16 +29,16 @@ type SessionResp struct {
 }
 
 type BetReq struct {
-	MerchantId       string  `json:"merchantId" validate:"required"`
-	UserId           uint64  `json:"userId" validate:"required"`
-	SessionToken     string  `json:"sessionToken" validate:"required"`
-	GameCode         string  `json:"gameCode" validate:"required"`
-	Action           string  `json:"action" validate:"required"` // 仅允许 cast
-	BetAmount        float64 `json:"betAmount" validate:"required,gt=0"`
-	RoundId          string  `json:"roundId" validate:"required"`
-	SequenceId       uint64  `json:"sequenceId" validate:"required"`
-	IdempotencyToken string  `json:"idempotencyToken,optional"`
-	ClientSeed       string  `json:"clientSeed,optional"`
+	MerchantId       string `json:"merchantId" validate:"required"`
+	UserId           uint64 `json:"userId" validate:"required"`
+	SessionToken     string `json:"sessionToken" validate:"required"`
+	GameCode         string `json:"gameCode" validate:"required"`
+	Action           string `json:"action" validate:"required"` // 仅允许 cast
+	BetAmount        int64  `json:"betAmount" validate:"required,gt=0"`
+	RoundId          string `json:"roundId" validate:"required"`
+	SequenceId       uint64 `json:"sequenceId" validate:"required"`
+	IdempotencyToken string `json:"idempotencyToken,optional"`
+	ClientSeed       string `json:"clientSeed,optional"`
 }
 
 type ProvablyFairProof struct {
@@ -50,10 +50,10 @@ type ProvablyFairProof struct {
 }
 
 type ReplayInputs struct {
-	ServerSeed string  `json:"serverSeed"`
-	ClientSeed string  `json:"clientSeed"`
-	Nonce      string  `json:"nonce"`
-	BetAmount  float64 `json:"betAmount"`
+	ServerSeed string `json:"serverSeed"`
+	ClientSeed string `json:"clientSeed"`
+	Nonce      string `json:"nonce"`
+	BetAmount  int64  `json:"betAmount"`
 }
 
 type ReplayPoint struct {
@@ -62,12 +62,12 @@ type ReplayPoint struct {
 }
 
 type ReplayScene struct {
-	Weather        string      `json:"weather"`
-	FishSpecies    string      `json:"fishSpecies"`
+	Weather        string        `json:"weather"`
+	FishSpecies    string        `json:"fishSpecies"`
 	FishPath       []ReplayPoint `json:"fishPath"`
-	BiteProp       string      `json:"biteProp"`
-	CastDurationMs int         `json:"castDurationMs"`
-	FishSpeed      float64     `json:"fishSpeed"`
+	BiteProp       string        `json:"biteProp"`
+	CastDurationMs int           `json:"castDurationMs"`
+	FishSpeed      float64       `json:"fishSpeed"`
 }
 
 type ReplayPayload struct {
@@ -77,9 +77,9 @@ type ReplayPayload struct {
 
 type BetResp struct {
 	RoundId          string            `json:"roundId"`
-	WinAmount        float64           `json:"winAmount"`
-	Multiplier       float64           `json:"multiplier"`
-	Balance          float64           `json:"balance"`
+	WinAmount        int64             `json:"winAmount"`
+	Multiplier       int64             `json:"multiplier"`
+	Balance          int64             `json:"balance"`
 	RtpTier          string            `json:"rtpTier"`
 	FishState        string            `json:"fishState"`
 	AnimationKey     string            `json:"animationKey"`
@@ -94,11 +94,11 @@ type ReplayReq struct {
 }
 
 type ReplayComputeReq struct {
-	ServerSeed string  `json:"serverSeed" validate:"required"`
-	ClientSeed string  `json:"clientSeed" validate:"required"`
-	Nonce      string  `json:"nonce" validate:"required"`
-	BetAmount  float64 `json:"betAmount" validate:"required,gt=0"`
-	RtpTier    string  `json:"rtpTier,optional"`
+	ServerSeed string `json:"serverSeed" validate:"required"`
+	ClientSeed string `json:"clientSeed" validate:"required"`
+	Nonce      string `json:"nonce" validate:"required"`
+	BetAmount  int64  `json:"betAmount" validate:"required,gt=0"`
+	RtpTier    string `json:"rtpTier,optional"`
 }
 
 type ReplayResp struct {
@@ -106,8 +106,8 @@ type ReplayResp struct {
 	SequenceId   uint64            `json:"sequenceId,omitempty"`
 	Replay       ReplayPayload     `json:"replay"`
 	ProvablyFair ProvablyFairProof `json:"provablyFair"`
-	WinAmount    float64           `json:"winAmount"`
-	Multiplier   float64           `json:"multiplier"`
+	WinAmount    int64             `json:"winAmount"`
+	Multiplier   int64             `json:"multiplier"`
 	FishState    string            `json:"fishState"`
 	AnimationKey string            `json:"animationKey"`
 }

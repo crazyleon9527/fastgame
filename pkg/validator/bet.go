@@ -2,38 +2,37 @@ package validator
 
 import (
 	"fmt"
-	"math"
+
+	"fastgame/pkg/money"
 )
 
 type BetLimits struct {
-	Min     float64   `json:"min"`
-	Max     float64   `json:"max"`
-	Allowed []float64 `json:"allowed"`
+	Min     int64   `json:"min"`
+	Max     int64   `json:"max"`
+	Allowed []int64 `json:"allowed"`
 }
 
-func (l BetLimits) Validate(amount float64) error {
-	if math.IsNaN(amount) || math.IsInf(amount, 0) {
-		return fmt.Errorf("invalid bet amount")
-	}
+func (l BetLimits) Validate(amount money.Amount) error {
 	if amount <= 0 {
 		return fmt.Errorf("bet amount must be positive")
 	}
 
 	min := l.Min
 	if min <= 0 {
-		min = 0.01
+		min = money.Scale / 100 // 0.01
 	}
 	max := l.Max
 	if max <= 0 {
-		max = 100000
+		max = 100000 * money.Scale
 	}
-	if amount < min || amount > max {
-		return fmt.Errorf("bet amount out of range [%.2f, %.2f]", min, max)
+	amt := amount.Minor()
+	if amt < min || amt > max {
+		return fmt.Errorf("bet amount out of range")
 	}
 
 	if len(l.Allowed) > 0 {
 		for _, allowed := range l.Allowed {
-			if math.Abs(amount-allowed) < 0.001 {
+			if amt == allowed {
 				return nil
 			}
 		}

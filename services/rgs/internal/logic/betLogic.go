@@ -9,6 +9,7 @@ import (
 	"fastgame/internal/model"
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/lock"
+	"fastgame/pkg/money"
 	"fastgame/pkg/prng"
 	"fastgame/pkg/trace"
 	"fastgame/pkg/wallet"
@@ -37,6 +38,8 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 	if req.Action != "cast" {
 		return nil, xerr.ErrInvalidRequest
 	}
+
+	betAmount := money.AmountFromMinor(req.BetAmount)
 
 	idempotencyToken := req.IdempotencyToken
 	if idempotencyToken == "" {
@@ -96,11 +99,14 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			MerchantID: req.MerchantId,
 			UserID:     req.UserId,
 			RoundID:    req.RoundId,
-			Amount:     req.BetAmount,
+			Amount:     betAmount,
 		})
 		trace.Record(l.ctx, l.svcCtx.Trace, "rgs", "wallet.bet", req.RoundId,
 			status(err), detailErr(err), time.Since(betStart))
 		if err != nil {
+			if errors.Is(err, wallet.ErrCircuitOpen) || errors.Is(err, wallet.ErrSlowResponse) {
+				return xerr.ErrWalletUnavailable
+			}
 			return xerr.ErrWalletBetFailed
 		}
 
@@ -112,7 +118,7 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			GameCode:        req.GameCode,
 			Phase:           model.PendingTxPhaseBetDebited,
 			Status:          model.PendingTxStatusPending,
-			BetAmount:       req.BetAmount,
+			BetAmount:       betAmount.Minor(),
 			ExpectedAction:  model.PendingTxActionRollbackBet,
 			WalletBetStatus: "confirmed",
 			WalletWinStatus: "unknown",
@@ -120,11 +126,13 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			logx.Errorf("insert pending_transaction failed: roundId=%s err=%v", req.RoundId, err)
 		}
 
-		scene, proof, err := prng.NewEngine(gameCfg.RtpTier).ComputeReplay(
+		engine := prng.NewEngine(gameCfg.RtpTier)
+		defer engine.Release()
+		scene, proof, err := engine.ComputeReplay(
 			sessionData.ServerSeed,
 			sessionData.ClientSeed,
 			req.RoundId,
-			req.BetAmount,
+			betAmount,
 		)
 		if err != nil {
 			return err
@@ -149,8 +157,8 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 				if wallet.IsTimeoutErr(err) {
 					opType = model.PendingOpWinTimeout
 				}
-				l.recordPending(req, outcome, opType, err)
-				if err := l.svcCtx.PendingTx.MarkWinPending(l.ctx, req.RoundId, outcome.WinAmount, err.Error()); err != nil {
+				l.recordPending(req, betAmount, outcome, opType, err)
+				if err := l.svcCtx.PendingTx.MarkWinPending(l.ctx, req.RoundId, outcome.WinAmount.Minor(), err.Error()); err != nil {
 					logx.Errorf("mark win pending failed: roundId=%s err=%v", req.RoundId, err)
 				}
 				settlementStatus = "pending"
@@ -162,16 +170,16 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 
 		resp = &types.BetResp{
 			RoundId:          req.RoundId,
-			WinAmount:        outcome.WinAmount,
-			Multiplier:       outcome.Multiplier,
-			Balance:          balance,
+			WinAmount:        outcome.WinAmount.Minor(),
+			Multiplier:       outcome.Multiplier.Minor(),
+			Balance:          balance.Minor(),
 			RtpTier:          outcome.RtpTier,
 			FishState:        outcome.FishState,
 			AnimationKey:     outcome.AnimationKey,
 			SequenceId:       req.SequenceId,
 			SettlementStatus: settlementStatus,
 			ProvablyFair:     proofToTypes(proof),
-			Replay: SceneToPayload(scene, sessionData.ServerSeed, sessionData.ClientSeed, req.RoundId, req.BetAmount),
+			Replay:           SceneToPayload(scene, sessionData.ServerSeed, sessionData.ClientSeed, req.RoundId, betAmount),
 		}
 
 		if settlementStatus == "settled" {
@@ -188,7 +196,7 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 				ServerSeed:   sessionData.ServerSeed,
 				ClientSeed:   sessionData.ClientSeed,
 				Nonce:        req.RoundId,
-				BetAmount:    req.BetAmount,
+				BetAmount:    betAmount.Minor(),
 				SequenceID:   req.SequenceId,
 			}); err != nil {
 				logx.Errorf("save replay record failed: roundId=%s err=%v", req.RoundId, err)
@@ -201,7 +209,7 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 
 		if settlementStatus == "settled" {
 			go l.publishSettledEvent(req, outcome, balance)
-			if outcome.Multiplier >= 50 {
+			if outcome.Multiplier >= money.Multiplier(500000) {
 				go l.publishBigWinEvent(req, outcome)
 			}
 		}
@@ -217,7 +225,7 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 	return resp, nil
 }
 
-func (l *BetLogic) recordPending(req *types.BetReq, outcome prng.Outcome, opType string, err error) {
+func (l *BetLogic) recordPending(req *types.BetReq, betAmount money.Amount, outcome prng.Outcome, opType string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -226,8 +234,8 @@ func (l *BetLogic) recordPending(req *types.BetReq, outcome prng.Outcome, opType
 		MerchantCode: req.MerchantId,
 		UserID:       req.UserId,
 		OpType:       opType,
-		BetAmount:    req.BetAmount,
-		WinAmount:    outcome.WinAmount,
+		BetAmount:    betAmount.Minor(),
+		WinAmount:    outcome.WinAmount.Minor(),
 		Status:       model.PendingStatusPending,
 		LastError:    sql.NullString{String: err.Error(), Valid: err != nil},
 	})
@@ -236,7 +244,7 @@ func (l *BetLogic) recordPending(req *types.BetReq, outcome prng.Outcome, opType
 	}
 }
 
-func (l *BetLogic) publishSettledEvent(req *types.BetReq, outcome prng.Outcome, balance float64) {
+func (l *BetLogic) publishSettledEvent(req *types.BetReq, outcome prng.Outcome, balance money.Amount) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	ctx = trace.WithID(ctx, trace.ID(l.ctx))
@@ -248,10 +256,10 @@ func (l *BetLogic) publishSettledEvent(req *types.BetReq, outcome prng.Outcome, 
 		MerchantID: req.MerchantId,
 		GameCode:   req.GameCode,
 		BetAmount:  req.BetAmount,
-		WinAmount:  outcome.WinAmount,
-		Multiplier: outcome.Multiplier,
+		WinAmount:  outcome.WinAmount.Minor(),
+		Multiplier: outcome.Multiplier.Minor(),
 		RtpTier:    outcome.RtpTier,
-		Balance:    balance,
+		Balance:    balance.Minor(),
 	})
 	if err != nil {
 		logx.Errorf("publish round settled event failed: roundId=%s err=%v", req.RoundId, err)
@@ -267,30 +275,11 @@ func (l *BetLogic) publishBigWinEvent(req *types.BetReq, outcome prng.Outcome) {
 		UserID:     req.UserId,
 		MerchantID: req.MerchantId,
 		GameCode:   req.GameCode,
-		WinAmount:  outcome.WinAmount,
-		Multiplier: outcome.Multiplier,
+		WinAmount:  outcome.WinAmount.Minor(),
+		Multiplier: outcome.Multiplier.Minor(),
 	})
 	if err != nil {
 		logx.Errorf("publish bigwin event failed: roundId=%s err=%v", req.RoundId, err)
-	}
-}
-
-func (l *BetLogic) publishRollbackEvent(req *types.BetReq, amount float64, reason string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	ctx = trace.WithID(ctx, trace.ID(l.ctx))
-	err := l.svcCtx.Kafka.PublishWalletRollback(ctx, kafka.WalletRollbackEvent{
-		TraceID:      trace.ID(l.ctx),
-		RoundID:      req.RoundId,
-		UserID:       req.UserId,
-		MerchantID:   req.MerchantId,
-		RollbackType: "bet_refund",
-		Amount:       amount,
-		Reason:       reason,
-	})
-	if err != nil {
-		logx.Errorf("publish wallet rollback event failed: roundId=%s err=%v", req.RoundId, err)
 	}
 }
 

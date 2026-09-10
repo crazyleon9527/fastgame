@@ -1,28 +1,36 @@
 package validator
 
-import "testing"
+import (
+	"testing"
+
+	"fastgame/pkg/money"
+)
 
 func TestBetLimitsValidate(t *testing.T) {
-	limits := BetLimits{Min: 1, Max: 100, Allowed: []float64{1, 5, 10, 50, 100}}
+	limits := BetLimits{
+		Min:     money.FromMajor(1).Minor(),
+		Max:     money.FromMajor(100).Minor(),
+		Allowed: []int64{money.FromMajor(1).Minor(), money.FromMajor(5).Minor(), money.FromMajor(10).Minor(), money.FromMajor(50).Minor(), money.FromMajor(100).Minor()},
+	}
 
 	cases := []struct {
-		amount float64
+		amount money.Amount
 		ok     bool
 	}{
-		{10, true},
-		{-10, false},
+		{money.FromMajor(10), true},
+		{money.FromMajor(-10), false},
 		{0, false},
-		{1000, false},
-		{7, false},
+		{money.FromMajor(1000), false},
+		{money.FromMajor(7), false},
 	}
 
 	for _, tc := range cases {
 		err := limits.Validate(tc.amount)
 		if tc.ok && err != nil {
-			t.Fatalf("amount %.2f should pass: %v", tc.amount, err)
+			t.Fatalf("amount %s should pass: %v", tc.amount.String(), err)
 		}
 		if !tc.ok && err == nil {
-			t.Fatalf("amount %.2f should fail", tc.amount)
+			t.Fatalf("amount %s should fail", tc.amount.String())
 		}
 	}
 }

@@ -17,7 +17,7 @@ type GameRoundReplay struct {
 	ServerSeed   string    `db:"server_seed"`
 	ClientSeed   string    `db:"client_seed"`
 	Nonce        string    `db:"nonce"`
-	BetAmount    float64   `db:"bet_amount"`
+	BetAmount    int64     `db:"bet_amount"`
 	SequenceID   uint64    `db:"sequence_id"`
 	CreatedAt    time.Time `db:"created_at"`
 }
