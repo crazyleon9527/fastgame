@@ -1,16 +1,40 @@
 (() => {
   const TYPE_LABELS = { ip: 'IP', user_id: '用户 ID', merchant: '商户' };
+  const TAB_TITLES = { blacklist: '风控黑名单', merchants: '商户密钥轮换' };
 
-  let page = 1;
-  const pageSize = 20;
-  let total = 0;
+  let activeTab = 'blacklist';
+
+  // Blacklist state
+  let blPage = 1;
+  const blPageSize = 20;
+  let blTotal = 0;
   let pendingDeleteId = null;
+
+  // Merchant state
+  let merchantPage = 1;
+  const merchantPageSize = 20;
+  let merchantTotal = 0;
+  let pendingRotateId = null;
+  let pendingRotateLabel = '';
 
   const $ = (sel) => document.querySelector(sel);
 
   function show(view) {
     $('#login-view').classList.toggle('hidden', view !== 'login');
     $('#main-view').classList.toggle('hidden', view !== 'main');
+  }
+
+  function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.nav-item').forEach((el) => {
+      el.classList.toggle('active', el.dataset.tab === tab);
+    });
+    $('#panel-blacklist').classList.toggle('hidden', tab !== 'blacklist');
+    $('#panel-merchants').classList.toggle('hidden', tab !== 'merchants');
+    $('#page-subtitle').textContent = TAB_TITLES[tab] || '';
+
+    if (tab === 'blacklist') loadBlacklist();
+    if (tab === 'merchants') loadMerchants();
   }
 
   function toast(msg, type = 'success') {
@@ -29,9 +53,22 @@
 
   function toRFC3339(localDatetime) {
     if (!localDatetime) return '';
-    const d = new Date(localDatetime);
-    return d.toISOString();
+    return new Date(localDatetime).toISOString();
   }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function escapeAttr(s) {
+    return String(s).replace(/"/g, '&quot;');
+  }
+
+  function handleAuthError(err) {
+    if (err.message.includes('登录')) show('login');
+  }
+
+  // ── Blacklist ──────────────────────────────────────────
 
   async function loadBlacklist() {
     const listType = $('#filter-type').value;
@@ -39,13 +76,13 @@
     tbody.innerHTML = '<tr><td colspan="8" class="empty">加载中…</td></tr>';
 
     try {
-      const data = await AdminAPI.listBlacklist({ listType, page, pageSize });
-      total = data.total || 0;
+      const data = await AdminAPI.listBlacklist({ listType, page: blPage, pageSize: blPageSize });
+      blTotal = data.total || 0;
       $('#stat-count').textContent = (data.list || []).length;
-      $('#stat-total').textContent = total;
-      $('#page-info').textContent = `第 ${page} 页 / 共 ${Math.max(1, Math.ceil(total / pageSize))} 页`;
-      $('#prev-page').disabled = page <= 1;
-      $('#next-page').disabled = page * pageSize >= total;
+      $('#stat-total').textContent = blTotal;
+      $('#page-info').textContent = `第 ${blPage} 页 / 共 ${Math.max(1, Math.ceil(blTotal / blPageSize))} 页`;
+      $('#prev-page').disabled = blPage <= 1;
+      $('#next-page').disabled = blPage * blPageSize >= blTotal;
 
       if (!data.list || data.list.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无封禁记录</td></tr>';
@@ -76,19 +113,78 @@
       });
     } catch (err) {
       tbody.innerHTML = `<tr><td colspan="8" class="empty error">${escapeHtml(err.message)}</td></tr>`;
-      if (err.message.includes('登录')) show('login');
+      handleAuthError(err);
     }
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // ── Merchants ──────────────────────────────────────────
+
+  async function loadMerchants() {
+    const tbody = $('#merchant-body');
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">加载中…</td></tr>';
+
+    try {
+      const data = await AdminAPI.listMerchants({ page: merchantPage, pageSize: merchantPageSize });
+      merchantTotal = data.total || 0;
+      const list = data.list || [];
+
+      $('#merchant-stat-total').textContent = merchantTotal;
+      $('#merchant-stat-active').textContent = list.filter((m) => m.status === 1).length;
+      $('#merchant-page-info').textContent = `第 ${merchantPage} 页 / 共 ${Math.max(1, Math.ceil(merchantTotal / merchantPageSize))} 页`;
+      $('#merchant-prev-page').disabled = merchantPage <= 1;
+      $('#merchant-next-page').disabled = merchantPage * merchantPageSize >= merchantTotal;
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">暂无商户</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map((m) => `
+        <tr>
+          <td>${m.id}</td>
+          <td><code>${escapeHtml(m.merchantCode)}</code></td>
+          <td>${escapeHtml(m.name)}</td>
+          <td><span class="badge ${m.status === 1 ? 'active' : 'inactive'}">${m.status === 1 ? '启用' : '禁用'}</span></td>
+          <td>
+            <button class="btn btn-sm" data-rotate="${m.id}" data-code="${escapeAttr(m.merchantCode)}" data-name="${escapeAttr(m.name)}" ${m.status !== 1 ? 'disabled' : ''}>
+              轮换密钥
+            </button>
+          </td>
+        </tr>
+      `).join('');
+
+      tbody.querySelectorAll('[data-rotate]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          pendingRotateId = btn.dataset.rotate;
+          pendingRotateLabel = `${btn.dataset.code} (${btn.dataset.name})`;
+          $('#rotate-merchant-label').textContent = `商户：${pendingRotateLabel}`;
+          $('#rotate-grace-hours').value = '24';
+          $('#rotate-error').classList.add('hidden');
+          $('#rotate-dialog').showModal();
+        });
+      });
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="5" class="empty error">${escapeHtml(err.message)}</td></tr>`;
+      handleAuthError(err);
+    }
   }
 
-  function escapeAttr(s) {
-    return String(s).replace(/"/g, '&quot;');
+  function showKeyResult(resp) {
+    $('#new-key-value').textContent = resp.newPrivateKey;
+    $('#key-meta').innerHTML = `
+      <li>商户编码：<code>${escapeHtml(resp.merchantCode)}</code></li>
+      <li>过渡期：<strong>${resp.gracePeriodHours}</strong> 小时</li>
+      <li>轮换时间：${formatTime(resp.rotatedAt)}</li>
+    `;
+    $('#key-result-dialog').showModal();
   }
 
-  // Login
+  // ── Event bindings ─────────────────────────────────────
+
+  document.querySelectorAll('.nav-item').forEach((btn) => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
   $('#login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const errEl = $('#login-error');
@@ -98,8 +194,8 @@
       AdminAPI.setToken(resp.accessToken);
       $('#user-label').textContent = $('#username').value;
       show('main');
-      page = 1;
-      await loadBlacklist();
+      blPage = 1;
+      switchTab('blacklist');
     } catch (err) {
       errEl.textContent = err.message || '登录失败';
       errEl.classList.remove('hidden');
@@ -111,26 +207,22 @@
     show('login');
   });
 
-  // Toolbar
+  // Blacklist toolbar
   $('#refresh-btn').addEventListener('click', () => loadBlacklist());
-  $('#filter-type').addEventListener('change', () => { page = 1; loadBlacklist(); });
-  $('#prev-page').addEventListener('click', () => { if (page > 1) { page--; loadBlacklist(); } });
-  $('#next-page').addEventListener('click', () => { if (page * pageSize < total) { page++; loadBlacklist(); } });
+  $('#filter-type').addEventListener('change', () => { blPage = 1; loadBlacklist(); });
+  $('#prev-page').addEventListener('click', () => { if (blPage > 1) { blPage--; loadBlacklist(); } });
+  $('#next-page').addEventListener('click', () => { if (blPage * blPageSize < blTotal) { blPage++; loadBlacklist(); } });
 
-  // Add
   $('#add-btn').addEventListener('click', () => {
     $('#add-form').reset();
     $('#add-error').classList.add('hidden');
     $('#add-dialog').showModal();
   });
-
   $('#cancel-add').addEventListener('click', () => $('#add-dialog').close());
-
   $('#add-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const errEl = $('#add-error');
     errEl.classList.add('hidden');
-
     const payload = {
       listType: $('#add-type').value,
       listValue: $('#add-value').value.trim(),
@@ -138,12 +230,11 @@
     };
     const expires = toRFC3339($('#add-expires').value);
     if (expires) payload.expiresAt = expires;
-
     try {
       await AdminAPI.createBlacklist(payload);
       $('#add-dialog').close();
       toast('封禁已添加');
-      page = 1;
+      blPage = 1;
       await loadBlacklist();
     } catch (err) {
       errEl.textContent = err.message;
@@ -151,9 +242,7 @@
     }
   });
 
-  // Delete
   $('#cancel-delete').addEventListener('click', () => $('#confirm-dialog').close());
-
   $('#confirm-delete').addEventListener('click', async () => {
     if (!pendingDeleteId) return;
     try {
@@ -167,11 +256,48 @@
     pendingDeleteId = null;
   });
 
+  // Merchants toolbar
+  $('#merchant-refresh-btn').addEventListener('click', () => loadMerchants());
+  $('#merchant-prev-page').addEventListener('click', () => { if (merchantPage > 1) { merchantPage--; loadMerchants(); } });
+  $('#merchant-next-page').addEventListener('click', () => { if (merchantPage * merchantPageSize < merchantTotal) { merchantPage++; loadMerchants(); } });
+
+  $('#cancel-rotate').addEventListener('click', () => $('#rotate-dialog').close());
+  $('#rotate-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = $('#rotate-error');
+    errEl.classList.add('hidden');
+    const graceHours = parseInt($('#rotate-grace-hours').value, 10) || 24;
+    try {
+      const resp = await AdminAPI.rotateMerchantKey(pendingRotateId, graceHours);
+      $('#rotate-dialog').close();
+      toast('密钥轮换成功');
+      showKeyResult(resp);
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+    }
+  });
+
+  $('#copy-key-btn').addEventListener('click', async () => {
+    const key = $('#new-key-value').textContent;
+    try {
+      await navigator.clipboard.writeText(key);
+      toast('已复制到剪贴板');
+    } catch {
+      toast('复制失败，请手动选择复制', 'error');
+    }
+  });
+
+  $('#close-key-result').addEventListener('click', () => {
+    $('#key-result-dialog').close();
+    $('#new-key-value').textContent = '';
+  });
+
   // Init
   if (AdminAPI.isLoggedIn()) {
     $('#user-label').textContent = $('#username').value || 'admin';
     show('main');
-    loadBlacklist();
+    switchTab('blacklist');
   } else {
     show('login');
   }

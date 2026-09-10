@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FastGame 风控黑名单</title>
+  <title>FastGame Admin</title>
   <link rel="stylesheet" href="/admin/css/style.css" />
 </head>
 <body>
@@ -12,7 +12,7 @@
     <section id="login-view" class="view">
       <div class="login-card">
         <h1>FastGame Admin</h1>
-        <p class="subtitle">风控黑名单管理</p>
+        <p class="subtitle">运营管理后台</p>
         <form id="login-form">
           <label>
             用户名
@@ -34,8 +34,8 @@
         <div class="brand">
           <span class="logo">FG</span>
           <div>
-            <strong>风控黑名单</strong>
-            <small>Risk Blacklist</small>
+            <strong>FastGame Admin</strong>
+            <small id="page-subtitle">风控黑名单</small>
           </div>
         </div>
         <div class="topbar-actions">
@@ -44,63 +44,119 @@
         </div>
       </header>
 
-      <main class="content">
-        <div class="toolbar">
-          <div class="filters">
-            <label>
-              类型
-              <select id="filter-type">
-                <option value="">全部</option>
-                <option value="ip">IP</option>
-                <option value="user_id">用户 ID</option>
-                <option value="merchant">商户</option>
-              </select>
-            </label>
-            <button id="refresh-btn" class="btn">刷新</button>
-          </div>
-          <button id="add-btn" class="btn primary">+ 添加封禁</button>
-        </div>
+      <div class="layout">
+        <nav class="sidebar">
+          <button class="nav-item active" data-tab="blacklist">风控黑名单</button>
+          <button class="nav-item" data-tab="merchants">商户密钥轮换</button>
+        </nav>
 
-        <div class="stats">
-          <div class="stat-card">
-            <span class="stat-label">当前页记录</span>
-            <span id="stat-count" class="stat-value">0</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">总计</span>
-            <span id="stat-total" class="stat-value">0</span>
-          </div>
-        </div>
+        <main class="content">
+          <!-- 黑名单 -->
+          <section id="panel-blacklist" class="panel">
+            <div class="toolbar">
+              <div class="filters">
+                <label>
+                  类型
+                  <select id="filter-type">
+                    <option value="">全部</option>
+                    <option value="ip">IP</option>
+                    <option value="user_id">用户 ID</option>
+                    <option value="merchant">商户</option>
+                  </select>
+                </label>
+                <button id="refresh-btn" class="btn">刷新</button>
+              </div>
+              <button id="add-btn" class="btn primary">+ 添加封禁</button>
+            </div>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>类型</th>
-                <th>值</th>
-                <th>原因</th>
-                <th>状态</th>
-                <th>过期时间</th>
-                <th>创建时间</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="blacklist-body">
-              <tr><td colspan="8" class="empty">加载中…</td></tr>
-            </tbody>
-          </table>
-        </div>
+            <div class="stats">
+              <div class="stat-card">
+                <span class="stat-label">当前页记录</span>
+                <span id="stat-count" class="stat-value">0</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">总计</span>
+                <span id="stat-total" class="stat-value">0</span>
+              </div>
+            </div>
 
-        <div class="pagination">
-          <button id="prev-page" class="btn" disabled>上一页</button>
-          <span id="page-info">第 1 页</span>
-          <button id="next-page" class="btn">下一页</button>
-        </div>
-      </main>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>类型</th>
+                    <th>值</th>
+                    <th>原因</th>
+                    <th>状态</th>
+                    <th>过期时间</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="blacklist-body">
+                  <tr><td colspan="8" class="empty">加载中…</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination">
+              <button id="prev-page" class="btn" disabled>上一页</button>
+              <span id="page-info">第 1 页</span>
+              <button id="next-page" class="btn">下一页</button>
+            </div>
+          </section>
+
+          <!-- 商户密钥轮换 -->
+          <section id="panel-merchants" class="panel hidden">
+            <div class="alert info">
+              <strong>密钥轮换说明</strong>
+              <p>轮换后旧密钥在过渡期内仍可用于签名验证。新密钥仅展示一次，请立即复制并更新客户端配置。</p>
+            </div>
+
+            <div class="toolbar">
+              <button id="merchant-refresh-btn" class="btn">刷新商户列表</button>
+            </div>
+
+            <div class="stats">
+              <div class="stat-card">
+                <span class="stat-label">商户总数</span>
+                <span id="merchant-stat-total" class="stat-value">0</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">已启用</span>
+                <span id="merchant-stat-active" class="stat-value">0</span>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>商户编码</th>
+                    <th>名称</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="merchant-body">
+                  <tr><td colspan="5" class="empty">加载中…</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination">
+              <button id="merchant-prev-page" class="btn" disabled>上一页</button>
+              <span id="merchant-page-info">第 1 页</span>
+              <button id="merchant-next-page" class="btn">下一页</button>
+            </div>
+          </section>
+        </main>
+      </div>
     </section>
 
-    <!-- 添加弹窗 -->
+    <!-- 添加封禁 -->
     <dialog id="add-dialog">
       <form id="add-form" method="dialog">
         <h2>添加封禁</h2>
@@ -121,7 +177,7 @@
           <input type="text" id="add-reason" placeholder="CC 攻击 / 刷钱 / 恶意脚本" />
         </label>
         <label>
-          过期时间 (可选, UTC)
+          过期时间 (可选)
           <input type="datetime-local" id="add-expires" />
           <small>留空表示永久封禁</small>
         </label>
@@ -133,12 +189,47 @@
       </form>
     </dialog>
 
-    <!-- 删除确认 -->
+    <!-- 解除封禁确认 -->
     <dialog id="confirm-dialog">
       <p id="confirm-text">确定解除该封禁？</p>
       <div class="dialog-actions">
         <button type="button" id="cancel-delete" class="btn">取消</button>
         <button type="button" id="confirm-delete" class="btn danger">解除封禁</button>
+      </div>
+    </dialog>
+
+    <!-- 轮换密钥确认 -->
+    <dialog id="rotate-dialog">
+      <form id="rotate-form" method="dialog">
+        <h2>轮换商户密钥</h2>
+        <p id="rotate-merchant-label" class="muted-text"></p>
+        <label>
+          过渡期 (小时)
+          <input type="number" id="rotate-grace-hours" value="24" min="1" max="168" required />
+          <small>过渡期内旧密钥仍可验签，便于客户端平滑切换</small>
+        </label>
+        <div class="alert warning">
+          轮换后旧密钥将在过渡期结束后失效。请确保已在客户端部署新密钥。
+        </div>
+        <p id="rotate-error" class="error hidden"></p>
+        <div class="dialog-actions">
+          <button type="button" id="cancel-rotate" class="btn">取消</button>
+          <button type="submit" class="btn danger">确认轮换</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- 新密钥展示 (仅一次) -->
+    <dialog id="key-result-dialog">
+      <h2>新密钥已生成</h2>
+      <p class="muted-text">以下密钥<strong>仅显示一次</strong>，关闭后无法再次查看，请立即保存。</p>
+      <div class="key-box">
+        <code id="new-key-value"></code>
+        <button type="button" id="copy-key-btn" class="btn">复制</button>
+      </div>
+      <ul id="key-meta" class="key-meta"></ul>
+      <div class="dialog-actions">
+        <button type="button" id="close-key-result" class="btn primary">我已保存，关闭</button>
       </div>
     </dialog>
 

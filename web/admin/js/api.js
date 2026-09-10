@@ -63,5 +63,14 @@ const AdminAPI = (() => {
     deleteBlacklist(id) {
       return request('DELETE', `/api/v1/admin/risk-blacklist/${id}`);
     },
+
+    listMerchants({ page = 1, pageSize = 20 } = {}) {
+      const params = new URLSearchParams({ page, pageSize });
+      return request('GET', `/api/v1/admin/merchants?${params}`);
+    },
+
+    rotateMerchantKey(id, gracePeriodHours = 24) {
+      return request('POST', `/api/v1/admin/merchants/${id}/rotate-key`, { gracePeriodHours });
+    },
   };
 })();
