@@ -14,6 +14,74 @@ function setResult(html, type = '') {
     el.className = `result-card ${type}`;
 }
 
+function showToast(msg, type = 'success') {
+    const el = $('#toast');
+    el.textContent = msg;
+    el.className = `toast ${type}`;
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.add('hidden'), 2800);
+}
+
+function buildShareUrl() {
+    const serverSeed = $('#server-seed').value.trim();
+    const serverSeedHash = $('#server-seed-hash').value.trim();
+    const clientSeed = $('#client-seed').value.trim();
+    const nonce = $('#nonce').value.trim();
+    const expectedRoll = $('#expected-roll').value.trim();
+    const betAmount = $('#bet-amount').value.trim();
+
+    if (!serverSeed || !clientSeed || !nonce) {
+        return null;
+    }
+
+    const params = new URLSearchParams();
+    params.set('serverSeed', serverSeed);
+    params.set('clientSeed', clientSeed);
+    params.set('nonce', nonce);
+    if (serverSeedHash) params.set('serverSeedHash', serverSeedHash);
+    if (expectedRoll) params.set('roll', expectedRoll);
+    if (betAmount) params.set('betAmount', betAmount);
+
+    return `${window.location.origin}/verify/?${params.toString()}`;
+}
+
+function updateSharePreview() {
+    const url = buildShareUrl();
+    const preview = $('#share-link-preview');
+    if (!url) {
+        preview.classList.add('hidden');
+        preview.textContent = '';
+        return;
+    }
+    preview.textContent = url;
+    preview.classList.remove('hidden');
+}
+
+async function copyShareLink() {
+    const url = buildShareUrl();
+    if (!url) {
+        showToast('请先填写 Server Seed、Client Seed 和 Nonce', 'error');
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(url);
+    } catch {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+    }
+
+    window.history.replaceState({}, '', url);
+    updateSharePreview();
+    showToast('分享链接已复制，可直接发送给其他玩家验算');
+}
+
 function almostEqual(a, b, eps = 1e-12) {
     if (a === '' || b === '' || a == null || b == null) return null;
     return Math.abs(Number(a) - Number(b)) < eps;
@@ -113,6 +181,7 @@ $('#import-json-btn').addEventListener('click', () => {
         if (parsed.nonce) $('#nonce').value = parsed.nonce;
         if (parsed.roll !== '') $('#expected-roll').value = String(parsed.roll);
         if (parsed.betAmount !== '') $('#bet-amount').value = String(parsed.betAmount);
+        updateSharePreview();
         setResult('<p class="ok">已从 JSON 导入字段</p>', 'success');
     } catch (err) {
         setResult(`<p class="error">JSON 解析失败: ${err.message}</p>`, 'error');
@@ -122,7 +191,15 @@ $('#import-json-btn').addEventListener('click', () => {
 $('#clear-btn').addEventListener('click', () => {
     $('#verify-form').reset();
     $('#json-import').value = '';
+    updateSharePreview();
     setResult('<p class="muted">已清空</p>');
 });
 
+$('#copy-link-btn').addEventListener('click', () => copyShareLink());
+
+['server-seed', 'server-seed-hash', 'client-seed', 'nonce', 'expected-roll', 'bet-amount'].forEach((id) => {
+    $(`#${id}`).addEventListener('input', updateSharePreview);
+});
+
 fillFromQuery();
+updateSharePreview();

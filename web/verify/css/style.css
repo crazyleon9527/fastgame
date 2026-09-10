@@ -136,7 +136,32 @@ input:focus, textarea:focus {
 
 .btn.primary:hover { background: var(--primary-hover); }
 
-.actions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; }
+
+.share-preview {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.hidden { display: none !important; }
+
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  font-size: 0.9rem;
+}
+
+.toast.error { border-color: var(--danger); }
 
 .result-card {
   min-height: 200px;

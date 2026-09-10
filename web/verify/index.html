@@ -61,8 +61,10 @@
           </label>
           <div class="actions">
             <button type="submit" class="btn primary">验算</button>
+            <button type="button" id="copy-link-btn" class="btn">复制分享链接</button>
             <button type="button" id="clear-btn" class="btn">清空</button>
           </div>
+          <p id="share-link-preview" class="share-preview hidden"></p>
         </form>
       </section>
 
@@ -81,6 +83,8 @@
       <button type="button" id="import-json-btn" class="btn">导入 JSON</button>
     </section>
   </main>
+
+  <div id="toast" class="toast hidden"></div>
 
   <footer class="footer">
     FastGame · 算法与 RGS <code>pkg/prng/provably_fair.go</code> 完全一致 · 纯浏览器本地计算，不上传任何数据

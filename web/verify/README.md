@@ -21,3 +21,4 @@ http://localhost:18000/verify/
 - 可选对比服务端返回的 Roll
 - 可选根据 Bet Amount 推导 fishState / multiplier / winAmount
 - 粘贴 `/game/bet` JSON 一键导入
+- **复制分享链接** — 将当前参数编码为 URL，一键复制发给其他玩家
