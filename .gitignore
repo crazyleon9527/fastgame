@@ -1,0 +1,6 @@
+.env
+.idea/
+*.log
+.DS_Store
+bin/
+services/rgs/rgs-api

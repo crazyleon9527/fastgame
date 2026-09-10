@@ -1,0 +1,51 @@
+syntax = "v1"
+
+info (
+	title:   "FastGame RGS Settlement API"
+	desc:    "核心游戏结算引擎 - 抛竿/下注/派彩"
+	author:  "leon"
+	version: "v1"
+)
+
+type (
+	// 抛竿/下注请求
+	BetReq {
+		MerchantId       string  `json:"merchantId" validate:"required"`
+		UserId           uint64  `json:"userId" validate:"required"`
+		RoundId          string  `json:"roundId" validate:"required"` // 幂等键
+		GameCode         string  `json:"gameCode" validate:"required"`
+		BetAmount        float64 `json:"betAmount" validate:"required,gt=0"`
+		IdempotencyToken string  `json:"idempotencyToken" validate:"required"`
+	}
+	// 结算结果（含动画指令）
+	BetResp {
+		RoundId      string  `json:"roundId"`
+		WinAmount    float64 `json:"winAmount"`
+		Multiplier   float64 `json:"multiplier"`
+		Balance      float64 `json:"balance"`
+		RtpTier      string  `json:"rtpTier"`
+		FishState    string  `json:"fishState"` // 咬钩状态: miss / bite / big_win
+		AnimationKey string  `json:"animationKey"`
+	}
+	BalanceReq {
+		MerchantId string `form:"merchantId" validate:"required"`
+		UserId     uint64 `form:"userId" validate:"required"`
+	}
+	BalanceResp {
+		Balance float64 `json:"balance"`
+	}
+)
+
+@server (
+	prefix: /api/v1
+)
+service rgs-api {
+	@doc "玩家抛竿/下注并结算"
+	@handler Bet
+	post /game/bet (BetReq) returns (BetResp)
+
+	@doc "查询玩家余额"
+	@handler Balance
+	get /game/balance (BalanceReq) returns (BalanceResp)
+}
+

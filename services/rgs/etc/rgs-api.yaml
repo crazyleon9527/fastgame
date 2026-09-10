@@ -1,0 +1,21 @@
+Name: rgs-api
+Host: 0.0.0.0
+Port: 18888
+Timeout: 30000
+
+Log:
+  Mode: console
+  Level: info
+
+Redis:
+  Addr: localhost:16379
+
+Kafka:
+  Brokers:
+    - localhost:19092
+
+Wallet:
+  Mock: true
+
+Game:
+  DefaultRtpTier: default
