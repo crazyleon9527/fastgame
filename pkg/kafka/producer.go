@@ -35,6 +35,7 @@ type RoundSettledEvent struct {
 
 type BigWinEvent struct {
 	EventID    string    `json:"eventId"`
+	TraceID    string    `json:"traceId,omitempty"`
 	RoundID    string    `json:"roundId"`
 	UserID     uint64    `json:"userId"`
 	MerchantID string    `json:"merchantId"`

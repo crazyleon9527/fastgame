@@ -9,6 +9,7 @@ import (
 
 	"fastgame/services/admin/internal/config"
 	"fastgame/services/admin/internal/handler"
+	"fastgame/services/admin/internal/middleware"
 	"fastgame/services/admin/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/conf"
@@ -25,6 +26,7 @@ func main() {
 
 	server := rest.MustNewServer(c.RestConf)
 	defer server.Stop()
+	server.Use(middleware.TraceMiddleware())
 
 	ctx, err := svc.NewServiceContext(c)
 	if err != nil {

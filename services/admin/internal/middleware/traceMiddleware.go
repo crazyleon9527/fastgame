@@ -6,7 +6,6 @@ import (
 	applog "fastgame/pkg/log"
 )
 
-// TraceMiddleware delegates to pkg/log HTTP access + trace correlation middleware.
 func TraceMiddleware() func(http.HandlerFunc) http.HandlerFunc {
 	return applog.HTTPMiddleware()
 }

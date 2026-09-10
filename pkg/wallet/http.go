@@ -10,7 +10,11 @@ import (
 	"strconv"
 	"time"
 
+	applog "fastgame/pkg/log"
 	"fastgame/pkg/money"
+	"fastgame/pkg/trace"
+
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 type HTTPConfig struct {
@@ -154,6 +158,9 @@ func (c *HTTPClient) post(ctx context.Context, path string, body any, dest any) 
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if tid := trace.ID(ctx); tid != "" {
+		req.Header.Set(trace.HeaderTraceID, tid)
+	}
 	if c.cfg.APIKey != "" {
 		req.Header.Set("X-API-Key", c.cfg.APIKey)
 	}
@@ -163,11 +170,21 @@ func (c *HTTPClient) post(ctx context.Context, path string, body any, dest any) 
 		}
 	}
 
+	start := time.Now()
 	res, err := c.client.Do(req)
 	if err != nil {
 		if IsTimeoutErr(err) {
+			applog.C(ctx).Errorw("wallet_request_timeout",
+				logx.Field(applog.KeyPath, path),
+				logx.Field(applog.KeyDurationMs, time.Since(start).Milliseconds()),
+				logx.Field(applog.KeyErr, err),
+			)
 			return fmt.Errorf("%w: %v", ErrTimeout, err)
 		}
+		applog.C(ctx).Errorw("wallet_request_failed",
+			logx.Field(applog.KeyPath, path),
+			logx.Field(applog.KeyErr, err),
+		)
 		return err
 	}
 	defer res.Body.Close()
@@ -177,6 +194,11 @@ func (c *HTTPClient) post(ctx context.Context, path string, body any, dest any) 
 		return err
 	}
 	if res.StatusCode >= 300 {
+		applog.C(ctx).Errorw("wallet_response_error",
+			logx.Field(applog.KeyPath, path),
+			logx.Field(applog.KeyStatus, res.StatusCode),
+			logx.Field(applog.KeyDurationMs, time.Since(start).Milliseconds()),
+		)
 		return fmt.Errorf("wallet api %s: status=%d body=%s", path, res.StatusCode, string(respBody))
 	}
 

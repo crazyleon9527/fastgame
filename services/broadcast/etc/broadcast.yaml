@@ -1,3 +1,9 @@
+Log:
+  ServiceName: broadcast
+  Mode: console
+  Level: info
+  Encoding: plain
+
 Host: 0.0.0.0
 Port: 18900
 

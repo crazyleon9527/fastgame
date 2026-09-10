@@ -4,8 +4,10 @@ Port: 18889
 Timeout: 30000
 
 Log:
+  ServiceName: admin-api
   Mode: console
   Level: info
+  Encoding: plain
 
 Auth:
   AccessSecret: fastgame-admin-jwt-secret-change-me

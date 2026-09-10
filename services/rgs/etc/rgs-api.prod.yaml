@@ -5,8 +5,12 @@ Timeout: 30000
 MaxBytes: 1048576
 
 Log:
+  ServiceName: rgs-api
   Mode: file
   Level: info
+  Encoding: json
+  Path: logs
+  KeepDays: 14
 
 MySQL:
   DataSource: fastgame:CHANGE_ME@tcp(127.0.0.1:3306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC

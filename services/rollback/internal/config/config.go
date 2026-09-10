@@ -1,8 +1,13 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	"github.com/zeromicro/go-zero/core/logx"
+)
 
 type Config struct {
+	Log        logx.LogConf
 	Kafka      KafkaConf
 	ClickHouse ClickHouseConf
 	MySQL      MySQLConf

@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	applog "fastgame/pkg/log"
 	"fastgame/services/broadcast/internal/hub"
 	"fastgame/services/broadcast/internal/worker"
 
@@ -20,6 +21,7 @@ import (
 var configFile = flag.String("f", "etc/broadcast.yaml", "the config file")
 
 type Config struct {
+	Log   logx.LogConf
 	Host  string
 	Port  int
 	Kafka struct {
@@ -35,6 +37,7 @@ func main() {
 
 	var c Config
 	conf.MustLoad(*configFile, &c)
+	applog.MustSetup("broadcast", c.Log)
 
 	h := hub.NewHub()
 	w := worker.NewWorker(c.Kafka.Brokers, c.Kafka.GroupID, h)

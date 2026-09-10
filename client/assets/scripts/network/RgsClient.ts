@@ -1,7 +1,10 @@
 import { GameConfig } from '../config/GameConfig';
+import { GameLogger } from '../util/GameLogger';
 import { RequestSigner } from './RequestSigner';
 import { SecureEnvelope } from './SecureEnvelope';
 import { GameSession, SessionInfo } from './GameSession';
+
+const TRACE_HEADER = 'X-Trace-Id';
 
 /** 客户端仅上报：action(cast) + betAmount(minor) + roundId + sequenceId */
 export interface BetRequest {
@@ -90,8 +93,12 @@ export class RgsClient {
     async createSession(merchantId: string, userId: number, gameCode: string, clientSeed?: string): Promise<SessionInfo> {
         const path = '/api/v1/game/session';
         const body = JSON.stringify({ merchantId, userId, gameCode, clientSeed: clientSeed || undefined });
-        const data: SessionInfo = await this.signedPost(path, body);
+        const { data, traceId } = await this.signedPost<SessionInfo>(path, body);
+        if (traceId) {
+            GameLogger.setTraceId(traceId);
+        }
         this.session.set(data);
+        GameLogger.info('session_created', { merchantId, userId, gameCode, traceId });
         return data;
     }
 
@@ -126,12 +133,20 @@ export class RgsClient {
         );
         headers['X-Session-Sign'] = sessionSign;
 
-        const resp = await fetch(`${this.baseUrl}${path}`, { method: 'POST', headers, body });
+        const resp = await fetch(`${this.baseUrl}${path}`, {
+            method: 'POST',
+            headers: this.withTraceHeader(headers),
+            body,
+        });
+        this.captureTraceId(resp);
         if (!resp.ok) {
             const text = await resp.text();
-            throw new Error(`request failed: ${resp.status} ${text}`);
+            GameLogger.error('bet_failed', { roundId: req.roundId, status: resp.status, traceId: GameLogger.getTraceId() });
+            throw new Error(`request failed: ${resp.status} ${text} trace=${GameLogger.getTraceId()}`);
         }
-        return resp.json();
+        const data: BetResponse = await resp.json();
+        GameLogger.info('bet_ok', { roundId: req.roundId, traceId: GameLogger.getTraceId() });
+        return data;
     }
 
     async fetchReplay(roundId: string): Promise<ReplayResponse> {
@@ -143,7 +158,22 @@ export class RgsClient {
         return resp.json();
     }
 
-    private async signedPost(path: string, body: string): Promise<any> {
+    private withTraceHeader(headers: Record<string, string>): Record<string, string> {
+        const traceId = GameLogger.getTraceId();
+        if (traceId) {
+            return { ...headers, [TRACE_HEADER]: traceId };
+        }
+        return headers;
+    }
+
+    private captureTraceId(resp: Response): void {
+        const traceId = resp.headers.get(TRACE_HEADER);
+        if (traceId) {
+            GameLogger.setTraceId(traceId);
+        }
+    }
+
+    private async signedPost<T>(path: string, body: string): Promise<{ data: T; traceId?: string }> {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
         if (this.merchantSecret) {
@@ -158,13 +188,17 @@ export class RgsClient {
 
         const resp = await fetch(`${this.baseUrl}${path}`, {
             method: 'POST',
-            headers,
+            headers: this.withTraceHeader(headers),
             body,
         });
+        this.captureTraceId(resp);
+        const traceId = GameLogger.getTraceId() || undefined;
         if (!resp.ok) {
             const text = await resp.text();
-            throw new Error(`request failed: ${resp.status} ${text}`);
+            GameLogger.error('request_failed', { path, status: resp.status, traceId });
+            throw new Error(`request failed: ${resp.status} ${text} trace=${traceId ?? ''}`);
         }
-        return resp.json();
+        const data: T = await resp.json();
+        return { data, traceId };
     }
 }

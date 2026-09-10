@@ -5,8 +5,10 @@ Timeout: 30000
 MaxBytes: 1048576
 
 Log:
+  ServiceName: rgs-api
   Mode: console
   Level: info
+  Encoding: plain
 
 MySQL:
   DataSource: fastgame:fastgame_pass@tcp(localhost:13306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC

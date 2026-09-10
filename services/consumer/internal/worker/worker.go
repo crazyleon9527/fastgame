@@ -8,6 +8,7 @@ import (
 
 	"fastgame/pkg/batch"
 	"fastgame/pkg/clickhouse"
+	applog "fastgame/pkg/log"
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/rtpwatchdog"
 	"fastgame/services/consumer/internal/svc"
@@ -46,28 +47,29 @@ func (w *Worker) Run(ctx context.Context) error {
 				w.batch.Stop()
 				return ctx.Err()
 			}
-			logx.Errorf("kafka fetch: %v", err)
+			applog.C(ctx).Errorw("kafka_fetch_failed", logx.Field(applog.KeyErr, err))
 			continue
 		}
 
 		row, evt, err := w.parseMessage(msg.Value)
+		msgCtx := applog.ContextFromKafka(ctx, msg, evt.TraceID, evt.RoundID, evt.MerchantID, evt.GameCode, evt.UserID)
 		if err != nil {
-			logx.Errorf("parse message: %v", err)
+			applog.C(msgCtx).Errorw("kafka_parse_failed", logx.Field(applog.KeyErr, err))
 			_ = w.reader.CommitMessages(ctx, msg)
 			continue
 		}
 
 		if w.svcCtx.Config.RtpWatch.Enabled {
-			w.evaluateRtp(ctx, evt)
+			w.evaluateRtp(msgCtx, evt)
 		}
 
-		if err := w.batch.Add(ctx, row); err != nil {
-			logx.Errorf("batch add: %v", err)
+		if err := w.batch.Add(msgCtx, row); err != nil {
+			applog.C(msgCtx).Errorw("batch_add_failed", logx.Field(applog.KeyErr, err))
 			continue
 		}
 
-		if err := w.reader.CommitMessages(ctx, msg); err != nil {
-			logx.Errorf("kafka commit: %v", err)
+		if err := w.reader.CommitMessages(msgCtx, msg); err != nil {
+			applog.C(msgCtx).Errorw("kafka_commit_failed", logx.Field(applog.KeyErr, err))
 		}
 	}
 }
@@ -81,12 +83,12 @@ func (w *Worker) evaluateRtp(ctx context.Context, evt kafka.RoundSettledEvent) {
 		WinMinor:     evt.WinAmount,
 	})
 	if err != nil {
-		logx.Errorf("rtp recorder: %v", err)
+		applog.C(ctx).Errorw("rtp_recorder_failed", logx.Field(applog.KeyErr, err))
 		return
 	}
 	for _, alert := range alerts {
 		if err := w.svcCtx.Enforcer.Handle(ctx, alert); err != nil {
-			logx.Errorf("rtp enforcer: %v", err)
+			applog.C(ctx).Errorw("rtp_enforcer_failed", logx.Field(applog.KeyErr, err))
 		}
 	}
 }
@@ -134,9 +136,11 @@ func (w *Worker) flush(ctx context.Context, rows []clickhouse.RoundSettledRow) e
 	if len(rows) == 0 {
 		return nil
 	}
-	logx.Infof("flushing %d round settled rows to clickhouse", len(rows))
+	applog.C(ctx).Infow("clickhouse_flush",
+		logx.Field("rows", len(rows)),
+	)
 	if err := w.svcCtx.Writer.BatchInsertRoundSettled(ctx, rows); err != nil {
-		logx.Errorf("clickhouse batch insert failed: %v", err)
+		applog.C(ctx).Errorw("clickhouse_batch_insert_failed", logx.Field(applog.KeyErr, err))
 		return err
 	}
 	return nil

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"fastgame/internal/model"
+	applog "fastgame/pkg/log"
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/lock"
 	"fastgame/pkg/money"
@@ -28,13 +29,16 @@ type BetLogic struct {
 
 func NewBetLogic(ctx context.Context, svcCtx *svc.ServiceContext) *BetLogic {
 	return &BetLogic{
-		Logger: logx.WithContext(ctx),
+		Logger: applog.C(ctx),
 		ctx:    ctx,
 		svcCtx: svcCtx,
 	}
 }
 
 func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
+	l.ctx = applog.WithRound(applog.WithMerchant(applog.WithUser(applog.WithGame(l.ctx, req.GameCode), req.UserId), req.MerchantId), req.RoundId)
+	l.Logger = applog.C(l.ctx)
+
 	if req.Action != "cast" {
 		return nil, xerr.ErrInvalidRequest
 	}

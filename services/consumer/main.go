@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	applog "fastgame/pkg/log"
 	"fastgame/services/consumer/internal/config"
 	"fastgame/services/consumer/internal/svc"
 	"fastgame/services/consumer/internal/worker"
@@ -23,6 +24,7 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
+	applog.MustSetup("consumer", c.Log)
 
 	svcCtx, err := svc.NewServiceContext(c)
 	if err != nil {

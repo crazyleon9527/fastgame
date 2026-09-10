@@ -8,8 +8,10 @@ import (
 
 	"fastgame/pkg/money"
 
+	applog "fastgame/pkg/log"
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/breaker"
+
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -92,7 +94,11 @@ func (c *breakerClient) run(ctx context.Context, merchantID string, op string, f
 			return err
 		}
 		if elapsed := time.Since(start); elapsed > c.cfg.SlowThreshold {
-			logx.WithContext(ctx).Slowf("wallet slow call: merchant=%s op=%s elapsed=%s", merchantID, op, elapsed)
+			applog.C(ctx).Sloww("wallet_slow_call",
+				logx.Field(applog.KeyMerchantID, merchantID),
+				logx.Field("op", op),
+				logx.Field(applog.KeyDurationMs, elapsed.Milliseconds()),
+			)
 			return fmt.Errorf("%w: %s took %s", ErrSlowResponse, op, elapsed)
 		}
 		return nil

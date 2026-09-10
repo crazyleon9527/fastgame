@@ -1,3 +1,9 @@
+Log:
+  ServiceName: consumer
+  Mode: console
+  Level: info
+  Encoding: plain
+
 Kafka:
   Brokers:
     - localhost:19092

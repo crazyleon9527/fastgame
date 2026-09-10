@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	applog "fastgame/pkg/log"
 	"fastgame/services/rollback/internal/config"
 	"fastgame/services/rollback/internal/svc"
 	"fastgame/services/rollback/internal/worker"
@@ -22,6 +23,7 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
+	applog.MustSetup("rollback", c.Log)
 
 	svcCtx, err := svc.NewServiceContext(c)
 	if err != nil {
