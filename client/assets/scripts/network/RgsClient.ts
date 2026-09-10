@@ -1,4 +1,5 @@
 import { GameConfig } from '../config/GameConfig';
+import { RequestSigner } from './RequestSigner';
 
 export interface BetRequest {
     merchantId: string;
@@ -26,9 +27,11 @@ export interface BalanceResponse {
 
 export class RgsClient {
     private baseUrl: string;
+    private merchantSecret?: string;
 
-    constructor(baseUrl = GameConfig.gatewayUrl) {
+    constructor(baseUrl = GameConfig.gatewayUrl, merchantSecret = GameConfig.merchantSecret) {
         this.baseUrl = baseUrl.replace(/\/$/, '');
+        this.merchantSecret = merchantSecret || undefined;
     }
 
     async getBalance(merchantId: string, userId: number): Promise<number> {
@@ -42,10 +45,24 @@ export class RgsClient {
     }
 
     async bet(req: BetRequest): Promise<BetResponse> {
-        const resp = await fetch(`${this.baseUrl}/api/v1/game/bet`, {
+        const path = '/api/v1/game/bet';
+        const body = JSON.stringify(req);
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+        if (this.merchantSecret) {
+            const timestamp = Math.floor(Date.now() / 1000).toString();
+            const nonce = crypto.randomUUID();
+            const payload = RequestSigner.buildPayload('POST', path, body, timestamp, nonce);
+            const signature = await RequestSigner.sign(this.merchantSecret, payload);
+            headers['X-Timestamp'] = timestamp;
+            headers['X-Nonce'] = nonce;
+            headers['X-Signature'] = signature;
+        }
+
+        const resp = await fetch(`${this.baseUrl}${path}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(req),
+            headers,
+            body,
         });
         if (!resp.ok) {
             const text = await resp.text();

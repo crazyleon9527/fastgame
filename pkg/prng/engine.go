@@ -61,7 +61,9 @@ func (e *Engine) Spin(betAmount float64) Outcome {
 
 func secureFloat() float64 {
 	var b [8]byte
-	_, _ = rand.Read(b[:])
+	if _, err := rand.Read(b[:]); err != nil {
+		panic("crypto/rand unavailable: " + err.Error())
+	}
 	n := binary.LittleEndian.Uint64(b[:])
 	return float64(n) / float64(math.MaxUint64)
 }

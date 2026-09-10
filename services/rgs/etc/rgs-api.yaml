@@ -2,6 +2,7 @@ Name: rgs-api
 Host: 0.0.0.0
 Port: 18888
 Timeout: 30000
+MaxBytes: 1048576
 
 Log:
   Mode: console
@@ -25,3 +26,10 @@ Wallet:
 
 Game:
   DefaultRtpTier: default
+
+Security:
+  SkipSignVerify: true
+  TimestampWindowSec: 60
+  UserBetLimitPerMin: 60
+  IPLimitPerSec: 20
+  MinResponseDelayMs: 150

@@ -8,4 +8,7 @@ var (
 	ErrWalletBetFailed = errors.New("wallet bet failed")
 	ErrWalletWinFailed = errors.New("wallet win failed")
 	ErrMerchantInvalid = errors.New("merchant invalid or disabled")
+	ErrInvalidRequest  = errors.New("invalid request")
+	ErrUnauthorized    = errors.New("unauthorized")
+	ErrRateLimited     = errors.New("too many requests")
 )

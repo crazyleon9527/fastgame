@@ -49,9 +49,9 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			return nil
 		}
 
-		claimed, err := l.svcCtx.Idempotent.Claim(l.ctx, req.RoundId)
+		claimed, err := l.svcCtx.Idempotent.ClaimWithToken(l.ctx, req.RoundId, req.IdempotencyToken)
 		if err != nil {
-			return err
+			return xerr.ErrInvalidRequest
 		}
 		if !claimed {
 			if ok, err := l.svcCtx.Idempotent.GetResult(l.ctx, req.RoundId, &cached); err != nil {

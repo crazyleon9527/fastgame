@@ -8,6 +8,7 @@ import (
 	"fastgame/pkg/idempotent"
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/lock"
+	"fastgame/pkg/security"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rgs/internal/config"
 
@@ -23,11 +24,13 @@ type ServiceContext struct {
 	Wallet     wallet.Client
 	GameConfig *gameconfig.Loader
 	Kafka      *kafka.Producer
+	Guard      *security.Guard
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	rdb := redis.NewClient(&redis.Options{Addr: c.Redis.Addr})
 	conn := sqlx.NewMysql(c.MySQL.DataSource)
+	merchants := model.NewMerchantsModel(conn)
 
 	return &ServiceContext{
 		Config:     c,
@@ -36,10 +39,17 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Idempotent: idempotent.NewStore(rdb, 24*time.Hour),
 		Wallet:     newWalletClient(c.Wallet),
 		GameConfig: gameconfig.NewLoader(
-			model.NewMerchantsModel(conn),
+			merchants,
 			model.NewGameConfigsModel(conn),
 		),
 		Kafka: kafka.NewProducer(c.Kafka.Brokers),
+		Guard: security.NewGuard(security.Config{
+			SkipSignVerify:     c.Security.SkipSignVerify,
+			TimestampWindow:    c.Security.TimestampWindow(),
+			UserBetLimitPerMin: c.Security.UserBetLimitPerMin,
+			IPLimitPerSec:      c.Security.IPLimitPerSec,
+			MinResponseDelay:   c.Security.MinResponseDelay(),
+		}, merchants, rdb),
 	}
 }
 

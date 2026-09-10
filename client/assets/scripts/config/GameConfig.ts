@@ -9,6 +9,8 @@ export const GameConfig = {
     wsUrl: 'ws://localhost:18000/ws/bigwin',
 
     merchantId: 'm001',
+    /** 商户 API 私钥；生产环境由构建注入，启用后 RGS 需关闭 SkipSignVerify */
+    merchantSecret: '',
     gameCode: 'fishing',
 
     /** 演示用玩家 ID，生产环境由登录态注入 */
