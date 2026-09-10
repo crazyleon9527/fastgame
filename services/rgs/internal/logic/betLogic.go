@@ -3,7 +3,6 @@ package logic
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"fastgame/pkg/kafka"
@@ -32,6 +31,15 @@ func NewBetLogic(ctx context.Context, svcCtx *svc.ServiceContext) *BetLogic {
 }
 
 func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
+	if req.Action != "cast" {
+		return nil, xerr.ErrInvalidRequest
+	}
+
+	idempotencyToken := req.IdempotencyToken
+	if idempotencyToken == "" {
+		idempotencyToken = req.RoundId
+	}
+
 	var cached types.BetResp
 	if ok, err := l.svcCtx.Idempotent.GetResult(l.ctx, req.RoundId, &cached); err != nil {
 		return nil, err
@@ -40,8 +48,7 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 	}
 
 	var resp *types.BetResp
-	lockKey := fmt.Sprintf("lock:user:%d", req.UserId)
-	err := l.svcCtx.Lock.WithLock(l.ctx, lockKey, 10*time.Second, func() error {
+	err := l.svcCtx.Lock.WithLock(l.ctx, lock.BetLockKey(req.UserId), lock.BetLockTTL, func() error {
 		if ok, err := l.svcCtx.Idempotent.GetResult(l.ctx, req.RoundId, &cached); err != nil {
 			return err
 		} else if ok {
@@ -49,7 +56,20 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			return nil
 		}
 
-		claimed, err := l.svcCtx.Idempotent.ClaimWithToken(l.ctx, req.RoundId, req.IdempotencyToken)
+		sessionData, err := l.svcCtx.Session.ConsumeSequence(
+			l.ctx, req.SessionToken, req.UserId, req.MerchantId, req.GameCode, req.SequenceId,
+		)
+		if err != nil {
+			if err.Error() == "invalid sequence id" {
+				return xerr.ErrInvalidSequence
+			}
+			return xerr.ErrInvalidSession
+		}
+		if req.ClientSeed != "" && req.ClientSeed != sessionData.ClientSeed {
+			return xerr.ErrInvalidRequest
+		}
+
+		claimed, err := l.svcCtx.Idempotent.ClaimWithToken(l.ctx, req.RoundId, idempotencyToken)
 		if err != nil {
 			return xerr.ErrInvalidRequest
 		}
@@ -78,9 +98,17 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			return xerr.ErrWalletBetFailed
 		}
 
-		outcome := prng.NewEngine(gameCfg.RtpTier).Spin(req.BetAmount)
-		balance := betResult.Balance
+		outcome, proof, err := prng.NewEngine(gameCfg.RtpTier).Spin(
+			sessionData.ServerSeed,
+			sessionData.ClientSeed,
+			req.RoundId,
+			req.BetAmount,
+		)
+		if err != nil {
+			return err
+		}
 
+		balance := betResult.Balance
 		if outcome.WinAmount > 0 {
 			winResult, err := l.svcCtx.Wallet.Win(l.ctx, wallet.WinReq{
 				MerchantID: req.MerchantId,
@@ -103,6 +131,14 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			RtpTier:      outcome.RtpTier,
 			FishState:    outcome.FishState,
 			AnimationKey: outcome.AnimationKey,
+			SequenceId:   req.SequenceId,
+			ProvablyFair: types.ProvablyFairProof{
+				ServerSeedHash: proof.ServerSeedHash,
+				ServerSeed:     proof.ServerSeed,
+				ClientSeed:     proof.ClientSeed,
+				Nonce:          proof.Nonce,
+				Roll:           proof.Roll,
+			},
 		}
 
 		if err := l.svcCtx.Idempotent.SaveResult(l.ctx, req.RoundId, resp); err != nil {

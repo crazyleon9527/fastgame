@@ -21,6 +21,12 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: BalanceHandler(serverCtx),
 			},
 			{
+				// 创建游戏会话 (下发 Session Token + Server Seed Hash)
+				Method:  http.MethodPost,
+				Path:    "/game/session",
+				Handler: SessionHandler(serverCtx),
+			},
+			{
 				// 玩家抛竿/下注并结算
 				Method:  http.MethodPost,
 				Path:    "/game/bet",

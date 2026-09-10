@@ -10,6 +10,7 @@ import (
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/lock"
 	"fastgame/pkg/security"
+	"fastgame/pkg/session"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rgs/internal/config"
 
@@ -27,6 +28,7 @@ type ServiceContext struct {
 	GameConfig *gameconfig.Loader
 	Kafka      *kafka.Producer
 	Guard      *security.Guard
+	Session    *session.Store
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -52,6 +54,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 			IPLimitPerSec:      c.Security.IPLimitPerSec,
 			MinResponseDelay:   c.Security.MinResponseDelay(),
 		}, merchants, rdb),
+		Session: session.NewStore(rdb, c.Session.TTL()),
 	}
 
 	bootstrapBlacklist(rdb, model.NewRiskBlacklistModel(conn))

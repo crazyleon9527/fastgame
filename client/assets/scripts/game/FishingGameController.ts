@@ -8,7 +8,7 @@ const { ccclass, property } = _decorator;
 
 /**
  * 钓鱼游戏主控制器
- * 严禁本地计算中奖结果 — 仅根据 RGS 返回的 fishState / animationKey 播放动画
+ * 胖服务端瘦客户端：仅上报 cast 动作 + betAmount，严禁本地计算任何游戏结果
  */
 @ccclass('FishingGameController')
 export class FishingGameController extends Component {
@@ -25,8 +25,19 @@ export class FishingGameController extends Component {
     private casting = false;
 
     async start(): Promise<void> {
-        await this.refreshBalance();
-        this.hud?.setStatus('点击抛竿开始游戏');
+        try {
+            await this.client.createSession(
+                GameConfig.merchantId,
+                GameConfig.userId,
+                GameConfig.gameCode,
+                GameConfig.clientSeed || undefined,
+            );
+            await this.refreshBalance();
+            this.hud?.setStatus(`就绪 | Seed Hash: ${this.client.session.serverSeedHash.slice(0, 12)}…`);
+        } catch (err) {
+            console.error('[FishingGame] session', err);
+            this.hud?.setStatus('无法建立游戏会话');
+        }
     }
 
     /** 绑定到抛竿按钮 Click Events */
@@ -34,24 +45,33 @@ export class FishingGameController extends Component {
         if (this.casting) {
             return;
         }
+        if (this.client.session.isExpired()) {
+            await this.start();
+        }
+
         this.casting = true;
         this.hud?.setInteractable(false);
         this.hud?.setStatus('抛竿中...');
 
         try {
             await this.playCastAnimation();
+            const sequenceId = this.client.session.consumeSequence();
             const result = await this.client.bet({
                 merchantId: GameConfig.merchantId,
                 userId: GameConfig.userId,
-                roundId: generateId('round'),
+                sessionToken: this.client.session.token,
                 gameCode: GameConfig.gameCode,
+                action: 'cast',
                 betAmount: GameConfig.defaultBet,
-                idempotencyToken: generateId('tok'),
+                roundId: generateId('round'),
+                sequenceId,
+                clientSeed: this.client.session.clientSeed,
             });
             await this.playResultAnimation(result);
             this.hud?.setBalance(result.balance);
             this.hud?.setWin(result.winAmount, result.multiplier);
             this.hud?.setStatus(this.statusText(result));
+            console.info('[ProvablyFair]', result.provablyFair);
         } catch (err) {
             console.error('[FishingGame]', err);
             this.hud?.setStatus(`请求失败: ${(err as Error).message}`);
@@ -62,13 +82,8 @@ export class FishingGameController extends Component {
     }
 
     private async refreshBalance(): Promise<void> {
-        try {
-            const balance = await this.client.getBalance(GameConfig.merchantId, GameConfig.userId);
-            this.hud?.setBalance(balance);
-        } catch (err) {
-            console.error('[FishingGame] balance', err);
-            this.hud?.setStatus('无法连接服务器');
-        }
+        const balance = await this.client.getBalance(GameConfig.merchantId, GameConfig.userId);
+        this.hud?.setBalance(balance);
     }
 
     /** 根据服务端 animationKey 驱动表现层 — 不做任何概率计算 */

@@ -33,3 +33,6 @@ Security:
   UserBetLimitPerMin: 60
   IPLimitPerSec: 20
   MinResponseDelayMs: 150
+
+Session:
+  TTLHours: 24

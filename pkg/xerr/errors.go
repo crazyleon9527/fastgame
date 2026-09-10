@@ -3,7 +3,9 @@ package xerr
 import "errors"
 
 var (
-	ErrLockBusy        = errors.New("player action in progress")
+	ErrLockBusy        = errors.New("player action in progress") // HTTP 429
+	ErrInvalidSession  = errors.New("invalid or expired session")
+	ErrInvalidSequence = errors.New("invalid sequence id")
 	ErrDuplicateRound  = errors.New("duplicate round id")
 	ErrWalletBetFailed = errors.New("wallet bet failed")
 	ErrWalletWinFailed = errors.New("wallet win failed")

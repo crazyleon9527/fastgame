@@ -11,6 +11,12 @@ import (
 
 var ErrBusy = errors.New("lock busy")
 
+const BetLockTTL = 3 * time.Second
+
+func BetLockKey(userID uint64) string {
+	return fmt.Sprintf("lock:bet:%d", userID)
+}
+
 const unlockScript = `
 if redis.call("GET", KEYS[1]) == ARGV[1] then
   return redis.call("DEL", KEYS[1])

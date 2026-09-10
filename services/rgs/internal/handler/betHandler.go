@@ -4,7 +4,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -21,7 +20,7 @@ import (
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
-// 玩家抛竿/下注并结算
+// 玩家抛竿/下注并结算 — 仅接受 action=cast + betAmount，拒绝任何游戏结果类字段
 func BetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -29,7 +28,7 @@ func BetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 		bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		if err != nil {
-			httpx.ErrorCtx(r.Context(), w, xerr.ErrInvalidRequest)
+			writeBetError(w, r, http.StatusBadRequest, xerr.ErrInvalidRequest)
 			return
 		}
 
@@ -39,14 +38,14 @@ func BetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		}
 
 		var req types.BetReq
-		if err := json.Unmarshal(bodyBytes, &req); err != nil {
-			httpx.ErrorCtx(r.Context(), w, xerr.ErrInvalidRequest)
+		if err := httputil.StrictUnmarshal(bodyBytes, &req); err != nil {
+			writeBetError(w, r, http.StatusBadRequest, xerr.ErrInvalidRequest)
 			return
 		}
 
 		gameCfg, err := svcCtx.GameConfig.Load(r.Context(), req.MerchantId, req.GameCode)
 		if err != nil {
-			httpx.ErrorCtx(r.Context(), w, xerr.ErrMerchantInvalid)
+			writeBetError(w, r, http.StatusBadRequest, xerr.ErrMerchantInvalid)
 			return
 		}
 
@@ -67,26 +66,45 @@ func BetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		l := logic.NewBetLogic(r.Context(), svcCtx)
 		resp, err := l.Bet(&req)
 		if err != nil {
-			httpx.ErrorCtx(r.Context(), w, err)
+			writeBetError(w, r, betErrorStatus(err), err)
 			return
 		}
 		httpx.OkJsonCtx(r.Context(), w, resp)
 	}
 }
 
+func betErrorStatus(err error) int {
+	switch {
+	case errors.Is(err, xerr.ErrLockBusy):
+		return http.StatusTooManyRequests
+	case errors.Is(err, xerr.ErrRateLimited):
+		return http.StatusTooManyRequests
+	case errors.Is(err, xerr.ErrInvalidSession), errors.Is(err, xerr.ErrInvalidSequence):
+		return http.StatusUnauthorized
+	case errors.Is(err, xerr.ErrDuplicateRound):
+		return http.StatusConflict
+	case errors.Is(err, xerr.ErrUnauthorized):
+		return http.StatusUnauthorized
+	default:
+		return http.StatusBadRequest
+	}
+}
+
+func writeBetError(w http.ResponseWriter, r *http.Request, status int, err error) {
+	httpx.WriteJsonCtx(r.Context(), w, status, map[string]string{
+		"message": err.Error(),
+	})
+}
+
 func writeSecurityError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case strings.Contains(err.Error(), "blocked"), strings.Contains(err.Error(), "suspicious"), strings.Contains(err.Error(), "not allowed"):
-		httpx.ErrorCtx(r.Context(), w, xerr.ErrBlocked)
+		writeBetError(w, r, http.StatusForbidden, xerr.ErrBlocked)
 	case strings.Contains(err.Error(), "rate limit"):
-		httpx.ErrorCtx(r.Context(), w, xerr.ErrRateLimited)
+		writeBetError(w, r, http.StatusTooManyRequests, xerr.ErrRateLimited)
 	case strings.Contains(err.Error(), "signature"), strings.Contains(err.Error(), "nonce"), strings.Contains(err.Error(), "timestamp"):
-		httpx.ErrorCtx(r.Context(), w, xerr.ErrUnauthorized)
+		writeBetError(w, r, http.StatusUnauthorized, xerr.ErrUnauthorized)
 	default:
-		if errors.Is(err, xerr.ErrInvalidRequest) {
-			httpx.ErrorCtx(r.Context(), w, err)
-			return
-		}
-		httpx.ErrorCtx(r.Context(), w, xerr.ErrInvalidRequest)
+		writeBetError(w, r, http.StatusBadRequest, xerr.ErrInvalidRequest)
 	}
 }

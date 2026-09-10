@@ -1,13 +1,26 @@
 import { GameConfig } from '../config/GameConfig';
 import { RequestSigner } from './RequestSigner';
+import { GameSession, SessionInfo } from './GameSession';
 
+/** 客户端仅上报：action(cast) + betAmount + roundId + sequenceId */
 export interface BetRequest {
     merchantId: string;
     userId: number;
-    roundId: string;
+    sessionToken: string;
     gameCode: string;
+    action: 'cast';
     betAmount: number;
-    idempotencyToken: string;
+    roundId: string;
+    sequenceId: number;
+    clientSeed?: string;
+}
+
+export interface ProvablyFairProof {
+    serverSeedHash: string;
+    serverSeed: string;
+    clientSeed: string;
+    nonce: string;
+    roll: number;
 }
 
 /** RGS 结算响应 — 客户端严禁自行计算，只消费此结构 */
@@ -19,6 +32,8 @@ export interface BetResponse {
     rtpTier: string;
     fishState: 'miss' | 'bite' | 'big_win' | string;
     animationKey: string;
+    sequenceId: number;
+    provablyFair: ProvablyFairProof;
 }
 
 export interface BalanceResponse {
@@ -28,10 +43,19 @@ export interface BalanceResponse {
 export class RgsClient {
     private baseUrl: string;
     private merchantSecret?: string;
+    readonly session = new GameSession();
 
     constructor(baseUrl = GameConfig.gatewayUrl, merchantSecret = GameConfig.merchantSecret) {
         this.baseUrl = baseUrl.replace(/\/$/, '');
         this.merchantSecret = merchantSecret || undefined;
+    }
+
+    async createSession(merchantId: string, userId: number, gameCode: string, clientSeed?: string): Promise<SessionInfo> {
+        const path = '/api/v1/game/session';
+        const body = JSON.stringify({ merchantId, userId, gameCode, clientSeed: clientSeed || undefined });
+        const data: SessionInfo = await this.signedPost(path, body);
+        this.session.set(data);
+        return data;
     }
 
     async getBalance(merchantId: string, userId: number): Promise<number> {
@@ -47,6 +71,10 @@ export class RgsClient {
     async bet(req: BetRequest): Promise<BetResponse> {
         const path = '/api/v1/game/bet';
         const body = JSON.stringify(req);
+        return this.signedPost(path, body);
+    }
+
+    private async signedPost(path: string, body: string): Promise<any> {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
         if (this.merchantSecret) {
@@ -66,7 +94,7 @@ export class RgsClient {
         });
         if (!resp.ok) {
             const text = await resp.text();
-            throw new Error(`bet failed: ${resp.status} ${text}`);
+            throw new Error(`request failed: ${resp.status} ${text}`);
         }
         return resp.json();
     }

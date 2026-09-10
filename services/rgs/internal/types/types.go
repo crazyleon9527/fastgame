@@ -4,29 +4,59 @@
 package types
 
 type BalanceReq struct {
-	MerchantId string `form:"merchantId" validate:"required"`
-	UserId     uint64 `form:"userId" validate:"required"`
+	MerchantId   string `form:"merchantId" validate:"required"`
+	UserId       uint64 `form:"userId" validate:"required"`
+	SessionToken string `form:"sessionToken,optional"`
 }
 
 type BalanceResp struct {
 	Balance float64 `json:"balance"`
 }
 
+type SessionReq struct {
+	MerchantId string `json:"merchantId" validate:"required"`
+	UserId     uint64 `json:"userId" validate:"required"`
+	GameCode   string `json:"gameCode" validate:"required"`
+	ClientSeed string `json:"clientSeed,optional"`
+}
+
+type SessionResp struct {
+	SessionToken   string `json:"sessionToken"`
+	ServerSeedHash string `json:"serverSeedHash"`
+	ClientSeed     string `json:"clientSeed"`
+	NextSequenceId uint64 `json:"nextSequenceId"`
+	ExpiresAt      int64  `json:"expiresAt"`
+}
+
 type BetReq struct {
 	MerchantId       string  `json:"merchantId" validate:"required"`
 	UserId           uint64  `json:"userId" validate:"required"`
-	RoundId          string  `json:"roundId" validate:"required"` // 幂等键
+	SessionToken     string  `json:"sessionToken" validate:"required"`
 	GameCode         string  `json:"gameCode" validate:"required"`
+	Action           string  `json:"action" validate:"required"` // 仅允许 cast
 	BetAmount        float64 `json:"betAmount" validate:"required,gt=0"`
-	IdempotencyToken string  `json:"idempotencyToken" validate:"required"`
+	RoundId          string  `json:"roundId" validate:"required"`
+	SequenceId       uint64  `json:"sequenceId" validate:"required"`
+	IdempotencyToken string  `json:"idempotencyToken,optional"`
+	ClientSeed       string  `json:"clientSeed,optional"`
+}
+
+type ProvablyFairProof struct {
+	ServerSeedHash string  `json:"serverSeedHash"`
+	ServerSeed     string  `json:"serverSeed"`
+	ClientSeed     string  `json:"clientSeed"`
+	Nonce          string  `json:"nonce"`
+	Roll           float64 `json:"roll"`
 }
 
 type BetResp struct {
-	RoundId      string  `json:"roundId"`
-	WinAmount    float64 `json:"winAmount"`
-	Multiplier   float64 `json:"multiplier"`
-	Balance      float64 `json:"balance"`
-	RtpTier      string  `json:"rtpTier"`
-	FishState    string  `json:"fishState"` // 咬钩状态: miss / bite / big_win
-	AnimationKey string  `json:"animationKey"`
+	RoundId      string            `json:"roundId"`
+	WinAmount    float64           `json:"winAmount"`
+	Multiplier   float64           `json:"multiplier"`
+	Balance      float64           `json:"balance"`
+	RtpTier      string            `json:"rtpTier"`
+	FishState    string            `json:"fishState"`
+	AnimationKey string            `json:"animationKey"`
+	SequenceId   uint64            `json:"sequenceId"`
+	ProvablyFair ProvablyFairProof `json:"provablyFair"`
 }

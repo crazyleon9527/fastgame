@@ -14,6 +14,7 @@ type Config struct {
 	Wallet   WalletConf
 	Game     GameConf
 	Security SecurityConf
+	Session  SessionConf
 }
 
 type MySQLConf struct {
@@ -59,4 +60,15 @@ func (c SecurityConf) MinResponseDelay() time.Duration {
 		return 0
 	}
 	return time.Duration(c.MinResponseDelayMs) * time.Millisecond
+}
+
+type SessionConf struct {
+	TTLHours int
+}
+
+func (c SessionConf) TTL() time.Duration {
+	if c.TTLHours <= 0 {
+		return 24 * time.Hour
+	}
+	return time.Duration(c.TTLHours) * time.Hour
 }

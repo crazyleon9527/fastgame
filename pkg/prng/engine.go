@@ -1,8 +1,6 @@
 package prng
 
 import (
-	"crypto/rand"
-	"encoding/binary"
 	"math"
 )
 
@@ -12,6 +10,15 @@ type Outcome struct {
 	FishState    string
 	AnimationKey string
 	RtpTier      string
+	Roll         float64
+}
+
+type FairProof struct {
+	ServerSeedHash string
+	ServerSeed     string
+	ClientSeed     string
+	Nonce          string
+	Roll           float64
 }
 
 type Engine struct {
@@ -25,10 +32,27 @@ func NewEngine(rtpTier string) *Engine {
 	return &Engine{rtpTier: rtpTier}
 }
 
-// Spin calculates outcome from bet amount using secure randomness.
-func (e *Engine) Spin(betAmount float64) Outcome {
-	roll := secureFloat()
+// Spin computes outcome using provably fair HMAC-SHA256 roll (crypto/rand seeded server seed).
+func (e *Engine) Spin(serverSeed, clientSeed, nonce string, betAmount float64) (Outcome, FairProof, error) {
+	roll, err := Roll(serverSeed, clientSeed, nonce)
+	if err != nil {
+		return Outcome{}, FairProof{}, err
+	}
 
+	proof := FairProof{
+		ServerSeedHash: HashServerSeed(serverSeed),
+		ServerSeed:     serverSeed,
+		ClientSeed:     clientSeed,
+		Nonce:          nonce,
+		Roll:           roll,
+	}
+
+	outcome := e.outcomeFromRoll(roll, serverSeed, clientSeed, nonce, betAmount)
+	outcome.Roll = roll
+	return outcome, proof, nil
+}
+
+func (e *Engine) outcomeFromRoll(roll float64, serverSeed, clientSeed, nonce string, betAmount float64) Outcome {
 	switch {
 	case roll < 0.55:
 		return Outcome{
@@ -39,7 +63,8 @@ func (e *Engine) Spin(betAmount float64) Outcome {
 			RtpTier:      e.rtpTier,
 		}
 	case roll < 0.90:
-		multiplier := 1.5 + secureFloat()*3.5
+		multiRoll, _ := RollIndex(serverSeed, clientSeed, nonce, 1)
+		multiplier := 1.5 + multiRoll*3.5
 		return Outcome{
 			Multiplier:   round2(multiplier),
 			WinAmount:    round2(betAmount * multiplier),
@@ -48,7 +73,8 @@ func (e *Engine) Spin(betAmount float64) Outcome {
 			RtpTier:      e.rtpTier,
 		}
 	default:
-		multiplier := 50 + secureFloat()*50
+		multiRoll, _ := RollIndex(serverSeed, clientSeed, nonce, 1)
+		multiplier := 50 + multiRoll*50
 		return Outcome{
 			Multiplier:   round2(multiplier),
 			WinAmount:    round2(betAmount * multiplier),
@@ -57,15 +83,6 @@ func (e *Engine) Spin(betAmount float64) Outcome {
 			RtpTier:      e.rtpTier,
 		}
 	}
-}
-
-func secureFloat() float64 {
-	var b [8]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		panic("crypto/rand unavailable: " + err.Error())
-	}
-	n := binary.LittleEndian.Uint64(b[:])
-	return float64(n) / float64(math.MaxUint64)
 }
 
 func round2(v float64) float64 {

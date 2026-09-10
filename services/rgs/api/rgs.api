@@ -2,30 +2,55 @@ syntax = "v1"
 
 info (
 	title:   "FastGame RGS Settlement API"
-	desc:    "核心游戏结算引擎 - 抛竿/下注/派彩"
+	desc:    "核心游戏结算引擎 - 胖服务端瘦客户端，100% 服务端判定"
 	author:  "leon"
 	version: "v1"
 )
 
 type (
-	// 抛竿/下注请求
+	SessionReq {
+		MerchantId string `json:"merchantId" validate:"required"`
+		UserId     uint64 `json:"userId" validate:"required"`
+		GameCode   string `json:"gameCode" validate:"required"`
+		ClientSeed string `json:"clientSeed,optional"`
+	}
+	SessionResp {
+		SessionToken   string `json:"sessionToken"`
+		ServerSeedHash string `json:"serverSeedHash"`
+		ClientSeed     string `json:"clientSeed"`
+		NextSequenceId uint64 `json:"nextSequenceId"`
+		ExpiresAt      int64  `json:"expiresAt"`
+	}
+	// 客户端仅上报：action(cast) + betAmount + roundId + sequenceId
 	BetReq {
 		MerchantId       string  `json:"merchantId" validate:"required"`
 		UserId           uint64  `json:"userId" validate:"required"`
-		RoundId          string  `json:"roundId" validate:"required"` // 幂等键
+		SessionToken     string  `json:"sessionToken" validate:"required"`
 		GameCode         string  `json:"gameCode" validate:"required"`
+		Action           string  `json:"action" validate:"required"`
 		BetAmount        float64 `json:"betAmount" validate:"required,gt=0"`
-		IdempotencyToken string  `json:"idempotencyToken" validate:"required"`
+		RoundId          string  `json:"roundId" validate:"required"`
+		SequenceId       uint64  `json:"sequenceId" validate:"required"`
+		IdempotencyToken string  `json:"idempotencyToken,optional"`
+		ClientSeed       string  `json:"clientSeed,optional"`
 	}
-	// 结算结果（含动画指令）
+	ProvablyFairProof {
+		ServerSeedHash string  `json:"serverSeedHash"`
+		ServerSeed     string  `json:"serverSeed"`
+		ClientSeed     string  `json:"clientSeed"`
+		Nonce          string  `json:"nonce"`
+		Roll           float64 `json:"roll"`
+	}
 	BetResp {
-		RoundId      string  `json:"roundId"`
-		WinAmount    float64 `json:"winAmount"`
-		Multiplier   float64 `json:"multiplier"`
-		Balance      float64 `json:"balance"`
-		RtpTier      string  `json:"rtpTier"`
-		FishState    string  `json:"fishState"` // 咬钩状态: miss / bite / big_win
-		AnimationKey string  `json:"animationKey"`
+		RoundId      string            `json:"roundId"`
+		WinAmount    float64           `json:"winAmount"`
+		Multiplier   float64           `json:"multiplier"`
+		Balance      float64           `json:"balance"`
+		RtpTier      string            `json:"rtpTier"`
+		FishState    string            `json:"fishState"`
+		AnimationKey string            `json:"animationKey"`
+		SequenceId   uint64            `json:"sequenceId"`
+		ProvablyFair ProvablyFairProof `json:"provablyFair"`
 	}
 	BalanceReq {
 		MerchantId string `form:"merchantId" validate:"required"`
@@ -40,6 +65,10 @@ type (
 	prefix: /api/v1
 )
 service rgs-api {
+	@doc "创建游戏会话"
+	@handler Session
+	post /game/session (SessionReq) returns (SessionResp)
+
 	@doc "玩家抛竿/下注并结算"
 	@handler Bet
 	post /game/bet (BetReq) returns (BetResp)
@@ -48,4 +77,3 @@ service rgs-api {
 	@handler Balance
 	get /game/balance (BalanceReq) returns (BalanceResp)
 }
-
