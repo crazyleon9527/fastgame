@@ -59,6 +59,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				},
 				{
 					Method:  http.MethodGet,
+					Path:    "/merchants/:id/allowed-ips",
+					Handler: GetMerchantAllowedIPsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPut,
+					Path:    "/merchants/:id/allowed-ips",
+					Handler: UpdateMerchantAllowedIPsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
 					Path:    "/risk-blacklist",
 					Handler: BlacklistListHandler(serverCtx),
 				},

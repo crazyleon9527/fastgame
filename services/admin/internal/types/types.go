@@ -134,3 +134,18 @@ type CreateBlacklistReq struct {
 type DeleteBlacklistReq struct {
 	Id uint64 `path:"id"`
 }
+
+type MerchantAllowedIPsReq struct {
+	Id uint64 `path:"id"`
+}
+
+type MerchantAllowedIPsResp struct {
+	MerchantId   uint64   `json:"merchantId"`
+	MerchantCode string   `json:"merchantCode"`
+	AllowedIps   []string `json:"allowedIps"`
+}
+
+type UpdateMerchantAllowedIPsReq struct {
+	Id         uint64   `path:"id"`
+	AllowedIps []string `json:"allowedIps"`
+}

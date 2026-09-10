@@ -48,6 +48,7 @@
         <nav class="sidebar">
           <button class="nav-item active" data-tab="blacklist">风控黑名单</button>
           <button class="nav-item" data-tab="merchants">商户密钥轮换</button>
+          <button class="nav-item" data-tab="whitelist">IP 白名单</button>
           <a class="nav-item nav-link" href="/verify/" target="_blank" rel="noopener">Provably Fair 验算 ↗</a>
         </nav>
 
@@ -153,6 +154,41 @@
               <button id="merchant-next-page" class="btn">下一页</button>
             </div>
           </section>
+
+          <!-- 商户 IP 白名单 -->
+          <section id="panel-whitelist" class="panel hidden">
+            <div class="alert info">
+              <strong>IP 白名单说明</strong>
+              <p>配置聚合器（商户）报备的公网 IP。留空表示不限制（开发环境）。保存后立即生效并清除 Redis 缓存。</p>
+            </div>
+
+            <div class="toolbar">
+              <button id="whitelist-refresh-btn" class="btn">刷新商户列表</button>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>商户编码</th>
+                    <th>名称</th>
+                    <th>白名单 IP 数</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="whitelist-body">
+                  <tr><td colspan="5" class="empty">加载中…</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination">
+              <button id="whitelist-prev-page" class="btn" disabled>上一页</button>
+              <span id="whitelist-page-info">第 1 页</span>
+              <button id="whitelist-next-page" class="btn">下一页</button>
+            </div>
+          </section>
         </main>
       </div>
     </section>
@@ -216,6 +252,24 @@
         <div class="dialog-actions">
           <button type="button" id="cancel-rotate" class="btn">取消</button>
           <button type="submit" class="btn danger">确认轮换</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- 编辑 IP 白名单 -->
+    <dialog id="whitelist-dialog">
+      <form id="whitelist-form" method="dialog">
+        <h2>编辑 IP 白名单</h2>
+        <p id="whitelist-merchant-label" class="muted-text"></p>
+        <label>
+          允许的 IP 地址
+          <textarea id="whitelist-ips" rows="8" placeholder="每行一个 IP，如：&#10;203.0.113.50&#10;198.51.100.10&#10;留空表示不限制"></textarea>
+          <small>支持 IPv4 / IPv6，保存时会自动去重并校验格式</small>
+        </label>
+        <p id="whitelist-error" class="error hidden"></p>
+        <div class="dialog-actions">
+          <button type="button" id="cancel-whitelist" class="btn">取消</button>
+          <button type="submit" class="btn primary">保存</button>
         </div>
       </form>
     </dialog>

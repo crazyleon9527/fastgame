@@ -1,6 +1,6 @@
 (() => {
   const TYPE_LABELS = { ip: 'IP', user_id: '用户 ID', merchant: '商户' };
-  const TAB_TITLES = { blacklist: '风控黑名单', merchants: '商户密钥轮换' };
+  const TAB_TITLES = { blacklist: '风控黑名单', merchants: '商户密钥轮换', whitelist: 'IP 白名单' };
 
   let activeTab = 'blacklist';
 
@@ -17,6 +17,14 @@
   let pendingRotateId = null;
   let pendingRotateLabel = '';
 
+  // Whitelist state
+  let whitelistPage = 1;
+  const whitelistPageSize = 20;
+  let whitelistTotal = 0;
+  let pendingWhitelistId = null;
+  let pendingWhitelistLabel = '';
+  const whitelistIPCache = new Map();
+
   const $ = (sel) => document.querySelector(sel);
 
   function show(view) {
@@ -31,10 +39,12 @@
     });
     $('#panel-blacklist').classList.toggle('hidden', tab !== 'blacklist');
     $('#panel-merchants').classList.toggle('hidden', tab !== 'merchants');
+    $('#panel-whitelist').classList.toggle('hidden', tab !== 'whitelist');
     $('#page-subtitle').textContent = TAB_TITLES[tab] || '';
 
     if (tab === 'blacklist') loadBlacklist();
     if (tab === 'merchants') loadMerchants();
+    if (tab === 'whitelist') loadWhitelist();
   }
 
   function toast(msg, type = 'success') {
@@ -169,6 +179,80 @@
     }
   }
 
+  // ── Whitelist ──────────────────────────────────────────
+
+  async function loadWhitelist() {
+    const tbody = $('#whitelist-body');
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">加载中…</td></tr>';
+
+    try {
+      const data = await AdminAPI.listMerchants({ page: whitelistPage, pageSize: whitelistPageSize });
+      whitelistTotal = data.total || 0;
+      const list = data.list || [];
+
+      $('#whitelist-page-info').textContent = `第 ${whitelistPage} 页 / 共 ${Math.max(1, Math.ceil(whitelistTotal / whitelistPageSize))} 页`;
+      $('#whitelist-prev-page').disabled = whitelistPage <= 1;
+      $('#whitelist-next-page').disabled = whitelistPage * whitelistPageSize >= whitelistTotal;
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">暂无商户</td></tr>';
+        return;
+      }
+
+      await Promise.all(list.map(async (m) => {
+        if (!whitelistIPCache.has(m.id)) {
+          try {
+            const detail = await AdminAPI.getMerchantAllowedIPs(m.id);
+            whitelistIPCache.set(m.id, detail.allowedIps || []);
+          } catch {
+            whitelistIPCache.set(m.id, null);
+          }
+        }
+      }));
+
+      tbody.innerHTML = list.map((m) => {
+        const ips = whitelistIPCache.get(m.id);
+        const countLabel = ips === null ? '—' : (ips.length === 0 ? '不限制' : String(ips.length));
+        return `
+        <tr>
+          <td>${m.id}</td>
+          <td><code>${escapeHtml(m.merchantCode)}</code></td>
+          <td>${escapeHtml(m.name)}</td>
+          <td>${countLabel}</td>
+          <td>
+            <button class="btn btn-sm" data-edit-whitelist="${m.id}" data-code="${escapeAttr(m.merchantCode)}" data-name="${escapeAttr(m.name)}">
+              编辑白名单
+            </button>
+          </td>
+        </tr>
+      `;
+      }).join('');
+
+      tbody.querySelectorAll('[data-edit-whitelist]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          pendingWhitelistId = btn.dataset.editWhitelist;
+          pendingWhitelistLabel = `${btn.dataset.code} (${btn.dataset.name})`;
+          $('#whitelist-merchant-label').textContent = `商户：${pendingWhitelistLabel}`;
+          $('#whitelist-error').classList.add('hidden');
+          $('#whitelist-ips').value = '加载中…';
+          $('#whitelist-dialog').showModal();
+          try {
+            const detail = await AdminAPI.getMerchantAllowedIPs(pendingWhitelistId);
+            whitelistIPCache.set(pendingWhitelistId, detail.allowedIps || []);
+            $('#whitelist-ips').value = (detail.allowedIps || []).join('\n');
+          } catch (err) {
+            $('#whitelist-ips').value = '';
+            $('#whitelist-error').textContent = err.message;
+            $('#whitelist-error').classList.remove('hidden');
+          }
+        });
+      });
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="5" class="empty error">${escapeHtml(err.message)}</td></tr>`;
+      handleAuthError(err);
+    }
+  }
+
   function showKeyResult(resp) {
     $('#new-key-value').textContent = resp.newPrivateKey;
     $('#key-meta').innerHTML = `
@@ -181,7 +265,7 @@
 
   // ── Event bindings ─────────────────────────────────────
 
-  document.querySelectorAll('.nav-item').forEach((btn) => {
+  document.querySelectorAll('.nav-item[data-tab]').forEach((btn) => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
@@ -291,6 +375,35 @@
   $('#close-key-result').addEventListener('click', () => {
     $('#key-result-dialog').close();
     $('#new-key-value').textContent = '';
+  });
+
+  // Whitelist toolbar
+  $('#whitelist-refresh-btn').addEventListener('click', () => {
+    whitelistIPCache.clear();
+    loadWhitelist();
+  });
+  $('#whitelist-prev-page').addEventListener('click', () => { if (whitelistPage > 1) { whitelistPage--; loadWhitelist(); } });
+  $('#whitelist-next-page').addEventListener('click', () => { if (whitelistPage * whitelistPageSize < whitelistTotal) { whitelistPage++; loadWhitelist(); } });
+
+  $('#cancel-whitelist').addEventListener('click', () => $('#whitelist-dialog').close());
+  $('#whitelist-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = $('#whitelist-error');
+    errEl.classList.add('hidden');
+    const allowedIps = $('#whitelist-ips').value
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    try {
+      const resp = await AdminAPI.updateMerchantAllowedIPs(pendingWhitelistId, allowedIps);
+      whitelistIPCache.set(pendingWhitelistId, resp.allowedIps || []);
+      $('#whitelist-dialog').close();
+      toast('IP 白名单已保存');
+      await loadWhitelist();
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+    }
   });
 
   // Init

@@ -51,6 +51,18 @@ type (
 		GracePeriodHours int64  `json:"gracePeriodHours"`
 		RotatedAt        int64  `json:"rotatedAt"`
 	}
+	MerchantAllowedIPsReq {
+		Id uint64 `path:"id"`
+	}
+	MerchantAllowedIPsResp {
+		MerchantId   uint64   `json:"merchantId"`
+		MerchantCode string   `json:"merchantCode"`
+		AllowedIps   []string `json:"allowedIps"`
+	}
+	UpdateMerchantAllowedIPsReq {
+		Id         uint64   `path:"id"`
+		AllowedIps []string `json:"allowedIps"`
+	}
 	BlacklistItem {
 		Id        uint64 `json:"id"`
 		ListType  string `json:"listType"`
@@ -146,6 +158,12 @@ service admin-api {
 
 	@handler RotateMerchantKey
 	post /merchants/:id/rotate-key (RotateMerchantKeyReq) returns (RotateMerchantKeyResp)
+
+	@handler GetMerchantAllowedIPs
+	get /merchants/:id/allowed-ips (MerchantAllowedIPsReq) returns (MerchantAllowedIPsResp)
+
+	@handler UpdateMerchantAllowedIPs
+	put /merchants/:id/allowed-ips (UpdateMerchantAllowedIPsReq) returns (MerchantAllowedIPsResp)
 
 	@handler BlacklistList
 	get /risk-blacklist (BlacklistListReq) returns (BlacklistListResp)

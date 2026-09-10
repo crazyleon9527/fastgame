@@ -72,5 +72,13 @@ const AdminAPI = (() => {
     rotateMerchantKey(id, gracePeriodHours = 24) {
       return request('POST', `/api/v1/admin/merchants/${id}/rotate-key`, { gracePeriodHours });
     },
+
+    getMerchantAllowedIPs(id) {
+      return request('GET', `/api/v1/admin/merchants/${id}/allowed-ips`);
+    },
+
+    updateMerchantAllowedIPs(id, allowedIps) {
+      return request('PUT', `/api/v1/admin/merchants/${id}/allowed-ips`, { allowedIps });
+    },
   };
 })();

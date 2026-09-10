@@ -24,6 +24,7 @@ type ServiceContext struct {
 	GameConfigs    model.GameConfigsModel
 	RiskBlacklist  model.RiskBlacklistModel
 	Blacklist      *security.Blacklist
+	IPWhitelist    *security.IPWhitelist
 	Reporter       *clickhouse.Writer
 }
 
@@ -36,16 +37,18 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 
 	rdb := redis.NewClient(&redis.Options{Addr: c.Redis.Addr})
 	blacklistModel := model.NewRiskBlacklistModel(conn)
+	merchantsModel := model.NewMerchantsModel(conn)
 	blacklist := security.NewBlacklist(rdb)
 
 	svcCtx := &ServiceContext{
 		Config:         c,
 		AuthMiddleware: middleware.NewAuthMiddleware().Handle,
 		AdminUsers:     model.NewAdminUsersModel(conn),
-		Merchants:      model.NewMerchantsModel(conn),
+		Merchants:      merchantsModel,
 		GameConfigs:    model.NewGameConfigsModel(conn),
 		RiskBlacklist:  blacklistModel,
 		Blacklist:      blacklist,
+		IPWhitelist:    security.NewIPWhitelist(merchantsModel, rdb),
 		Reporter:       reporter,
 	}
 

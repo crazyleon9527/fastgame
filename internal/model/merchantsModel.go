@@ -27,6 +27,8 @@ type (
 		ListPage(ctx context.Context, page, pageSize int) ([]*Merchants, int64, error)
 		FindSecretsByMerchantCode(ctx context.Context, merchantCode string) (*MerchantSecrets, error)
 		FindAllowedIPs(ctx context.Context, merchantCode string) ([]string, error)
+		FindAllowedIPsByID(ctx context.Context, id uint64) (merchantCode string, ips []string, err error)
+		UpdateAllowedIPs(ctx context.Context, id uint64, ips []string) error
 		RotatePrivateKey(ctx context.Context, id uint64, newKey string, gracePeriod time.Duration) error
 	}
 
@@ -105,6 +107,43 @@ func (m *customMerchantsModel) FindAllowedIPs(ctx context.Context, merchantCode 
 	default:
 		return nil, err
 	}
+}
+
+func (m *customMerchantsModel) FindAllowedIPsByID(ctx context.Context, id uint64) (string, []string, error) {
+	query := fmt.Sprintf("select `merchant_code`, `allowed_ips` from %s where `id` = ? limit 1", m.table)
+	var row struct {
+		MerchantCode string         `db:"merchant_code"`
+		AllowedIPs   sql.NullString `db:"allowed_ips"`
+	}
+	err := m.conn.QueryRowCtx(ctx, &row, query, id)
+	switch err {
+	case nil:
+		if !row.AllowedIPs.Valid || row.AllowedIPs.String == "" || row.AllowedIPs.String == "null" {
+			return row.MerchantCode, nil, nil
+		}
+		var ips []string
+		if err := json.Unmarshal([]byte(row.AllowedIPs.String), &ips); err != nil {
+			return "", nil, err
+		}
+		return row.MerchantCode, ips, nil
+	case sqlx.ErrNotFound:
+		return "", nil, ErrNotFound
+	default:
+		return "", nil, err
+	}
+}
+
+func (m *customMerchantsModel) UpdateAllowedIPs(ctx context.Context, id uint64, ips []string) error {
+	if ips == nil {
+		ips = []string{}
+	}
+	data, err := json.Marshal(ips)
+	if err != nil {
+		return err
+	}
+	query := fmt.Sprintf("update %s set `allowed_ips` = ? where `id` = ?", m.table)
+	_, err = m.conn.ExecCtx(ctx, query, string(data), id)
+	return err
 }
 
 func (m *customMerchantsModel) RotatePrivateKey(ctx context.Context, id uint64, newKey string, gracePeriod time.Duration) error {
