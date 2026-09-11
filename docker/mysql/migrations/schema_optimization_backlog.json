@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "interval_minutes": 10,
+  "phase": "maintenance",
+  "pending": [],
+  "completed": [
+    "17-index-optimize",
+    "18-index-optimize-2",
+    "19-normalize-merchant-refs",
+    "20-audit-archive-policy",
+    "21-merchant-lobby-view",
+    "22-status-checks",
+    "23-seed-extra-games"
+  ],
+  "recurring_checks": [
+    "Run EXPLAIN on admin list queries (merchants, daily_settlements, settlement_periods, v_merchant_game_lobby)",
+    "Verify unused indexes via information_schema INDEX_STATISTICS if enabled",
+    "Ensure all money columns are BIGINT minor units",
+    "Review JSON column sizes (tags, bet_limit_override, headers)",
+    "Run archive job dry-run against schema_archive_policies thresholds",
+    "Check merchant_id backfill completeness on legacy merchant_code tables"
+  ],
+  "future_candidates": [
+    "Partition audit_logs by month when row count exceeds 10M",
+    "Add covering index on daily_settlements for settlement_period rollup",
+    "Migrate wallet_pending_ops.bet_amount/win_amount from DECIMAL to BIGINT minor units"
+  ]
+}
