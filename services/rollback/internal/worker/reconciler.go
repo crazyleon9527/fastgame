@@ -45,6 +45,11 @@ func (r *Reconciler) processPending(ctx context.Context) {
 
 	for _, op := range ops {
 		if op.RetryCount >= maxRetries {
+			lastErr := "max retries exceeded"
+			if op.LastError.Valid {
+				lastErr = op.LastError.String
+			}
+			publishReconcileDLQ(ctx, r.svcCtx, dlqFromPendingOp(op, lastErr))
 			if err := r.svcCtx.PendingOps.MarkFailed(ctx, op.Id, "max retries exceeded"); err != nil {
 				logx.Errorf("mark failed: id=%d err=%v", op.Id, err)
 			}

@@ -15,6 +15,14 @@ func TestWAFBlocksSQLMap(t *testing.T) {
 	}
 }
 
+func TestWAFAllowsEmptyUserAgent(t *testing.T) {
+	waf := NewWAF()
+	req := httptest.NewRequest("GET", "/api/v1/game/balance", nil)
+	if err := waf.InspectRequest(req, ""); err != nil {
+		t.Fatalf("empty user agent should be allowed: %v", err)
+	}
+}
+
 func TestWAFBlocksInjectionInBody(t *testing.T) {
 	waf := NewWAF()
 	body := `{"betAmount":10,"note":"union select * from users"}`

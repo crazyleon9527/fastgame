@@ -35,6 +35,7 @@ Wallet:
   VerifyResponse: false
   ResponseTimestampSec: 60
   Timeout: 5s
+  SlowThresholdMs: 500
 
 Game:
   DefaultRtpTier: default
@@ -42,6 +43,7 @@ Game:
 Security:
   SkipMerchantSign: true
   SkipSessionEnvelope: false
+  MerchantKeyCipher: fastgame-dev-cipher-change-me-in-prod
   TimestampWindowSec: 60
   MaxClockSkewSec: 5
   UserLimitPerSec: 5

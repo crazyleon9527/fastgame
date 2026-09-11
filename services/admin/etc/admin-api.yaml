@@ -2,6 +2,7 @@ Name: admin-api
 Host: 0.0.0.0
 Port: 18889
 Timeout: 30000
+MaxBytes: 33554432
 
 Log:
   ServiceName: admin-api
@@ -12,6 +13,14 @@ Log:
 Auth:
   AccessSecret: fastgame-admin-jwt-secret-change-me
   AccessExpire: 86400
+
+Security:
+  MerchantKeyCipher: fastgame-dev-cipher-change-me-in-prod
+
+Upload:
+  Dir: web/admin/uploads
+  PublicBase: /admin/uploads
+  MaxBytes: 10485760
 
 MySQL:
   DataSource: fastgame:fastgame_pass@tcp(localhost:13306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC

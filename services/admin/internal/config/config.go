@@ -8,9 +8,21 @@ type Config struct {
 		AccessSecret string
 		AccessExpire int64
 	}
-	MySQL MySQLConf
-	Redis RedisConf
-	CH    ClickHouseConf
+	Security SecurityConf
+	Upload   UploadConf
+	MySQL    MySQLConf
+	Redis    RedisConf
+	CH       ClickHouseConf
+}
+
+type UploadConf struct {
+	Dir        string
+	PublicBase string
+	MaxBytes   int64
+}
+
+type SecurityConf struct {
+	MerchantKeyCipher string
 }
 
 type RedisConf struct {

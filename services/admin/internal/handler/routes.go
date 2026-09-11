@@ -20,6 +20,16 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/login",
 				Handler: LoginHandler(serverCtx),
 			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/locales",
+				Handler: LocaleListHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/i18n/dictionary",
+				Handler: I18nDictionaryHandler(serverCtx),
+			},
 		},
 		rest.WithPrefix("/api/v1/admin"),
 	)
@@ -37,6 +47,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Method:  http.MethodPost,
 					Path:    "/game-configs",
 					Handler: UpsertGameConfigHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodDelete,
+					Path:    "/game-configs/:id",
+					Handler: DeleteGameConfigHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodGet,
@@ -90,6 +105,21 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				},
 				{
 					Method:  http.MethodGet,
+					Path:    "/reports/daily-settlements",
+					Handler: DailySettlementListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/reports/daily-settlements/sync",
+					Handler: SyncDailySettlementHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/reports/daily-settlements/:id/confirm",
+					Handler: ConfirmDailySettlementHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
 					Path:    "/traces/:traceId",
 					Handler: GetTraceHandler(serverCtx),
 				},
@@ -127,6 +157,101 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Method:  http.MethodPost,
 					Path:    "/wallet/breaker/reset",
 					Handler: ResetWalletBreakerHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/users",
+					Handler: AdminUserListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/users",
+					Handler: CreateAdminUserHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPut,
+					Path:    "/users/:id",
+					Handler: UpdateAdminUserHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/roles",
+					Handler: RoleListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/platform/game-categories",
+					Handler: GameCategoryListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/platform/games",
+					Handler: PlatformGameListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/platform/games",
+					Handler: CreatePlatformGameHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPut,
+					Path:    "/platform/games/:id",
+					Handler: UpdatePlatformGameHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/platform/games/:id/rtp-tiers",
+					Handler: GameRtpTierListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/merchant-games",
+					Handler: MerchantGameListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/merchant-games",
+					Handler: CreateMerchantGameHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPut,
+					Path:    "/merchant-games/:id",
+					Handler: UpdateMerchantGameHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodDelete,
+					Path:    "/merchant-games/:id",
+					Handler: DeleteMerchantGameHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/files/upload",
+					Handler: UploadAssetHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/export/merchants",
+					Handler: ExportMerchantsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/export/platform-games",
+					Handler: ExportPlatformGamesHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/export/merchant-games",
+					Handler: ExportMerchantGamesHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/import/merchant-games",
+					Handler: ImportMerchantGamesHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/import/platform-games",
+					Handler: ImportPlatformGamesHandler(serverCtx),
 				},
 			}...,
 		),

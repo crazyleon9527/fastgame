@@ -1,0 +1,34 @@
+Log:
+  ServiceName: rollback
+  Mode: file
+  Level: info
+  Encoding: json
+  Path: logs
+  KeepDays: 30
+
+Kafka:
+  Brokers:
+    - kafka.internal:9092
+  GroupID: fastgame-rollback-consumer
+  Topic: game.wallet.rollback
+  DLQTopic: game.reconcile.dlq
+
+ClickHouse:
+  Addr: clickhouse.internal:9000
+  Database: fastgame
+  User: fastgame
+  Password: CHANGE_ME
+
+MySQL:
+  DataSource: fastgame:CHANGE_ME@tcp(mysql.internal:3306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC
+
+Wallet:
+  Mock: false
+  BaseURL: "https://wallet.example.com"
+  APIKey: ""
+  SignSecret: CHANGE_ME
+  SignEnabled: true
+  VerifyResponse: true
+  ResponseTimestampSec: 60
+  Timeout: 5s
+  SlowThresholdMs: 500

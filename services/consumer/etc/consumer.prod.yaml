@@ -1,0 +1,36 @@
+Log:
+  ServiceName: consumer
+  Mode: file
+  Level: info
+  Encoding: json
+  Path: logs
+  KeepDays: 30
+
+Kafka:
+  Brokers:
+    - kafka.internal:9092
+  GroupID: fastgame-settle-consumer
+  Topic: game.round.settled
+
+ClickHouse:
+  Addr: clickhouse.internal:9000
+  Database: fastgame
+  User: fastgame
+  Password: CHANGE_ME
+
+MySQL:
+  DataSource: fastgame:CHANGE_ME@tcp(mysql.internal:3306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC
+
+Redis:
+  Addr: redis.internal:6379
+
+RtpWatch:
+  Enabled: true
+  UseRedis: true
+  GlobalMax: 10000
+  PlayerMax: 200
+  ThresholdPPM: 1800000
+
+Batch:
+  MaxSize: 2000
+  Interval: 1s

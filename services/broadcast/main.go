@@ -28,9 +28,28 @@ type Config struct {
 		Brokers []string
 		GroupID string
 	}
+	CORS struct {
+		AllowedOrigins []string
+	}
 }
 
-var upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+func makeCheckOrigin(allowed []string) func(*http.Request) bool {
+	if len(allowed) == 0 {
+		return func(r *http.Request) bool { return true }
+	}
+	set := make(map[string]struct{}, len(allowed))
+	for _, origin := range allowed {
+		set[origin] = struct{}{}
+	}
+	return func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		_, ok := set[origin]
+		return ok
+	}
+}
 
 func main() {
 	flag.Parse()
@@ -49,6 +68,8 @@ func main() {
 			logx.Must(err)
 		}
 	}()
+
+	upgrader := websocket.Upgrader{CheckOrigin: makeCheckOrigin(c.CORS.AllowedOrigins)}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws/bigwin", func(rw http.ResponseWriter, r *http.Request) {

@@ -13,14 +13,20 @@ Log:
   KeepDays: 14
 
 MySQL:
-  DataSource: fastgame:CHANGE_ME@tcp(127.0.0.1:3306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC
+  DataSource: fastgame:CHANGE_ME@tcp(mysql.internal:3306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC
 
 Redis:
-  Addr: 127.0.0.1:6379
+  Addr: redis.internal:6379
 
 Kafka:
   Brokers:
-    - 127.0.0.1:9092
+    - kafka.internal:9092
+
+CH:
+  Addr: clickhouse.internal:9000
+  Database: fastgame
+  User: fastgame
+  Password: CHANGE_ME
 
 Wallet:
   Mock: false
@@ -38,6 +44,7 @@ Game:
 Security:
   SkipMerchantSign: false
   SkipSessionEnvelope: false
+  MerchantKeyCipher: CHANGE_ME_MERCHANT_KEY_CIPHER
   TimestampWindowSec: 60
   MaxClockSkewSec: 5
   UserLimitPerSec: 5

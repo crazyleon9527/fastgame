@@ -11,3 +11,8 @@ Kafka:
   Brokers:
     - localhost:19092
   GroupID: fastgame-broadcast
+
+CORS:
+  AllowedOrigins:
+    - "http://localhost:18000"
+    - "http://sponge.localhost:18000"

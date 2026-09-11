@@ -6,6 +6,7 @@ import (
 
 	"fastgame/internal/model"
 	"fastgame/pkg/clickhouse"
+	"fastgame/pkg/fieldcipher"
 	"fastgame/pkg/gameconfig"
 	"fastgame/pkg/idempotent"
 	"fastgame/pkg/kafka"
@@ -42,6 +43,8 @@ type ServiceContext struct {
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
+	fieldcipher.Init(c.Security.MerchantKeyCipher)
+
 	rdb := goredis.NewClient(&goredis.Options{Addr: c.Redis.Addr})
 	conn := sqlx.NewMysql(c.MySQL.DataSource)
 	merchants := model.NewMerchantsModel(conn)

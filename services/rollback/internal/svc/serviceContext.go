@@ -5,6 +5,7 @@ import (
 
 	"fastgame/internal/model"
 	"fastgame/pkg/clickhouse"
+	"fastgame/pkg/kafka"
 	"fastgame/pkg/money"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rollback/internal/config"
@@ -16,6 +17,7 @@ import (
 type ServiceContext struct {
 	Config     config.Config
 	Writer     *clickhouse.Writer
+	Kafka      *kafka.Producer
 	Merchants  model.MerchantsModel
 	PendingOps model.WalletPendingOpsModel
 	PendingTx  model.PendingTransactionsModel
@@ -37,6 +39,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	return &ServiceContext{
 		Config:     c,
 		Writer:     writer,
+		Kafka:      kafka.NewProducer(c.Kafka.Brokers),
 		Merchants:  model.NewMerchantsModel(conn),
 		PendingOps: model.NewWalletPendingOpsModel(conn),
 		PendingTx:  model.NewPendingTransactionsModel(conn),

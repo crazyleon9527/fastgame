@@ -12,6 +12,7 @@ import (
 	"fastgame/services/rgs/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/conf"
+	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest"
 )
 
@@ -28,6 +29,11 @@ func main() {
 
 	ctx := svc.NewServiceContext(c)
 	handler.RegisterHandlers(server, ctx)
+
+	if c.Wallet.Mock || c.Security.SkipMerchantSign {
+		logx.Errorf("[DEV-WARN] RGS running with insecure dev flags: Wallet.Mock=%v SkipMerchantSign=%v — do NOT use this config in production",
+			c.Wallet.Mock, c.Security.SkipMerchantSign)
+	}
 
 	fmt.Printf("Starting server at %s:%d...\n", c.Host, c.Port)
 	server.Start()

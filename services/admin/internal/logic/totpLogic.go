@@ -70,7 +70,12 @@ func (l *TotpLogic) Confirm(userID uint64, req *types.TotpConfirmReq) (*types.To
 	if err != nil {
 		return nil, err
 	}
-	token, expireAt, err := issueAdminToken(user, l.svcCtx.Config.Auth.AccessSecret, l.svcCtx.Config.Auth.AccessExpire)
+	roleName, err := resolveRoleName(l.ctx, l.svcCtx.Roles, user)
+	if err != nil {
+		return nil, err
+	}
+
+	token, expireAt, err := issueAdminToken(user, roleName, l.svcCtx.Config.Auth.AccessSecret, l.svcCtx.Config.Auth.AccessExpire)
 	if err != nil {
 		return nil, err
 	}
@@ -78,6 +83,7 @@ func (l *TotpLogic) Confirm(userID uint64, req *types.TotpConfirmReq) (*types.To
 	return &types.TotpConfirmResp{
 		AccessToken:   token,
 		ExpireAt:      expireAt,
+		RoleName:      roleName,
 		RecoveryCodes: plain,
 	}, nil
 }

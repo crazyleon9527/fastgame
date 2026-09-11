@@ -9,6 +9,7 @@ Kafka:
     - localhost:19092
   GroupID: fastgame-rollback-consumer
   Topic: game.wallet.rollback
+  DLQTopic: game.reconcile.dlq
 
 ClickHouse:
   Addr: localhost:19000
@@ -28,3 +29,4 @@ Wallet:
   VerifyResponse: false
   ResponseTimestampSec: 60
   Timeout: 5s
+  SlowThresholdMs: 500

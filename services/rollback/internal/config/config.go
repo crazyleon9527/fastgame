@@ -18,6 +18,7 @@ type KafkaConf struct {
 	Brokers []string
 	GroupID string
 	Topic   string
+	DLQTopic string
 }
 
 type ClickHouseConf struct {

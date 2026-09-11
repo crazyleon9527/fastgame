@@ -77,6 +77,7 @@ type SecurityConf struct {
 	SkipSignVerify      bool `json:",optional"`
 	SkipMerchantSign    bool `json:",optional"`
 	SkipSessionEnvelope bool `json:",optional"`
+	MerchantKeyCipher   string
 	TimestampWindowSec  int
 	MaxClockSkewSec     int
 	UserLimitPerSec     int

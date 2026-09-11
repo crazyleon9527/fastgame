@@ -49,6 +49,11 @@ func (r *OrphanReconciler) process(ctx context.Context) {
 
 	for _, tx := range txs {
 		if tx.RetryCount >= orphanMaxRetries {
+			lastErr := "max retries exceeded"
+			if tx.LastError.Valid {
+				lastErr = tx.LastError.String
+			}
+			publishReconcileDLQ(ctx, r.svcCtx, dlqFromPendingTx(tx, lastErr))
 			if err := r.svcCtx.PendingTx.MarkFailed(ctx, tx.Id, "max retries exceeded"); err != nil {
 				logx.Errorf("orphan mark failed: id=%d err=%v", tx.Id, err)
 			}

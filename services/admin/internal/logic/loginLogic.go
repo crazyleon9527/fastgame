@@ -59,7 +59,12 @@ func (l *LoginLogic) Login(req *types.LoginReq) (*types.LoginResp, error) {
 		}
 	}
 
-	tokenStr, expireAt, err := issueAdminToken(user, l.svcCtx.Config.Auth.AccessSecret, l.svcCtx.Config.Auth.AccessExpire)
+	roleName, err := resolveRoleName(l.ctx, l.svcCtx.Roles, user)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenStr, expireAt, err := issueAdminToken(user, roleName, l.svcCtx.Config.Auth.AccessSecret, l.svcCtx.Config.Auth.AccessExpire)
 	if err != nil {
 		return nil, err
 	}
@@ -67,6 +72,7 @@ func (l *LoginLogic) Login(req *types.LoginReq) (*types.LoginResp, error) {
 	return &types.LoginResp{
 		AccessToken:       tokenStr,
 		ExpireAt:          expireAt,
+		RoleName:          roleName,
 		RequiresTotpSetup: user.TotpEnabled != 1,
 	}, nil
 }

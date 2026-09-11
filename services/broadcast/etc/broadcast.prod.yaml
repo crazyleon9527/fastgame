@@ -1,0 +1,20 @@
+Log:
+  ServiceName: broadcast
+  Mode: file
+  Level: info
+  Encoding: json
+  Path: logs
+  KeepDays: 14
+
+Host: 0.0.0.0
+Port: 18900
+
+Kafka:
+  Brokers:
+    - kafka.internal:9092
+  GroupID: fastgame-broadcast
+
+CORS:
+  AllowedOrigins:
+    - "https://game.example.com"
+    - "https://sponge.example.com"

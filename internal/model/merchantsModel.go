@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"fastgame/pkg/fieldcipher"
+
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
@@ -80,6 +82,20 @@ func (m *customMerchantsModel) FindSecretsByMerchantCode(ctx context.Context, me
 	err := m.conn.QueryRowCtx(ctx, &resp, query, merchantCode)
 	switch err {
 	case nil:
+		if resp.PrivateKey.Valid {
+			plain, decErr := fieldcipher.Decrypt(resp.PrivateKey.String)
+			if decErr != nil {
+				return nil, decErr
+			}
+			resp.PrivateKey = sql.NullString{String: plain, Valid: true}
+		}
+		if resp.PrivateKeyPrev.Valid {
+			plain, decErr := fieldcipher.Decrypt(resp.PrivateKeyPrev.String)
+			if decErr != nil {
+				return nil, decErr
+			}
+			resp.PrivateKeyPrev = sql.NullString{String: plain, Valid: true}
+		}
 		return &resp, nil
 	case sqlx.ErrNotFound:
 		return nil, ErrNotFound
@@ -152,6 +168,11 @@ func (m *customMerchantsModel) RotatePrivateKey(ctx context.Context, id uint64, 
 		return err
 	}
 
+	encNewKey, err := fieldcipher.Encrypt(newKey)
+	if err != nil {
+		return err
+	}
+
 	var prevKey sql.NullString
 	var prevExpires sql.NullTime
 	if merchant.PrivateKey.Valid && merchant.PrivateKey.String != "" {
@@ -163,6 +184,6 @@ func (m *customMerchantsModel) RotatePrivateKey(ctx context.Context, id uint64, 
 		"update %s set `private_key` = ?, `private_key_prev` = ?, `private_key_prev_expires_at` = ? where `id` = ?",
 		m.table,
 	)
-	_, err = m.conn.ExecCtx(ctx, query, newKey, prevKey, prevExpires, id)
+	_, err = m.conn.ExecCtx(ctx, query, encNewKey, prevKey, prevExpires, id)
 	return err
 }

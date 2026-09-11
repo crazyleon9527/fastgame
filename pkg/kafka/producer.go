@@ -16,6 +16,7 @@ const (
 	TopicRoundSettled   = "game.round.settled"
 	TopicWalletRollback = "game.wallet.rollback"
 	TopicEventBigwin    = "game.event.bigwin"
+	TopicReconcileDLQ   = "game.reconcile.dlq"
 )
 
 type RoundSettledEvent struct {
@@ -43,6 +44,18 @@ type BigWinEvent struct {
 	WinAmount  int64     `json:"winAmount"`
 	Multiplier int64     `json:"multiplier"`
 	OccurredAt time.Time `json:"occurredAt"`
+}
+
+type ReconcileDLQEvent struct {
+	Source       string    `json:"source"`
+	RecordID     uint64    `json:"recordId"`
+	RoundID      string    `json:"roundId"`
+	MerchantCode string    `json:"merchantCode"`
+	UserID       uint64    `json:"userId,omitempty"`
+	OpType       string    `json:"opType"`
+	RetryCount   int64     `json:"retryCount"`
+	LastError    string    `json:"lastError"`
+	FailedAt     time.Time `json:"failedAt"`
 }
 
 type WalletRollbackEvent struct {
@@ -88,6 +101,17 @@ func (p *Producer) PublishBigWin(ctx context.Context, evt BigWinEvent) error {
 		evt.OccurredAt = time.Now().UTC()
 	}
 	return p.publish(ctx, TopicEventBigwin, "", evt)
+}
+
+func (p *Producer) PublishReconcileDLQ(ctx context.Context, evt ReconcileDLQEvent) error {
+	if evt.FailedAt.IsZero() {
+		evt.FailedAt = time.Now().UTC()
+	}
+	key := evt.RoundID
+	if key == "" {
+		key = fmt.Sprintf("%d", evt.RecordID)
+	}
+	return p.publish(ctx, TopicReconcileDLQ, key, evt)
 }
 
 func (p *Producer) PublishWalletRollback(ctx context.Context, evt WalletRollbackEvent) error {

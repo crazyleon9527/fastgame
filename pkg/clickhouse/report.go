@@ -73,6 +73,54 @@ func (w *Writer) QueryRtpReport(ctx context.Context, merchantID uint64, gameCode
 	return result, rows.Err()
 }
 
+type DailySettlementRow struct {
+	MerchantID  uint64
+	SettleDate  time.Time
+	TotalBet    int64
+	TotalWin    int64
+	TotalRounds uint64
+}
+
+func (w *Writer) QueryDailySettlement(ctx context.Context, merchantID uint64, days int) ([]DailySettlementRow, error) {
+	if days <= 0 {
+		days = 7
+	}
+	since := time.Now().UTC().AddDate(0, 0, -days).Truncate(24 * time.Hour)
+
+	query := `
+		SELECT
+			merchant_id,
+			toDate(settled_at) AS settle_date,
+			sum(bet_amount) AS total_bet,
+			sum(win_amount) AS total_win,
+			count() AS total_rounds
+		FROM fastgame.game_round_settled
+		WHERE settled_at >= ?
+	`
+	args := []any{since}
+	if merchantID > 0 {
+		query += " AND merchant_id = ?"
+		args = append(args, merchantID)
+	}
+	query += " GROUP BY merchant_id, settle_date ORDER BY settle_date DESC, merchant_id ASC LIMIT 500"
+
+	rows, err := w.conn.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("daily settlement: %w", err)
+	}
+	defer rows.Close()
+
+	var result []DailySettlementRow
+	for rows.Next() {
+		var row DailySettlementRow
+		if err := rows.Scan(&row.MerchantID, &row.SettleDate, &row.TotalBet, &row.TotalWin, &row.TotalRounds); err != nil {
+			return nil, err
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
 // Fallback query when materialized view is empty.
 func (w *Writer) QueryRtpReportFromRaw(ctx context.Context, merchantID uint64, gameCode string, hours int) ([]RtpReportRow, error) {
 	if hours <= 0 {
