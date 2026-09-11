@@ -1,0 +1,1 @@
+import{l as i,bf as o}from"./index-Cfb12lij.js";function t(){var e,n;const r=i().getItem(o);return(n=(e=r==null?void 0:r.roles)==null?void 0:e[0])!=null?n:"viewer"}function u(){return t()!=="viewer"}function c(){return t()==="admin"}export{u as c,c as i};

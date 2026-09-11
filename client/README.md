@@ -11,7 +11,14 @@
    - HUD 节点 → `GameHud`（绑定余额/下注/赢额 Label 与抛竿 Button）
    - 跑马灯节点 → `BigWinMarquee`（绑定跑马灯 Label）
 4. 在 `GameConfig.ts` 中确认 Gateway 地址（默认 `http://localhost:18000`）
-5. 启动后端：`make up && make seed && make run-rgs && make run-broadcast`，Gateway 随 `make up` 启动
+5. 启动后端（Windows）：
+   ```powershell
+   Copy-Item .env.example .env
+   docker compose up -d
+   go run scripts/seed_admin.go | docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame
+   .\scripts\dev-start.ps1
+   ```
+   详见 [docs/DEV.md](../docs/DEV.md)。需启动 **5 个 Go 服务**（含 consumer/rollback），否则 RTP 报表与冲正不可用。
 6. Cocos 预览运行
 
 ## 性能与加载优化
@@ -36,7 +43,8 @@ Cocos Builder 分包模板见 `settings/builder-performance.template.json`。
 ```bash
 # 1. Cocos Creator: 构建 -> Web Mobile
 # 2. 一键部署到 Gateway（混淆 + Brotli 预压缩 + 拷贝到 web/game）
-make deploy-client
+.\scripts\deploy-client.ps1
+# Unix: make deploy-client
 # 3. 重建带 Brotli 模块的 Gateway
 docker compose build gateway && docker compose up -d gateway
 ```

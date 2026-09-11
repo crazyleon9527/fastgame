@@ -1,3 +1,4 @@
+# Windows: use .\scripts\make.ps1 <target> instead of make (see docs/DEV.md)
 .PHONY: up down restart ps logs init clean run-rgs run-consumer run-rollback run-admin run-broadcast build install-goctl codegen seed seed-admin migrate-security migrate-wallet migrate-replay migrate-orphan-trace migrate-antiabuse migrate-money migrate-totp obfuscate-client compress-client-brotli deploy-client fetch-cf-ips
 
 seed:
@@ -30,8 +31,46 @@ migrate-ch-money:
 migrate-totp:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/09-totp-recovery-migration.sql
 
+migrate-rbac:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/10-rbac-roles-migration.sql
+
+migrate-platform-games:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/11-platform-games-migration.sql
+
+migrate-operations-audit:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/12-operations-audit-migration.sql
+
+migrate-settlement-billing:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/13-settlement-billing-migration.sql
+
+migrate-player-profiles:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/14-player-profiles-migration.sql
+
+migrate-api-governance:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/15-api-governance-migration.sql
+
+migrate-game-versions:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/16-game-versions-migration.sql
+
+migrate-index-optimize:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/17-index-optimize-migration.sql
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/18-index-optimize-migration.sql
+
+migrate-i18n:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/24-i18n-dictionary-migration.sql
+
+migrate-schema-optimize:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/19-normalize-merchant-refs-migration.sql
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/20-audit-archive-policy-migration.sql
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/21-merchant-lobby-view-migration.sql
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/22-status-checks-migration.sql
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/23-seed-extra-games-migration.sql
+
+migrate-pending:
+	$(MAKE) migrate-player-profiles migrate-api-governance migrate-game-versions migrate-index-optimize migrate-schema-optimize
+
 migrate-all:
-	$(MAKE) migrate-security migrate-wallet migrate-replay migrate-orphan-trace migrate-antiabuse migrate-totp migrate-money
+	$(MAKE) migrate-security migrate-wallet migrate-replay migrate-orphan-trace migrate-antiabuse migrate-totp migrate-rbac migrate-money
 
 verify-staging-money:
 	chmod +x scripts/verify_staging_money.sh
@@ -39,6 +78,9 @@ verify-staging-money:
 
 seed-admin:
 	go run scripts/seed_admin.go | docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame
+
+seed-rbac-users:
+	go run scripts/seed_rbac_users.go | docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame
 
 # goctl 无独立 v1.10.3 tag，从 go-zero v1.10.3 源码编译安装
 install-goctl:

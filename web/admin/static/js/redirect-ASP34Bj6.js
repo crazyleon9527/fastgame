@@ -1,0 +1,1 @@
+import{d as c,f as s,u as p,o as u,c as _}from"./index-Cfb12lij.js";const l=c({name:"Redirect",__name:"redirect",setup(i){const{currentRoute:r,replace:t}=s(),{params:a,query:n}=p(r),{path:e}=a,o=Array.isArray(e)?e.join("/"):e;return t({path:"/"+o,query:n}),(m,d)=>(u(),_("div"))}});export{l as default};

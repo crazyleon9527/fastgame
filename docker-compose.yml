@@ -4,7 +4,7 @@ services:
     container_name: fastgame-mysql
     restart: unless-stopped
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "${MYSQL_PORT:-13306}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-fastgame_root}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-fastgame}
@@ -33,7 +33,7 @@ services:
     container_name: fastgame-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT:-16379}:6379"
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
@@ -50,8 +50,8 @@ services:
     container_name: fastgame-clickhouse
     restart: unless-stopped
     ports:
-      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"
-      - "${CLICKHOUSE_NATIVE_PORT:-9000}:9000"
+      - "${CLICKHOUSE_HTTP_PORT:-18123}:8123"
+      - "${CLICKHOUSE_NATIVE_PORT:-19000}:9000"
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DATABASE:-fastgame}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-fastgame}
@@ -134,16 +134,19 @@ services:
       - ./docker/clickhouse/init-db.sh:/scripts/init-db.sh:ro
       - ./docker/clickhouse/init/01-init.sql:/scripts/01-init.sql:ro
       - ./docker/clickhouse/init/02-trace-migration.sql:/scripts/02-trace-migration.sql:ro
+      - ./docker/clickhouse/init/03-money-migration.sql:/scripts/03-money-migration.sql:ro
     restart: on-failure
     networks:
       - fastgame
 
   kafka-ui:
+    profiles:
+      - dev-tools
     image: provectuslabs/kafka-ui:latest
     container_name: fastgame-kafka-ui
     restart: unless-stopped
     ports:
-      - "${KAFKA_UI_PORT:-8080}:8080"
+      - "127.0.0.1:${KAFKA_UI_PORT:-18080}:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: fastgame-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
@@ -155,11 +158,13 @@ services:
       - fastgame
 
   adminer:
+    profiles:
+      - dev-tools
     image: adminer:4
     container_name: fastgame-adminer
     restart: unless-stopped
     ports:
-      - "${ADMINER_PORT:-8081}:8080"
+      - "127.0.0.1:${ADMINER_PORT:-18081}:8080"
     environment:
       ADMINER_DEFAULT_SERVER: mysql
     depends_on:
@@ -188,6 +193,7 @@ services:
       - ./docker/nginx/waf-blocks.conf:/etc/nginx/waf-blocks.conf:ro
       - ./docker/nginx/merchant-whitelist.conf:/etc/nginx/merchant-whitelist.conf:ro
       - ./web/admin:/usr/share/nginx/admin:ro
+      - ./web/admin/uploads:/usr/share/nginx/admin/uploads:ro
       - ./web/shared:/usr/share/nginx/shared:ro
       - ./web/verify:/usr/share/nginx/verify:ro
       - ./web/replay:/usr/share/nginx/replay:ro
@@ -198,11 +204,13 @@ services:
       - fastgame
 
   redisinsight:
+    profiles:
+      - dev-tools
     image: redis/redisinsight:latest
     container_name: fastgame-redisinsight
     restart: unless-stopped
     ports:
-      - "${REDIS_INSIGHT_PORT:-5540}:5540"
+      - "127.0.0.1:${REDIS_INSIGHT_PORT:-15540}:5540"
     volumes:
       - redisinsight_data:/data
     depends_on:

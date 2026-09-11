@@ -62,6 +62,7 @@ wait_for_kafka
 create_topic "game.round.settled" 6 "compression.type=snappy"
 create_topic "game.event.bigwin" 3 "compression.type=snappy"
 create_topic "game.wallet.rollback" 3 "compression.type=snappy"
+create_topic "game.reconcile.dlq" 3 "compression.type=snappy"
 
 echo "Kafka topics initialized:"
 $KAFKA_BIN --bootstrap-server "$BOOTSTRAP_SERVER" --list

@@ -26,6 +26,21 @@ body {
 
 .hidden { display: none !important; }
 
+.role-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--surface2);
+}
+
+.role-badge.role-admin { color: #93c5fd; border-color: rgba(59, 130, 246, 0.35); }
+.role-badge.role-operator { color: #86efac; border-color: rgba(34, 197, 94, 0.35); }
+.role-badge.role-viewer { color: #fcd34d; border-color: rgba(245, 158, 11, 0.35); }
+
 .view { min-height: 100vh; }
 
 /* Login */
@@ -216,11 +231,96 @@ a.nav-link {
 
 .key-box .btn { flex-shrink: 0; align-self: center; }
 
+.totp-qr-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 1.25rem 0;
+  padding: 1rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+#totp-qr {
+  display: inline-flex;
+  padding: 0.75rem;
+  background: #fff;
+  border-radius: 8px;
+  line-height: 0;
+}
+
+#totp-qr img,
+#totp-qr canvas {
+  display: block;
+}
+
+.totp-uri-fallback {
+  margin: 0.75rem 0 1rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.totp-uri-fallback summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.totp-uri-fallback code {
+  display: block;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
 .key-meta {
   list-style: none;
   margin-bottom: 1rem;
   font-size: 0.875rem;
   color: var(--muted);
+}
+
+.actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.json-preview {
+  margin: 0;
+  max-width: 280px;
+  max-height: 80px;
+  overflow: auto;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--muted);
+}
+
+.badge.rtp-high {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.badge.rtp-low {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+dialog textarea {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  resize: vertical;
 }
 
 .key-meta li { padding: 0.25rem 0; }
@@ -253,6 +353,16 @@ a.nav-link {
 .brand small { display: block; color: var(--muted); font-size: 0.75rem; }
 
 .topbar-actions { display: flex; align-items: center; gap: 1rem; }
+.locale-select, .locale-row select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.875rem;
+}
+.locale-row { display: block; margin-bottom: 1rem; font-size: 0.875rem; color: var(--muted); }
+.locale-row select { width: 100%; margin-top: 0.35rem; }
 #user-label { color: var(--muted); font-size: 0.875rem; }
 
 .toolbar {
@@ -323,6 +433,8 @@ tr:hover td { background: rgba(59, 130, 246, 0.04); }
 
 .badge.active { background: rgba(34, 197, 94, 0.15); color: var(--success); }
 .badge.inactive { background: rgba(139, 156, 179, 0.15); color: var(--muted); }
+.badge.ok { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+.badge.warn { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
 
 .badge.type-ip { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
 .badge.type-user_id { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
