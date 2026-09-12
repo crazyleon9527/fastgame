@@ -6,7 +6,7 @@ import {
   getKeyList,
   filterTree,
   constantMenus,
-  filterNoPermissionTree,
+  filterChildrenTree,
   formatFlatteningRoutes
 } from "../utils";
 import { useMultiTagsStoreHook } from "./multiTags";
@@ -23,9 +23,9 @@ export const usePermissionStore = defineStore("pure-permission", {
     cachePageList: []
   }),
   actions: {
-    /** 组装整体路由生成的菜单 */
+    /** 组装整体路由生成的菜单（FastGame 用静态菜单，RBAC 由页面/API 负责） */
     handleWholeMenus(routes: any[]) {
-      this.wholeMenus = filterNoPermissionTree(
+      this.wholeMenus = filterChildrenTree(
         filterTree(ascending(this.constantMenus.concat(routes)))
       );
       this.flatteningRoutes = formatFlatteningRoutes(

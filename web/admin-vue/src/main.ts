@@ -7,6 +7,7 @@ import { createApp, type Directive } from "vue";
 import { useElementPlus } from "@/plugins/elementPlus";
 import { injectResponsiveStorage } from "@/utils/responsive";
 import { useI18nStoreHook } from "@/store/modules/i18n";
+import { initRouter } from "@/router/utils";
 
 import Table from "@pureadmin/table";
 // import PureDescriptions from "@pureadmin/descriptions";
@@ -70,6 +71,7 @@ getPlatformConfig(app).then(async config => {
   app.use(router);
   await router.isReady();
   injectResponsiveStorage(app, config);
+  await initRouter();
   app.use(useElementPlus).use(Table);
   // .use(PureDescriptions)
   // .use(useEcharts);

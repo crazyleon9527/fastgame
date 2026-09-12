@@ -128,3 +128,6 @@ export const updateMerchantGame = (id: number, data: object) =>
 
 export const deleteMerchantGame = (id: number) =>
   http.request<any>("delete", `/merchant-games/${id}`);
+
+export const listAuditLogs = (params: object) =>
+  http.get<any, any>("/audit-logs", { params });

@@ -18,7 +18,7 @@ import {
 } from "@pureadmin/utils";
 import { getConfig } from "@/config";
 import { buildHierarchyTree } from "@/utils/tree";
-import { userKey, type DataInfo } from "@/utils/auth";
+import { getToken, userKey, type DataInfo } from "@/utils/auth";
 import { type menuType, routerArrays } from "@/layout/types";
 import { useMultiTagsStoreHook } from "@/store/modules/multiTags";
 import { usePermissionStoreHook } from "@/store/modules/permission";
@@ -81,10 +81,25 @@ function isOneOfArray(a: Array<string>, b: Array<string>) {
     : true;
 }
 
+/** 从 token 或 localStorage 解析角色，避免 roles 为空时菜单被全部过滤 */
+function resolveCurrentRoles(): string[] {
+  const stored =
+    storageLocal().getItem<DataInfo<number>>(userKey)?.roles ?? [];
+  if (stored.length > 0) return stored;
+  try {
+    const token = getToken()?.accessToken;
+    if (!token) return [];
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const roleName = payload?.roleName;
+    return roleName ? [roleName] : [];
+  } catch {
+    return [];
+  }
+}
+
 /** 从localStorage里取出当前登录用户的角色roles，过滤无权限的菜单 */
 function filterNoPermissionTree(data: RouteComponent[]) {
-  const currentRoles =
-    storageLocal().getItem<DataInfo<number>>(userKey)?.roles ?? [];
+  const currentRoles = resolveCurrentRoles();
   const newTree = cloneDeep(data).filter((v: any) =>
     isOneOfArray(v.meta?.roles, currentRoles)
   );
@@ -157,7 +172,8 @@ function addPathMatch() {
 /** 处理动态路由（后端返回的路由） */
 function handleAsyncRoutes(routeList) {
   if (routeList.length === 0) {
-    usePermissionStoreHook().handleWholeMenus(routeList);
+    // 纯静态菜单：必须写入 wholeMenus，否则侧栏会一直 loading
+    usePermissionStoreHook().handleWholeMenus([]);
   } else {
     formatFlatteningRoutes(addAsyncRoutes(routeList)).map(
       (v: RouteRecordRaw) => {
@@ -198,6 +214,11 @@ function handleAsyncRoutes(routeList) {
 
 /** 初始化路由（`new Promise` 写法防止在异步请求中造成无限循环）*/
 function initRouter() {
+  const roles = resolveCurrentRoles();
+  const cached = storageLocal().getItem<DataInfo<number>>(userKey);
+  if (roles.length > 0 && cached && (!cached.roles || cached.roles.length === 0)) {
+    storageLocal().setItem(userKey, { ...cached, roles });
+  }
   if (getConfig()?.CachingAsyncRoutes) {
     // 开启动态路由缓存本地localStorage
     const key = "async-routes";
@@ -404,6 +425,7 @@ export {
   getTopMenu,
   addPathMatch,
   isOneOfArray,
+  resolveCurrentRoles,
   getHistoryMode,
   addAsyncRoutes,
   getParentPaths,
@@ -411,5 +433,6 @@ export {
   handleAliveRoute,
   formatTwoStageRoutes,
   formatFlatteningRoutes,
-  filterNoPermissionTree
+  filterNoPermissionTree,
+  filterChildrenTree
 };

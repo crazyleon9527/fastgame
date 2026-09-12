@@ -500,3 +500,31 @@ type FileUploadResp struct {
 	Filename string `json:"filename"`
 	Size     int64  `json:"size"`
 }
+
+type AuditLogListReq struct {
+	Page     int    `form:"page,default=1"`
+	PageSize int    `form:"pageSize,default=20"`
+	Action   string `form:"action,optional"`
+	Username string `form:"username,optional"`
+}
+
+type AuditLogItem struct {
+	Id           uint64 `json:"id"`
+	AdminUserId  uint64 `json:"adminUserId,omitempty"`
+	Username     string `json:"username"`
+	RoleName     string `json:"roleName"`
+	Action       string `json:"action"`
+	ResourceType string `json:"resourceType"`
+	ResourceId   string `json:"resourceId"`
+	HttpMethod   string `json:"httpMethod,omitempty"`
+	RequestPath  string `json:"requestPath,omitempty"`
+	Detail       string `json:"detail,omitempty"`
+	ClientIp     string `json:"clientIp,omitempty"`
+	StatusCode   int    `json:"statusCode,omitempty"`
+	CreatedAt    int64  `json:"createdAt"`
+}
+
+type AuditLogListResp struct {
+	Total int64          `json:"total"`
+	List  []AuditLogItem `json:"list"`
+}

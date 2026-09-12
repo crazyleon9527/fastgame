@@ -85,7 +85,11 @@ export function setToken(data: DataInfo<Date>) {
     });
   }
 
-  if (data.username && data.roles) {
+  if (
+    data.username &&
+    Array.isArray(data.roles) &&
+    data.roles.length > 0
+  ) {
     const { username, roles } = data;
     setUserKey({
       avatar: data?.avatar ?? "",

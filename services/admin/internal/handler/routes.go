@@ -180,6 +180,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				},
 				{
 					Method:  http.MethodGet,
+					Path:    "/audit-logs",
+					Handler: AuditLogListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
 					Path:    "/platform/game-categories",
 					Handler: GameCategoryListHandler(serverCtx),
 				},

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { isTotpPending } from "@/utils/totp";
@@ -10,6 +10,7 @@ import {
   listWalletBreakers
 } from "@/api/fastgame";
 import { withRequest } from "@/utils/request";
+import { useI18nStoreHook } from "@/store/modules/i18n";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import Shop from "~icons/ep/office-building";
 import Warning from "~icons/ep/warning";
@@ -19,6 +20,7 @@ import Switch from "~icons/ep/switch-button";
 defineOptions({ name: "Dashboard" });
 
 const router = useRouter();
+const i18n = useI18nStoreHook();
 const loading = ref(true);
 const stats = ref({
   merchants: 0,
@@ -69,20 +71,20 @@ onMounted(async () => {
   }
 });
 
-const cards = [
+const cards = computed(() => [
   {
     key: "merchants",
-    title: "商户总数",
+    title: i18n.t("dash.merchants", "商户总数"),
     field: "merchants",
     sub: "activeMerchants",
-    subLabel: "已启用",
+    subLabel: i18n.t("dash.active", "已启用"),
     icon: Shop,
     color: "#6366f1",
     path: "/merchant/list"
   },
   {
     key: "alerts",
-    title: "RTP 告警",
+    title: i18n.t("dash.alerts", "RTP 告警"),
     field: "openAlerts",
     sub: null,
     subLabel: "",
@@ -92,7 +94,7 @@ const cards = [
   },
   {
     key: "settlement",
-    title: "待确认结算",
+    title: i18n.t("dash.settlements", "待确认结算"),
     field: "pendingSettlements",
     sub: null,
     subLabel: "",
@@ -102,7 +104,7 @@ const cards = [
   },
   {
     key: "breaker",
-    title: "钱包熔断",
+    title: i18n.t("dash.breakers", "钱包熔断"),
     field: "breakers",
     sub: null,
     subLabel: "",
@@ -110,7 +112,7 @@ const cards = [
     color: "#ef4444",
     path: "/merchant/list"
   }
-];
+]);
 </script>
 
 <template>
@@ -125,8 +127,8 @@ const cards = [
     />
     <div class="hero">
       <div>
-        <h1>FastGame 运营控制台</h1>
-        <p>多商户 · 自研游戏 · 实时风控与对账</p>
+        <h1>{{ i18n.t("dash.title", "FastGame 运营控制台") }}</h1>
+        <p>{{ i18n.t("dash.subtitle", "多商户 · 自研游戏 · 实时风控与对账") }}</p>
       </div>
     </div>
     <el-row :gutter="16" class="stat-row">
@@ -156,16 +158,20 @@ const cards = [
     </el-row>
     <el-row :gutter="16">
       <el-col :span="24">
-        <el-card header="快捷入口">
+        <el-card :header="i18n.t('dash.shortcuts', '快捷入口')">
           <el-space wrap>
             <el-button type="primary" @click="router.push('/merchant/list')">
-              商户管理
+              {{ i18n.t("nav.merchants", "商户管理") }}
             </el-button>
-            <el-button @click="router.push('/finance/rtp')">RTP 报表</el-button>
+            <el-button @click="router.push('/finance/rtp')">
+              {{ i18n.t("nav.rtp", "RTP 报表") }}
+            </el-button>
             <el-button @click="router.push('/risk/blacklist')">
-              风控黑名单
+              {{ i18n.t("nav.blacklist", "风控黑名单") }}
             </el-button>
-            <el-button @click="router.push('/ops/trace')">Trace 排查</el-button>
+            <el-button @click="router.push('/ops/trace')">
+              {{ i18n.t("nav.trace", "Trace 排查") }}
+            </el-button>
           </el-space>
         </el-card>
       </el-col>

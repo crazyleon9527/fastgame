@@ -5,6 +5,7 @@ export { getConfig, responsiveStorageNameSpace } from "@/config";
 export {
   ascending,
   filterTree,
+  filterChildrenTree,
   filterNoPermissionTree,
   formatFlatteningRoutes
 } from "@/router/utils";

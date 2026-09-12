@@ -38,6 +38,7 @@ type ServiceContext struct {
 	DailySettlements   model.DailySettlementsModel
 	I18n               model.I18nModel
 	PlatformGames      model.PlatformGamesModel
+	AuditLogs          model.AuditLogsModel
 	UploadDir          string
 	UploadPublicBase   string
 	UploadMaxBytes     int64
@@ -95,6 +96,7 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		DailySettlements: model.NewDailySettlementsModel(conn),
 		I18n:             model.NewI18nModel(conn),
 		PlatformGames:    model.NewPlatformGamesModel(conn),
+		AuditLogs:        model.NewAuditLogsModel(conn),
 		UploadDir:        uploadDir,
 		UploadPublicBase: uploadBase,
 		UploadMaxBytes:   uploadMax,

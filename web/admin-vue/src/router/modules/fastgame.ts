@@ -186,6 +186,16 @@ export default [
           i18nKey: "nav.users",
           roles: ["admin"]
         }
+      },
+      {
+        path: "/system/audit",
+        name: "AuditLogs",
+        component: () => import("@/views/fastgame/audit/index.vue"),
+        meta: {
+          title: "审计日志",
+          i18nKey: "nav.audit",
+          roles: ["admin", "operator", "viewer"]
+        }
       }
     ]
   }
