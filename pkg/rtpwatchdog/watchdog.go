@@ -2,7 +2,6 @@ package rtpwatchdog
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"fastgame/pkg/money"
@@ -14,7 +13,7 @@ type Alert struct {
 	ScopeValue   string
 	MerchantCode string
 	GameCode     string
-	UserID       uint64
+	UserID       string
 	RtpPPM       int64
 	TotalBet     int64
 	TotalWin     int64
@@ -24,7 +23,7 @@ type Alert struct {
 type sample struct {
 	merchantCode string
 	gameCode     string
-	userID       uint64
+	userID       string
 	bet          int64
 	win          int64
 }
@@ -37,7 +36,7 @@ type Watchdog struct {
 	playerMax     int
 	thresholdPPM  int64
 	minSampleBet  int64
-	playerWindows map[uint64][]sample
+	playerWindows map[string][]sample
 	gameWindows   map[string][]sample
 }
 
@@ -66,7 +65,7 @@ func New(cfg Config) *Watchdog {
 		playerMax:     cfg.PlayerMax,
 		thresholdPPM:  cfg.ThresholdPPM,
 		minSampleBet:  cfg.MinSampleBet,
-		playerWindows: make(map[uint64][]sample),
+		playerWindows: make(map[string][]sample),
 		gameWindows:   make(map[string][]sample),
 	}
 }
@@ -74,7 +73,7 @@ func New(cfg Config) *Watchdog {
 type RecordInput struct {
 	MerchantCode string
 	GameCode     string
-	UserID       uint64
+	UserID       string
 	BetMinor     int64
 	WinMinor     int64
 }
@@ -84,7 +83,7 @@ func (w *Watchdog) RecordCtx(_ context.Context, in RecordInput) ([]Alert, error)
 }
 
 func (w *Watchdog) Record(in RecordInput) []Alert {
-	if in.BetMinor <= 0 {
+	if in.BetMinor <= 0 || in.UserID == "" {
 		return nil
 	}
 
@@ -105,10 +104,10 @@ func (w *Watchdog) Record(in RecordInput) []Alert {
 	w.gameWindows[gameKey] = appendSample(w.gameWindows[gameKey], s, w.globalMax)
 
 	var alerts []Alert
-	if alert, ok := w.evalSamples("user", formatUser(in.UserID), in.MerchantCode, in.GameCode, in.UserID, w.playerWindows[in.UserID]); ok {
+	if alert, ok := w.evalSamples("user", in.UserID, in.MerchantCode, in.GameCode, in.UserID, w.playerWindows[in.UserID]); ok {
 		alerts = append(alerts, alert)
 	}
-	if alert, ok := w.evalSamples("game", gameKey, in.MerchantCode, in.GameCode, 0, w.gameWindows[gameKey]); ok {
+	if alert, ok := w.evalSamples("game", gameKey, in.MerchantCode, in.GameCode, "", w.gameWindows[gameKey]); ok {
 		alerts = append(alerts, alert)
 	}
 	return alerts
@@ -122,7 +121,7 @@ func appendSample(buf []sample, s sample, max int) []sample {
 	return buf
 }
 
-func (w *Watchdog) evalSamples(scopeType, scopeValue, merchantCode, gameCode string, userID uint64, samples []sample) (Alert, bool) {
+func (w *Watchdog) evalSamples(scopeType, scopeValue, merchantCode, gameCode, userID string, samples []sample) (Alert, bool) {
 	var totalBet, totalWin int64
 	for _, s := range samples {
 		totalBet += s.bet
@@ -146,8 +145,4 @@ func (w *Watchdog) evalSamples(scopeType, scopeValue, merchantCode, gameCode str
 		TotalWin:     totalWin,
 		SampleSize:   len(samples),
 	}, true
-}
-
-func formatUser(userID uint64) string {
-	return fmt.Sprintf("%d", userID)
 }

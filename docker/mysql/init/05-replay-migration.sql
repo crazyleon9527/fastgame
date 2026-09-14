@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS game_round_replay (
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   round_id      VARCHAR(64)     NOT NULL COMMENT 'Nonce / Round ID',
   merchant_code VARCHAR(32)     NOT NULL,
-  user_id       BIGINT UNSIGNED NOT NULL,
+  user_id       VARCHAR(64) NOT NULL COMMENT '下游玩家唯一ID',
   game_code     VARCHAR(32)     NOT NULL,
   server_seed   VARCHAR(128)    NOT NULL,
   client_seed   VARCHAR(128)    NOT NULL,

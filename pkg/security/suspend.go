@@ -15,8 +15,8 @@ func NewSuspendStore(client *redis.Client) *SuspendStore {
 	return &SuspendStore{client: client}
 }
 
-func (s *SuspendStore) IsUserSuspended(ctx context.Context, userID uint64) (bool, error) {
-	if userID == 0 {
+func (s *SuspendStore) IsUserSuspended(ctx context.Context, userID string) (bool, error) {
+	if len(userID) == 0 {
 		return false, nil
 	}
 	n, err := s.client.Exists(ctx, fmt.Sprintf("rtp:suspend:user:%d", userID)).Result()

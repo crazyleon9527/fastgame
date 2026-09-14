@@ -30,6 +30,9 @@ fi
 if [ -f /scripts/03-money-migration.sql ]; then
   clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --multiquery < /scripts/03-money-migration.sql
 fi
+if [ -f /scripts/04-user-id-string-migration.sql ]; then
+  clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --multiquery < /scripts/04-user-id-string-migration.sql
+fi
 
 echo "ClickHouse tables:"
 clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --query "SHOW TABLES FROM fastgame"

@@ -6,7 +6,7 @@ export interface LogContext {
     traceId?: string;
     roundId?: string;
     merchantId?: string;
-    userId?: number;
+    userId?: string;
     [key: string]: string | number | boolean | undefined;
 }
 

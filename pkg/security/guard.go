@@ -24,10 +24,10 @@ type Config struct {
 	SkipMerchantSign    bool
 	SkipSessionEnvelope bool
 	// SkipSignVerify 兼容旧配置：为 true 时同时跳过商户签名与会话 Envelope
-	SkipSignVerify      bool
-	TimestampWindow     time.Duration
-	MaxClockSkew        time.Duration
-	MinResponseDelay    time.Duration
+	SkipSignVerify   bool
+	TimestampWindow  time.Duration
+	MaxClockSkew     time.Duration
+	MinResponseDelay time.Duration
 }
 
 func (c Config) skipMerchant() bool {
@@ -72,7 +72,7 @@ type BetCheckInput struct {
 	Path       string
 	Body       string
 	MerchantID string
-	UserID     uint64
+	UserID     string
 	ClientIP   string
 	Headers    http.Header
 }
@@ -81,7 +81,7 @@ func (g *Guard) CheckRequest(r *http.Request, body string) error {
 	return g.waf.InspectRequest(r, body)
 }
 
-func (g *Guard) CheckAccess(ctx context.Context, clientIP, merchantID string, userID uint64) error {
+func (g *Guard) CheckAccess(ctx context.Context, clientIP, merchantID, userID string) error {
 	if err := g.blacklist.CheckAccess(ctx, clientIP, merchantID, userID); err != nil {
 		return err
 	}

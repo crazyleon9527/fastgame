@@ -30,8 +30,15 @@ migrate-ch-money:
 migrate-totp:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/09-totp-recovery-migration.sql
 
+migrate-user-id-string:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/10-user-id-string-migration.sql
+
+migrate-ch-user-id:
+	chmod +x scripts/migrate_ch_user_id.sh
+	./scripts/migrate_ch_user_id.sh
+
 migrate-all:
-	$(MAKE) migrate-security migrate-wallet migrate-replay migrate-orphan-trace migrate-antiabuse migrate-totp migrate-money
+	$(MAKE) migrate-security migrate-wallet migrate-replay migrate-orphan-trace migrate-antiabuse migrate-totp migrate-user-id-string migrate-money migrate-ch-user-id
 
 verify-staging-money:
 	chmod +x scripts/verify_staging_money.sh

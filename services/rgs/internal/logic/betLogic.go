@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"fastgame/internal/model"
-	applog "fastgame/pkg/log"
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/lock"
+	applog "fastgame/pkg/log"
 	"fastgame/pkg/money"
 	"fastgame/pkg/prng"
 	"fastgame/pkg/trace"
@@ -36,7 +36,12 @@ func NewBetLogic(ctx context.Context, svcCtx *svc.ServiceContext) *BetLogic {
 }
 
 func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
-	l.ctx = applog.WithRound(applog.WithMerchant(applog.WithUser(applog.WithGame(l.ctx, req.GameCode), req.UserId), req.MerchantId), req.RoundId)
+	l.ctx = applog.WithRoundContext(l.ctx, applog.RoundFields{
+		MerchantCode: req.MerchantId,
+		GameCode:     req.GameCode,
+		UserId:       req.UserId,
+		RoundId:      req.RoundId,
+	})
 	l.Logger = applog.C(l.ctx)
 
 	if req.Action != "cast" {
@@ -58,7 +63,8 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 	}
 
 	var resp *types.BetResp
-	err := l.svcCtx.Lock.WithLock(l.ctx, lock.BetLockKey(req.UserId), lock.BetLockTTL, func() error {
+	lockKey := lock.BetLockKey(req.MerchantId, req.UserId)
+	err := l.svcCtx.Lock.WithLock(l.ctx, lockKey, lock.DefaultBetLockTTL, func() error {
 		if ok, err := l.svcCtx.Idempotent.GetResult(l.ctx, req.RoundId, &cached); err != nil {
 			return err
 		} else if ok {

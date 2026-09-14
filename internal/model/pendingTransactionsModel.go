@@ -29,7 +29,7 @@ type PendingTransaction struct {
 	TraceID         string         `db:"trace_id"`
 	RoundID         string         `db:"round_id"`
 	MerchantCode    string         `db:"merchant_code"`
-	UserID          uint64         `db:"user_id"`
+	UserID          string         `db:"user_id"`
 	GameCode        string         `db:"game_code"`
 	Phase           string         `db:"phase"`
 	Status          string         `db:"status"`

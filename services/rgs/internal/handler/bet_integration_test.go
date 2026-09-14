@@ -147,7 +147,7 @@ func TestBetGoldenPathSessionEnvelope(t *testing.T) {
 	// 1) Create session
 	sessionBody, _ := json.Marshal(types.SessionReq{
 		MerchantId: "m001",
-		UserId:     10001,
+		UserId:     "10001",
 		GameCode:   "fishing",
 		ClientSeed: "client-test-seed",
 	})
@@ -174,7 +174,7 @@ func TestBetGoldenPathSessionEnvelope(t *testing.T) {
 
 	betBody, _ := json.Marshal(types.BetReq{
 		MerchantId:   "m001",
-		UserId:       10001,
+		UserId:       "10001",
 		SessionToken: sessionResp.SessionToken,
 		GameCode:     "fishing",
 		Action:       "cast",
@@ -211,7 +211,7 @@ func TestBetProdSecurityMerchantSignAndEnvelope(t *testing.T) {
 
 	sessionBody, _ := json.Marshal(types.SessionReq{
 		MerchantId: "m001",
-		UserId:     10001,
+		UserId:     "10001",
 		GameCode:   "fishing",
 		ClientSeed: "client-prod-e2e",
 	})
@@ -231,7 +231,7 @@ func TestBetProdSecurityMerchantSignAndEnvelope(t *testing.T) {
 	roundID := "prod-e2e-round-1"
 	betBody, _ := json.Marshal(types.BetReq{
 		MerchantId:   "m001",
-		UserId:       10001,
+		UserId:       "10001",
 		SessionToken: sessionResp.SessionToken,
 		GameCode:     "fishing",
 		Action:       "cast",
@@ -262,7 +262,7 @@ func TestBetRejectsBadMerchantSign(t *testing.T) {
 
 	sessionBody, _ := json.Marshal(types.SessionReq{
 		MerchantId: "m001",
-		UserId:     10001,
+		UserId:     "10001",
 		GameCode:   "fishing",
 	})
 	sreq := httptest.NewRequest(http.MethodPost, "/api/v1/game/session", bytes.NewReader(sessionBody))
@@ -278,7 +278,7 @@ func TestBetRejectsBadMerchantSign(t *testing.T) {
 	roundID := "bad-sign-round"
 	betBody, _ := json.Marshal(types.BetReq{
 		MerchantId:   "m001",
-		UserId:       10001,
+		UserId:       "10001",
 		SessionToken: sessionResp.SessionToken,
 		GameCode:     "fishing",
 		Action:       "cast",
@@ -307,7 +307,7 @@ func TestBetRejectsInvalidEnvelope(t *testing.T) {
 
 	sessionBody, _ := json.Marshal(types.SessionReq{
 		MerchantId: "m001",
-		UserId:     10001,
+		UserId:     "10001",
 		GameCode:   "fishing",
 	})
 	sreq := httptest.NewRequest(http.MethodPost, "/api/v1/game/session", bytes.NewReader(sessionBody))
@@ -322,7 +322,7 @@ func TestBetRejectsInvalidEnvelope(t *testing.T) {
 	ts := strconv.FormatInt(time.Now().Unix(), 10)
 	betBody, _ := json.Marshal(types.BetReq{
 		MerchantId:   "m001",
-		UserId:       10001,
+		UserId:       "10001",
 		SessionToken: sessionResp.SessionToken,
 		GameCode:     "fishing",
 		Action:       "cast",

@@ -9,7 +9,7 @@ const TRACE_HEADER = 'X-Trace-Id';
 /** 客户端仅上报：action(cast) + betAmount(minor) + roundId + sequenceId */
 export interface BetRequest {
     merchantId: string;
-    userId: number;
+    userId: string;
     sessionToken: string;
     gameCode: string;
     action: 'cast';
@@ -90,7 +90,7 @@ export class RgsClient {
         this.merchantSecret = merchantSecret || undefined;
     }
 
-    async createSession(merchantId: string, userId: number, gameCode: string, clientSeed?: string): Promise<SessionInfo> {
+    async createSession(merchantId: string, userId: string, gameCode: string, clientSeed?: string): Promise<SessionInfo> {
         const path = '/api/v1/game/session';
         const body = JSON.stringify({ merchantId, userId, gameCode, clientSeed: clientSeed || undefined });
         const { data, traceId } = await this.signedPost<SessionInfo>(path, body);
@@ -102,8 +102,8 @@ export class RgsClient {
         return data;
     }
 
-    async getBalance(merchantId: string, userId: number): Promise<number> {
-        const url = `${this.baseUrl}/api/v1/game/balance?merchantId=${encodeURIComponent(merchantId)}&userId=${userId}`;
+    async getBalance(merchantId: string, userId: string): Promise<number> {
+        const url = `${this.baseUrl}/api/v1/game/balance?merchantId=${encodeURIComponent(merchantId)}&userId=${encodeURIComponent(userId)}`;
         const resp = await fetch(url);
         if (!resp.ok) {
             throw new Error(`balance failed: ${resp.status}`);

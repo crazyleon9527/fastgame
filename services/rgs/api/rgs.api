@@ -10,7 +10,7 @@ info (
 type (
 	SessionReq {
 		MerchantId string `json:"merchantId" validate:"required"`
-		UserId     uint64 `json:"userId" validate:"required"`
+		UserId     string `json:"userId" validate:"required"`
 		GameCode   string `json:"gameCode" validate:"required"`
 		ClientSeed string `json:"clientSeed,optional"`
 	}
@@ -25,7 +25,7 @@ type (
 	// 客户端仅上报：action(cast) + betAmount + roundId + sequenceId
 	BetReq {
 		MerchantId       string  `json:"merchantId" validate:"required"`
-		UserId           uint64  `json:"userId" validate:"required"`
+		UserId           string  `json:"userId" validate:"required"`
 		SessionToken     string  `json:"sessionToken" validate:"required"`
 		GameCode         string  `json:"gameCode" validate:"required"`
 		Action           string  `json:"action" validate:"required"`
@@ -98,7 +98,7 @@ type (
 	}
 	BalanceReq {
 		MerchantId string `form:"merchantId" validate:"required"`
-		UserId     uint64 `form:"userId" validate:"required"`
+		UserId     string `form:"userId" validate:"required"`
 	}
 	BalanceResp {
 		Balance int64   `json:"balance"`

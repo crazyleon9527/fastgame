@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS pending_transactions (
   trace_id         VARCHAR(64)     NOT NULL COMMENT '全链路 TraceID',
   round_id         VARCHAR(64)     NOT NULL COMMENT 'Round / Nonce',
   merchant_code    VARCHAR(32)     NOT NULL,
-  user_id          BIGINT UNSIGNED NOT NULL,
+  user_id          VARCHAR(64) NOT NULL COMMENT '下游玩家唯一ID',
   game_code        VARCHAR(32)     NOT NULL,
   phase            VARCHAR(32)     NOT NULL COMMENT 'bet_debited|win_pending|settled|orphan',
   status           VARCHAR(16)     NOT NULL DEFAULT 'pending' COMMENT 'pending|done|failed',

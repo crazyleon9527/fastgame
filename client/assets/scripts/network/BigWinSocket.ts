@@ -3,7 +3,7 @@ import { GameConfig } from '../config/GameConfig';
 export interface BigWinPayload {
     type: string;
     roundId: string;
-    userId: number;
+    userId: string;
     merchantId: string;
     gameCode: string;
     winAmount: number;

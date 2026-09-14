@@ -16,7 +16,7 @@ const defaultTTL = 24 * time.Hour
 
 type Data struct {
 	Token             string `json:"token"`
-	UserID            uint64 `json:"userId"`
+	UserID            string `json:"userId"`
 	MerchantID        string `json:"merchantId"`
 	GameCode          string `json:"gameCode"`
 	ServerSeed        string `json:"serverSeed"`
@@ -63,7 +63,7 @@ func HashSeed(seed string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (s *Store) Create(ctx context.Context, merchantID string, userID uint64, gameCode, clientSeed string) (*Data, error) {
+func (s *Store) Create(ctx context.Context, merchantID, userID, gameCode, clientSeed string) (*Data, error) {
 	token, err := GenerateToken()
 	if err != nil {
 		return nil, err
@@ -122,7 +122,7 @@ func (s *Store) Get(ctx context.Context, token string) (*Data, error) {
 }
 
 // ConsumeSequence validates monotonic sequence and advances counter atomically.
-func (s *Store) ConsumeSequence(ctx context.Context, token string, userID uint64, merchantID, gameCode string, sequenceID uint64) (*Data, error) {
+func (s *Store) ConsumeSequence(ctx context.Context, token string, userID, merchantID, gameCode string, sequenceID uint64) (*Data, error) {
 	data, err := s.Get(ctx, token)
 	if err != nil {
 		return nil, err

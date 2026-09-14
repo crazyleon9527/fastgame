@@ -44,7 +44,7 @@ func (b *Blacklist) IsBlocked(ctx context.Context, listType, value string) (bool
 	return n > 0, nil
 }
 
-func (b *Blacklist) CheckAccess(ctx context.Context, ip, merchantID string, userID uint64) error {
+func (b *Blacklist) CheckAccess(ctx context.Context, ip, merchantID, userID string) error {
 	if blocked, err := b.IsBlocked(ctx, model.BlacklistTypeIP, ip); err != nil {
 		return err
 	} else if blocked {
@@ -57,8 +57,8 @@ func (b *Blacklist) CheckAccess(ctx context.Context, ip, merchantID string, user
 		return fmt.Errorf("merchant blocked")
 	}
 
-	if userID > 0 {
-		if blocked, err := b.IsBlocked(ctx, model.BlacklistTypeUserID, fmt.Sprintf("%d", userID)); err != nil {
+	if len(userID) > 0 {
+		if blocked, err := b.IsBlocked(ctx, model.BlacklistTypeUserID, userID); err != nil {
 			return err
 		} else if blocked {
 			return fmt.Errorf("user blocked")

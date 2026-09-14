@@ -22,7 +22,7 @@ type WalletPendingOp struct {
 	Id           uint64         `db:"id"`
 	RoundID      string         `db:"round_id"`
 	MerchantCode string         `db:"merchant_code"`
-	UserID       uint64         `db:"user_id"`
+	UserID       string         `db:"user_id"`
 	OpType       string         `db:"op_type"`
 	BetAmount    int64          `db:"bet_amount"`
 	WinAmount    int64          `db:"win_amount"`

@@ -16,7 +16,7 @@ func TestWatchdogTriggersHighRtp(t *testing.T) {
 		alerts = append(alerts, w.Record(RecordInput{
 			MerchantCode: "m001",
 			GameCode:     "fishing",
-			UserID:       10001,
+			UserID:       "10001",
 			BetMinor:     bet,
 			WinMinor:     win,
 		})...)

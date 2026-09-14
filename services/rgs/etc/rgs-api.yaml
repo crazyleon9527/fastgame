@@ -28,13 +28,14 @@ CH:
 
 Wallet:
   Mock: true
-  BaseURL: ""
-  APIKey: ""
+  BaseURL: "http://127.0.0.1:8089"
+  APIKey: "test_key"
   SignSecret: dev-wallet-hmac-secret
   SignEnabled: false
   VerifyResponse: false
   ResponseTimestampSec: 60
   Timeout: 5s
+  SlowThresholdMs: 500
 
 Game:
   DefaultRtpTier: default

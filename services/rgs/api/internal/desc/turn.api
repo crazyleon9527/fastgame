@@ -1,0 +1,26 @@
+type (
+	TurnReq {
+		GameCode   string `json:"game_code"`              // 游戏代号: fishing_tycoon
+		RoundID    string `json:"round_id"`               // 前端生成的本局单号 (雪花ID/UUID)
+		Currency   string `json:"currency,default=USD"`   // 货币代码
+		BetAmount  int64  `json:"bet_amount"`             // 下注金额 (单位: 分，如 100 代表 $1.00)
+	}
+
+	TurnResp {
+		RoundID             string  `json:"round_id"`
+		Balance             int64   `json:"balance"`              // 结算后最新余额 (分)
+		WinAmount           int64   `json:"win_amount"`           // 本局派彩 (分)
+		PayoutMultiplier    float64 `json:"payout_multiplier"`    // 倍数
+		PresentationPayload string  `json:"presentation_payload"` // 客户端渲染 JSON
+	}
+)
+
+@server (
+	prefix: /api/v1/game
+	group:  game
+)
+service rgs-api {
+	@doc "统一单局下注与推演接口"
+	@handler Turn
+	post /turn (TurnReq) returns (TurnResp)
+}

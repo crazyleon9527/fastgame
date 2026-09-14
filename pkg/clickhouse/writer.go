@@ -14,7 +14,7 @@ type WalletRollbackRow struct {
 	EventID      string
 	TraceID      string
 	RoundID      string
-	UserID       uint64
+	UserID       string
 	MerchantID   uint64
 	RollbackType string
 	Amount       int64
@@ -39,7 +39,7 @@ type RoundSettledRow struct {
 	EventID      string
 	TraceID      string
 	RoundID      string
-	UserID       uint64
+	UserID       string
 	MerchantID   uint64
 	GameCode     string
 	BetAmount    int64

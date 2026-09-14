@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS fastgame.game_round_settled
 (
     event_id       UUID,
     round_id       String,
-    user_id        UInt64,
+    user_id        String COMMENT '下游玩家外部唯一ID',
     merchant_id    UInt64,
     game_code      LowCardinality(String),
     bet_amount     Int64 COMMENT 'minor units scale=10000',
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS fastgame.game_event_bigwin
 (
     event_id     UUID,
     round_id     String,
-    user_id      UInt64,
+    user_id      String COMMENT '下游玩家外部唯一ID',
     merchant_id  UInt64,
     game_code    LowCardinality(String),
     win_amount   Int64,
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS fastgame.game_wallet_rollback
 (
     event_id      UUID,
     round_id      String,
-    user_id       UInt64,
+    user_id       String COMMENT '下游玩家外部唯一ID',
     merchant_id   UInt64,
     rollback_type LowCardinality(String),
     amount        Int64,

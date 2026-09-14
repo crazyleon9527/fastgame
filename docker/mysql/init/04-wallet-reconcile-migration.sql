@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS wallet_pending_ops (
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   round_id      VARCHAR(128)    NOT NULL,
   merchant_code VARCHAR(64)     NOT NULL,
-  user_id       BIGINT UNSIGNED NOT NULL,
+  user_id       VARCHAR(64) NOT NULL COMMENT '下游玩家唯一ID',
   op_type       VARCHAR(32)     NOT NULL COMMENT 'win_failed / win_timeout / rollback',
   bet_amount    DECIMAL(20, 4)  NOT NULL DEFAULT 0,
   win_amount    DECIMAL(20, 4)  NOT NULL DEFAULT 0,

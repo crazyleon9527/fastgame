@@ -5,7 +5,7 @@ package types
 
 type BalanceReq struct {
 	MerchantId   string `form:"merchantId" validate:"required"`
-	UserId       uint64 `form:"userId" validate:"required"`
+	UserId       string `form:"userId" validate:"required"`
 	SessionToken string `form:"sessionToken,optional"`
 }
 
@@ -15,7 +15,7 @@ type BalanceResp struct {
 
 type SessionReq struct {
 	MerchantId string `json:"merchantId" validate:"required"`
-	UserId     uint64 `json:"userId" validate:"required"`
+	UserId     string `json:"userId" validate:"required"`
 	GameCode   string `json:"gameCode" validate:"required"`
 	ClientSeed string `json:"clientSeed,optional"`
 }
@@ -31,7 +31,7 @@ type SessionResp struct {
 
 type BetReq struct {
 	MerchantId       string `json:"merchantId" validate:"required"`
-	UserId           uint64 `json:"userId" validate:"required"`
+	UserId           string `json:"userId" validate:"required"`
 	SessionToken     string `json:"sessionToken" validate:"required"`
 	GameCode         string `json:"gameCode" validate:"required"`
 	Action           string `json:"action" validate:"required"` // 仅允许 cast

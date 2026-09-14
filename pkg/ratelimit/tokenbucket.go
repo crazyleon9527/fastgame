@@ -51,8 +51,8 @@ func (g *Gateway) AllowIP(ctx context.Context, ip string) bool {
 	return limiter.AllowCtx(ctx)
 }
 
-func (g *Gateway) AllowUser(ctx context.Context, userID uint64) bool {
-	if userID == 0 {
+func (g *Gateway) AllowUser(ctx context.Context, userID string) bool {
+	if len(userID) == 0 {
 		return true
 	}
 	key := fmt.Sprintf("user:%d", userID)
