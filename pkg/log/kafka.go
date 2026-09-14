@@ -9,28 +9,51 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
+// InjectKafkaHeader injects trace_id from context into kafka message headers.
+func InjectKafkaHeader(ctx context.Context, msg *kafka.Message) {
+	if msg == nil {
+		return
+	}
+	traceID := trace.ID(ctx)
+	if traceID == "" {
+		return
+	}
+
+	for i, h := range msg.Headers {
+		if h.Key == trace.HeaderTraceID {
+			msg.Headers[i].Value = []byte(traceID)
+			return
+		}
+	}
+	msg.Headers = append(msg.Headers, kafka.Header{
+		Key:   trace.HeaderTraceID,
+		Value: []byte(traceID),
+	})
+}
+
 // ContextFromKafka builds trace + business correlation from message headers and payload fields.
-func ContextFromKafka(ctx context.Context, msg kafka.Message, traceID, roundID, merchantID, gameCode string, userID uint64) context.Context {
+func ContextFromKafka(ctx context.Context, msg kafka.Message, traceID, roundID, merchantCode, gameCode, userID string) context.Context {
 	if tid := traceIDFromMessage(msg); tid != "" {
 		traceID = tid
 	}
 	if traceID != "" {
 		ctx = trace.WithID(ctx, traceID)
 	}
-	fields := make([]logx.LogField, 0, 6)
+
+	fields := make([]logx.LogField, 0, 7)
 	if traceID != "" {
 		fields = append(fields, logx.Field(KeyTraceID, traceID))
 	}
 	if roundID != "" {
 		fields = append(fields, logx.Field(KeyRoundID, roundID))
 	}
-	if merchantID != "" {
-		fields = append(fields, logx.Field(KeyMerchantID, merchantID))
+	if merchantCode != "" {
+		fields = append(fields, logx.Field(KeyMerchantCode, merchantCode))
 	}
 	if gameCode != "" {
 		fields = append(fields, logx.Field(KeyGameCode, gameCode))
 	}
-	if userID != 0 {
+	if userID != "" {
 		fields = append(fields, logx.Field(KeyUserID, userID))
 	}
 	if msg.Topic != "" {
@@ -42,6 +65,7 @@ func ContextFromKafka(ctx context.Context, msg kafka.Message, traceID, roundID, 
 			logx.Field(KeyOffset, msg.Offset),
 		)
 	}
+
 	if len(fields) == 0 {
 		return ctx
 	}

@@ -80,7 +80,7 @@ CREATE TABLE `game_sessions`
     `accumulated_payout`     BIGINT         NOT NULL DEFAULT 0 COMMENT '当前若选择结算可拿走的派彩金额 (分)',
     `step_history`           JSON NULL COMMENT '步进历史与状态快照: [{"step":1,"action":"tile_3","outcome":"safe","mult":1.2}]',
     `encrypted_secret_state` TEXT           NOT NULL COMMENT '加密存储的底牌/炸弹位置 (防内存透视或提前解密)',
-    `step_version INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '步进操作版本号 (乐观锁)'`,
+    `step_version` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '步进操作版本号 (乐观锁)',
     `session_status`         VARCHAR(16)    NOT NULL DEFAULT 'IN_PROGRESS' COMMENT '会话状态: IN_PROGRESS (进行中), CASHED_OUT (主动提现), CRASHED (触雷失败), EXPIRED_AUTO_SETTLE (超时系统自动平账)',
     `expire_at`              DATETIME       NOT NULL COMMENT '会话最迟过期时间 (到期由 Cron 自动执行保底结算并销毁)',
     `created_at`             DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '开局时间',

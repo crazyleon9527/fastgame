@@ -51,6 +51,16 @@ install-goctl:
 codegen:
 	cd services/rgs && goctl api go -api api/rgs.api -dir . -style goZero
 
+apply-biz-schema:
+	chmod +x scripts/apply_docs_database_mysql.sh
+	./scripts/apply_docs_database_mysql.sh
+
+gen-biz-models:
+	chmod +x scripts/gen_biz_models.sh scripts/verify_biz_models.sh
+	./scripts/gen_biz_models.sh
+	./scripts/verify_biz_models.sh
+	go build ./internal/model/biz/...
+
 up:
 	docker compose up -d
 
