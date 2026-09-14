@@ -30,7 +30,7 @@ func VerifySignatureMiddleware(secret string) func(http.Handler) http.Handler {
 			sigReceived := r.Header.Get(HeaderSignature)
 
 			if tsStr == "" || nonce == "" || sigReceived == "" {
-				applog.C(ctx).Warnw("seamless_missing_signature_headers", logx.Field("path", r.URL.Path))
+				applog.C(ctx).Errorw("seamless_missing_signature_headers", logx.Field("path", r.URL.Path))
 				http.Error(w, `{"code":"INVALID_SIGNATURE","message":"missing security headers"}`, http.StatusUnauthorized)
 				return
 			}
@@ -39,7 +39,7 @@ func VerifySignatureMiddleware(secret string) func(http.Handler) http.Handler {
 			ts, err := strconv.ParseInt(tsStr, 10, 64)
 			now := time.Now().Unix()
 			if err != nil || ts < now-MaxTimeSkewSec || ts > now+MaxTimeSkewSec {
-				applog.C(ctx).Warnw("seamless_timestamp_skew_too_large",
+				applog.C(ctx).Errorw("seamless_timestamp_skew_too_large",
 					logx.Field("req_ts", ts),
 					logx.Field("server_ts", now),
 				)
@@ -88,11 +88,11 @@ func FaultInjectionMiddleware() func(http.Handler) http.Handler {
 			// 2. 模拟三方服务端故障
 			switch r.Header.Get(HeaderMockFault) {
 			case "504_GATEWAY_TIMEOUT":
-				applog.C(ctx).Warnw("seamless_mock_fault_triggered_504")
+				applog.C(ctx).Errorw("seamless_mock_fault_triggered_504")
 				http.Error(w, `{"code":"GATEWAY_TIMEOUT","message":"Mock 504 Timeout"}`, http.StatusGatewayTimeout)
 				return
 			case "500_INTERNAL_ERROR":
-				applog.C(ctx).Warnw("seamless_mock_fault_triggered_500")
+				applog.C(ctx).Errorw("seamless_mock_fault_triggered_500")
 				http.Error(w, `{"code":"INTERNAL_ERROR","message":"Mock 500 Error"}`, http.StatusInternalServerError)
 				return
 			case "HANG_TIMEOUT":
