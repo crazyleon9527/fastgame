@@ -71,6 +71,13 @@ gen-biz-models:
 up:
 	docker compose up -d
 
+deploy-tools:
+	@test -f .env || cp .env.example .env
+	docker compose up -d mysql redis kafka clickhouse gateway kafka-ui adminer redisinsight
+	docker compose run --rm kafka-init
+	docker compose run --rm clickhouse-init
+	@echo "Mock wallet: 本机 8089 已占用时可跳过；否则 docker compose --profile wallet up -d mock-wallet"
+
 down:
 	docker compose down
 

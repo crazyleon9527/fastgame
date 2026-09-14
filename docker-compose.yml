@@ -4,7 +4,7 @@ services:
     container_name: fastgame-mysql
     restart: unless-stopped
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "${MYSQL_PORT:-13306}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-fastgame_root}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-fastgame}
@@ -33,7 +33,7 @@ services:
     container_name: fastgame-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT:-16379}:6379"
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
@@ -50,8 +50,8 @@ services:
     container_name: fastgame-clickhouse
     restart: unless-stopped
     ports:
-      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"
-      - "${CLICKHOUSE_NATIVE_PORT:-9000}:9000"
+      - "${CLICKHOUSE_HTTP_PORT:-18123}:8123"
+      - "${CLICKHOUSE_NATIVE_PORT:-19000}:9000"
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DATABASE:-fastgame}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-fastgame}
@@ -143,7 +143,7 @@ services:
     container_name: fastgame-kafka-ui
     restart: unless-stopped
     ports:
-      - "${KAFKA_UI_PORT:-8080}:8080"
+      - "${KAFKA_UI_PORT:-18080}:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: fastgame-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
@@ -159,7 +159,7 @@ services:
     container_name: fastgame-adminer
     restart: unless-stopped
     ports:
-      - "${ADMINER_PORT:-8081}:8080"
+      - "${ADMINER_PORT:-18081}:8080"
     environment:
       ADMINER_DEFAULT_SERVER: mysql
     depends_on:
@@ -202,12 +202,25 @@ services:
     container_name: fastgame-redisinsight
     restart: unless-stopped
     ports:
-      - "${REDIS_INSIGHT_PORT:-5540}:5540"
+      - "${REDIS_INSIGHT_PORT:-15540}:5540"
     volumes:
       - redisinsight_data:/data
     depends_on:
       redis:
         condition: service_healthy
+    networks:
+      - fastgame
+
+  mock-wallet:
+    profiles: ["wallet"]
+    build:
+      context: .
+      dockerfile: docker/mockwallet/Dockerfile
+    image: fastgame-mock-wallet:latest
+    container_name: fastgame-mock-wallet
+    restart: unless-stopped
+    ports:
+      - "${MOCK_WALLET_PORT:-8089}:8089"
     networks:
       - fastgame
 
