@@ -62,6 +62,10 @@ apply-biz-schema:
 	chmod +x scripts/apply_docs_database_mysql.sh
 	./scripts/apply_docs_database_mysql.sh
 
+apply-platform-schema:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docs/database/platform.sql
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docs/database/risk.sql
+
 gen-biz-models:
 	chmod +x scripts/gen_biz_models.sh scripts/verify_biz_models.sh
 	./scripts/gen_biz_models.sh

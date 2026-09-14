@@ -42,7 +42,7 @@ Game:
 
 Security:
   SkipMerchantSign: true
-  SkipSessionEnvelope: false
+  SkipSessionEnvelope: true
   TimestampWindowSec: 60
   MaxClockSkewSec: 5
   UserLimitPerSec: 5

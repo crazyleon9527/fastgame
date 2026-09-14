@@ -11,6 +11,8 @@ run_sql() {
   $MYSQL < "$f"
 }
 
+run_sql "$ROOT/docs/database/platform.sql"
+run_sql "$ROOT/docs/database/risk.sql"
 run_sql "$ROOT/docs/database/merchant.sql"
 run_sql "$ROOT/docs/database/math.sql"
 run_sql "$ROOT/docs/database/game.sql"

@@ -90,15 +90,17 @@ func (m *customMerchantsModel) FindSecretsByMerchantCode(ctx context.Context, me
 
 func (m *customMerchantsModel) FindAllowedIPs(ctx context.Context, merchantCode string) ([]string, error) {
 	query := fmt.Sprintf("select `allowed_ips` from %s where `merchant_code` = ? limit 1", m.table)
-	var raw sql.NullString
-	err := m.conn.QueryRowCtx(ctx, &raw, query, merchantCode)
+	var row struct {
+		AllowedIPs sql.NullString `db:"allowed_ips"`
+	}
+	err := m.conn.QueryRowCtx(ctx, &row, query, merchantCode)
 	switch err {
 	case nil:
-		if !raw.Valid || raw.String == "" || raw.String == "null" {
+		if !row.AllowedIPs.Valid || row.AllowedIPs.String == "" || row.AllowedIPs.String == "null" {
 			return nil, nil
 		}
 		var ips []string
-		if err := json.Unmarshal([]byte(raw.String), &ips); err != nil {
+		if err := json.Unmarshal([]byte(row.AllowedIPs.String), &ips); err != nil {
 			return nil, err
 		}
 		return ips, nil
