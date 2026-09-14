@@ -9,9 +9,9 @@ import (
 	"fastgame/pkg/money"
 
 	applog "fastgame/pkg/log"
+
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/breaker"
-
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -113,7 +113,7 @@ func (c *breakerClient) run(ctx context.Context, merchantID string, op string, f
 	return nil
 }
 
-func (c *breakerClient) GetBalance(ctx context.Context, merchantID string, userID uint64) (money.Amount, error) {
+func (c *breakerClient) GetBalance(ctx context.Context, merchantID string, userID string) (money.Amount, error) {
 	var balance money.Amount
 	err := c.run(ctx, merchantID, "GetBalance", func() error {
 		var err error
@@ -149,7 +149,7 @@ func (c *breakerClient) Rollback(ctx context.Context, req RollbackReq) error {
 	})
 }
 
-func (c *breakerClient) CheckTransaction(ctx context.Context, merchantID string, userID uint64, roundID string) (*TxCheckResult, error) {
+func (c *breakerClient) CheckTransaction(ctx context.Context, merchantID string, userID string, roundID string) (*TxCheckResult, error) {
 	var result *TxCheckResult
 	err := c.run(ctx, merchantID, "CheckTransaction", func() error {
 		var err error

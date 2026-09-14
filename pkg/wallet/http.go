@@ -49,7 +49,7 @@ func NewHTTPClient(cfg HTTPConfig) *HTTPClient {
 
 type balanceReq struct {
 	MerchantID string `json:"merchantId"`
-	UserID     uint64 `json:"userId"`
+	UserID     string `json:"userId"`
 }
 
 type balanceResp struct {
@@ -58,7 +58,7 @@ type balanceResp struct {
 
 type txReq struct {
 	MerchantID string `json:"merchantId"`
-	UserID     uint64 `json:"userId"`
+	UserID     string `json:"userId"`
 	RoundID    string `json:"roundId"`
 	Amount     int64  `json:"amount"`
 	Reason     string `json:"reason,omitempty"`
@@ -68,7 +68,7 @@ type txResp struct {
 	Balance int64 `json:"balance"`
 }
 
-func (c *HTTPClient) GetBalance(ctx context.Context, merchantID string, userID uint64) (money.Amount, error) {
+func (c *HTTPClient) GetBalance(ctx context.Context, merchantID string, userID string) (money.Amount, error) {
 	var resp balanceResp
 	err := c.post(ctx, "/api/v1/wallet/balance", balanceReq{
 		MerchantID: merchantID,
@@ -117,7 +117,7 @@ func (c *HTTPClient) Rollback(ctx context.Context, req RollbackReq) error {
 
 type checkTxReq struct {
 	MerchantID string `json:"merchantId"`
-	UserID     uint64 `json:"userId"`
+	UserID     string `json:"userId"`
 	RoundID    string `json:"roundId"`
 }
 
@@ -128,7 +128,7 @@ type checkTxResp struct {
 	WinAmount int64  `json:"winAmount"`
 }
 
-func (c *HTTPClient) CheckTransaction(ctx context.Context, merchantID string, userID uint64, roundID string) (*TxCheckResult, error) {
+func (c *HTTPClient) CheckTransaction(ctx context.Context, merchantID string, userID string, roundID string) (*TxCheckResult, error) {
 	var resp checkTxResp
 	err := c.post(ctx, "/api/v1/wallet/check-transaction", checkTxReq{
 		MerchantID: merchantID,

@@ -27,30 +27,30 @@ type TxCheckResult struct {
 }
 
 type Client interface {
-	GetBalance(ctx context.Context, merchantID string, userID uint64) (money.Amount, error)
+	GetBalance(ctx context.Context, merchantID string, userID string) (money.Amount, error)
 	Bet(ctx context.Context, req BetReq) (*Result, error)
 	Win(ctx context.Context, req WinReq) (*Result, error)
 	Rollback(ctx context.Context, req RollbackReq) error
-	CheckTransaction(ctx context.Context, merchantID string, userID uint64, roundID string) (*TxCheckResult, error)
+	CheckTransaction(ctx context.Context, merchantID string, userID string, roundID string) (*TxCheckResult, error)
 }
 
 type BetReq struct {
 	MerchantID string
-	UserID     uint64
+	UserID     string
 	RoundID    string
 	Amount     money.Amount
 }
 
 type WinReq struct {
 	MerchantID string
-	UserID     uint64
+	UserID     string
 	RoundID    string
 	Amount     money.Amount
 }
 
 type RollbackReq struct {
 	MerchantID string
-	UserID     uint64
+	UserID     string
 	RoundID    string
 	Amount     money.Amount
 	Reason     string
