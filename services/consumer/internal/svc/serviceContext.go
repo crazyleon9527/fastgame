@@ -5,6 +5,7 @@ import (
 
 	"fastgame/internal/model"
 	"fastgame/pkg/clickhouse"
+	"fastgame/pkg/outbox"
 	"fastgame/pkg/rtpwatchdog"
 	"fastgame/pkg/security"
 	"fastgame/services/consumer/internal/config"
@@ -23,6 +24,12 @@ type ServiceContext struct {
 	Merchants model.MerchantsModel
 	Recorder  RtpRecorder
 	Enforcer  *rtpwatchdog.Enforcer
+
+	// DB 与 Idem 用于消费端 DB 兜底幂等：
+	// outbox 的投递保证是 at-least-once，重复事件必须在这里被拦住，
+	// 否则重复写 ClickHouse 会让 RTP 统计与账单翻倍。
+	DB   sqlx.SqlConn
+	Idem *outbox.Idempotency
 }
 
 func NewServiceContext(c config.Config) (*ServiceContext, error) {
@@ -63,6 +70,8 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		Merchants: model.NewMerchantsModel(conn),
 		Recorder:  recorder,
 		Enforcer:  rtpwatchdog.NewEnforcer(rdb, blacklistModel, blacklist, model.NewRiskAlertsModel(conn)),
+		DB:        conn,
+		Idem:      outbox.NewIdempotency(conn),
 	}, nil
 }
 

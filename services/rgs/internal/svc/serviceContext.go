@@ -2,6 +2,8 @@ package svc
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"time"
 
 	"fastgame/internal/model"
@@ -11,11 +13,12 @@ import (
 	"fastgame/pkg/idempotent"
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/lock"
+	"fastgame/pkg/money"
+	"fastgame/pkg/outbox"
 	"fastgame/pkg/ratelimit"
 	"fastgame/pkg/security"
 	"fastgame/pkg/session"
 	"fastgame/pkg/trace"
-	"fastgame/pkg/money"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rgs/internal/config"
 
@@ -40,6 +43,11 @@ type ServiceContext struct {
 	PendingTx   model.PendingTransactionsModel
 	ReplayStore model.GameRoundReplayModel
 	Trace       *trace.CHRecorder
+
+	// DB 供需要事务的地方使用（例如把结算事件与业务写放进同一事务）
+	DB               sqlx.SqlConn
+	Outbox           *outbox.Store
+	OutboxDispatcher *outbox.Dispatcher
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -79,7 +87,14 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		PendingOps:  model.NewWalletPendingOpsModel(conn),
 		PendingTx:   model.NewPendingTransactionsModel(conn),
 		ReplayStore: model.NewGameRoundReplayModel(conn),
+		// 事务性发件箱：结算事件不再裸 go func 投递 Kafka，而是与业务写同事务落表，
+		// 由 OutboxDispatcher 负责可靠投递（投递失败退避重试）。
+		DB:     conn,
+		Outbox: outbox.NewStore(conn),
 	}
+
+	// 派发器依赖已构造好的 svcCtx（需要其中的 Kafka producer），故在其之后装配。
+	svcCtx.OutboxDispatcher = newOutboxDispatcher(conn, svcCtx)
 
 	if c.CH.Addr != "" {
 		writer, err := clickhouse.NewWriterWithAuth(c.CH.Addr, c.CH.Database, c.CH.User, c.CH.Password)
@@ -92,6 +107,23 @@ func NewServiceContext(c config.Config) *ServiceContext {
 
 	bootstrapBlacklist(rdb, model.NewRiskBlacklistModel(conn))
 	return svcCtx
+}
+
+// newOutboxDispatcher 组装派发器。owner 用 "主机名:pid"，
+// SettleBatch 靠它 + status 双守卫，避免被 Reaper 回收后旧 owner 误标状态。
+func newOutboxDispatcher(conn sqlx.SqlConn, svcCtx *ServiceContext) *outbox.Dispatcher {
+	host, err := os.Hostname()
+	if err != nil {
+		host = "unknown"
+	}
+	return outbox.NewDispatcher(
+		conn,
+		outbox.NewKafkaDeliverer(svcCtx.Kafka),
+		outbox.DispatcherConfig{
+			Owner:     fmt.Sprintf("rgs-api:%s:%d", host, os.Getpid()),
+			BatchSize: 100,
+		},
+	)
 }
 
 func bootstrapBlacklist(rdb *goredis.Client, blacklistModel model.RiskBlacklistModel) {

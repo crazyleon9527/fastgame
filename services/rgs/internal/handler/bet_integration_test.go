@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/lock"
 	"fastgame/pkg/money"
+	"fastgame/pkg/outbox"
 	"fastgame/pkg/ratelimit"
 	"fastgame/pkg/security"
 	"fastgame/pkg/session"
@@ -28,6 +30,7 @@ import (
 	miniredis "github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	zeroredis "github.com/zeromicro/go-zero/core/stores/redis"
+	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
 type stubGameConfig struct{}
@@ -133,7 +136,20 @@ func newIntegrationSvcCtx(t *testing.T, prodSecurity bool) *svc.ServiceContext {
 		PendingTx:   noopPendingTx{},
 		PendingOps:  noopPendingOps{},
 		ReplayStore: noopReplayStore{},
+		// 结算收尾（recordSettled）现在把「对账标记 + 回放记录 + 事件登记」
+		// 收进同一事务，因此集成测试也需要真实 MySQL；
+		// 用与 internal/model 测试一致的 DSN，可用 MYSQL_DSN 覆盖。
+		DB:     sqlx.NewMysql(integrationDSN()),
+		Outbox: outbox.NewStore(sqlx.NewMysql(integrationDSN())),
 	}
+}
+
+// integrationDSN 集成测试的 MySQL 连接串（与 docker compose 暴露的端口一致）。
+func integrationDSN() string {
+	if v := os.Getenv("MYSQL_DSN"); v != "" {
+		return v
+	}
+	return "fastgame:fastgame_pass@tcp(127.0.0.1:13306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC"
 }
 
 func signMerchantRequest(method, path, body, ts, nonce, secret string) string {

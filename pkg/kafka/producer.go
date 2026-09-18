@@ -79,8 +79,35 @@ func NewProducer(brokers []string) *Producer {
 		writer: &kafka.Writer{
 			Addr:     kafka.TCP(brokers...),
 			Balancer: &kafka.Hash{},
+			// RequiredAcks 必须显式设置：kafka-go 的零值是 RequireNone（不等待 broker
+			// 确认），消息可能静默丢失而无任何报错。RequireAll 让 broker 落盘后再返回，
+			// 投递失败才可能被 outbox 捕获并重试。
+			RequiredAcks: kafka.RequireAll,
+			// 单条写入失败时重试次数（与 outbox 的退避重试互补：此处兜短暂网络抖动，
+			// 仍失败则交给 outbox 的 next_retry_at）。
+			MaxAttempts: 3,
+			// 批量投递由 outbox 的 Dispatcher 控制节奏，这里缩短内部攒批时间，
+			// 避免事件要等 writer 攒够一批才真正发出。
+			BatchTimeout: 10 * time.Millisecond,
 		},
 	}
+}
+
+// PublishRaw 投递已经序列化好的消息体（供 outbox 派发器使用）。
+// key 为空时由调用方保证稳定；此处不做二次封装，直接透传 body。
+func (p *Producer) PublishRaw(ctx context.Context, topic, key string, body []byte) error {
+	msg := kafka.Message{
+		Topic: topic,
+		Key:   []byte(key),
+		Value: body,
+	}
+	if tid := trace.ID(ctx); tid != "" {
+		msg.Headers = []kafka.Header{{Key: trace.HeaderTraceID, Value: []byte(tid)}}
+	}
+	if err := p.writer.WriteMessages(ctx, msg); err != nil {
+		return fmt.Errorf("kafka publish raw to %s: %w", topic, err)
+	}
+	return nil
 }
 
 func (p *Producer) PublishRoundSettled(ctx context.Context, evt RoundSettledEvent) error {

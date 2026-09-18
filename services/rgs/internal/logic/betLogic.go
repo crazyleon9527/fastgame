@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"fastgame/internal/model"
@@ -11,7 +12,9 @@ import (
 	"fastgame/pkg/lock"
 	applog "fastgame/pkg/log"
 	"fastgame/pkg/money"
+	"fastgame/pkg/outbox"
 	"fastgame/pkg/prng"
+	"fastgame/pkg/session"
 	"fastgame/pkg/trace"
 	"fastgame/pkg/wallet"
 	"fastgame/pkg/xerr"
@@ -19,6 +22,7 @@ import (
 	"fastgame/services/rgs/internal/types"
 
 	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
 type BetLogic struct {
@@ -193,35 +197,18 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 		}
 
 		if settlementStatus == "settled" {
-			if err := l.svcCtx.PendingTx.MarkSettled(l.ctx, req.RoundId); err != nil {
-				logx.Errorf("mark pending_transaction settled failed: roundId=%s err=%v", req.RoundId, err)
-			}
-			trace.Record(l.ctx, l.svcCtx.Trace, "rgs", "settlement.complete", req.RoundId, "ok", "", 0)
-
-			if err := l.svcCtx.ReplayStore.Insert(l.ctx, &model.GameRoundReplay{
-				RoundID:      req.RoundId,
-				MerchantCode: req.MerchantId,
-				UserID:       req.UserId,
-				GameCode:     req.GameCode,
-				ServerSeed:   sessionData.ServerSeed,
-				ClientSeed:   sessionData.ClientSeed,
-				Nonce:        req.RoundId,
-				BetAmount:    betAmount.Minor(),
-				SequenceID:   req.SequenceId,
-			}); err != nil {
-				logx.Errorf("save replay record failed: roundId=%s err=%v", req.RoundId, err)
+			// 结算收尾：账变已由钱包完成，这里把「本地对账标记 + 回放记录 + 事件登记」
+			// 收进同一个事务。事务提交成功即保证事件不会丢（由 outbox 负责投递），
+			// 取代原先的裸 `go publishSettledEvent(...)`（投递失败无人知晓）。
+			if err := l.recordSettled(req, sessionData, outcome, betAmount, balance); err != nil {
+				// 不阻断下注返回：钱已在钱包侧结算完成，此处失败由 pending_transactions
+				// （phase=bet_debited）与 rollback 服务的对账兜住。
+				logx.Errorf("record settled bookkeeping failed: roundId=%s err=%v", req.RoundId, err)
 			}
 		}
 
 		if err := l.svcCtx.Idempotent.SaveResult(l.ctx, req.RoundId, resp); err != nil {
 			logx.Errorf("save idempotent result failed: roundId=%s err=%v", req.RoundId, err)
-		}
-
-		if settlementStatus == "settled" {
-			go l.publishSettledEvent(req, outcome, balance)
-			if outcome.Multiplier >= money.Multiplier(500000) {
-				go l.publishBigWinEvent(req, outcome)
-			}
 		}
 		return nil
 	})
@@ -254,43 +241,117 @@ func (l *BetLogic) recordPending(req *types.BetReq, betAmount money.Amount, outc
 	}
 }
 
-func (l *BetLogic) publishSettledEvent(req *types.BetReq, outcome prng.Outcome, balance money.Amount) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	ctx = trace.WithID(ctx, trace.ID(l.ctx))
+// recordSettled 在一个事务里完成结算收尾：
+//
+//	MarkSettled（本地对账标记）+ 回放记录 + 结算事件登记（outbox）
+//
+// 三者同事务提交，因此「事件一定不会丢」这件事由数据库保证，而不是靠
+// goroutine 是否跑成功。投递交给 outbox.Dispatcher（失败会退避重试）。
+//
+// 旁路的 trace 埋点与幂等结果缓存不进事务：前者是观测数据，
+// 后者是 Redis，都不应与资金相关的事务成败互相牵连。
+func (l *BetLogic) recordSettled(
+	req *types.BetReq,
+	sessionData *session.Data,
+	outcome prng.Outcome,
+	betAmount money.Amount,
+	balance money.Amount,
+) error {
+	trace.Record(l.ctx, l.svcCtx.Trace, "rgs", "settlement.complete", req.RoundId, "ok", "", 0)
 
-	err := l.svcCtx.Kafka.PublishRoundSettled(ctx, kafka.RoundSettledEvent{
-		TraceID:    trace.ID(l.ctx),
-		RoundID:    req.RoundId,
-		UserID:     req.UserId,
-		MerchantID: req.MerchantId,
-		GameCode:   req.GameCode,
-		BetAmount:  req.BetAmount,
-		WinAmount:  outcome.WinAmount.Minor(),
-		Multiplier: outcome.Multiplier.Minor(),
-		RtpTier:    outcome.RtpTier,
-		Balance:    balance.Minor(),
+	return l.svcCtx.DB.TransactCtx(l.ctx, func(ctx context.Context, session sqlx.Session) error {
+		txConn := sqlx.NewSqlConnFromSession(session)
+
+		// 1) 本地对账标记：该局已结算，rollback 服务不会再当孤儿单处理
+		if err := model.NewPendingTransactionsModel(txConn).MarkSettled(ctx, req.RoundId); err != nil {
+			return fmt.Errorf("mark pending_transaction settled: %w", err)
+		}
+
+		// 2) 确定性回放记录（供 /verify 与 /replay 使用）
+		if err := model.NewGameRoundReplayModel(txConn).Insert(ctx, &model.GameRoundReplay{
+			RoundID:      req.RoundId,
+			MerchantCode: req.MerchantId,
+			UserID:       req.UserId,
+			GameCode:     req.GameCode,
+			ServerSeed:   sessionData.ServerSeed,
+			ClientSeed:   sessionData.ClientSeed,
+			Nonce:        req.RoundId,
+			BetAmount:    betAmount.Minor(),
+			SequenceID:   req.SequenceId,
+		}); err != nil {
+			return fmt.Errorf("save replay record: %w", err)
+		}
+
+		// 3) 结算事件登记（outbox，与上面两步同事务）
+		//
+		// 注意构造顺序：必须先生成 eventID 并写入 payload，再序列化信封。
+		// 反过来（先序列化、后赋值）会导致内层 payload.eventId 为空，
+		// 消费端就无法用它与信封 eventId 对账。
+		settledID, err := outbox.NewEventID()
+		if err != nil {
+			return fmt.Errorf("generate settled event id: %w", err)
+		}
+		settled := kafka.RoundSettledEvent{
+			EventID:    settledID,
+			TraceID:    trace.ID(l.ctx),
+			RoundID:    req.RoundId,
+			UserID:     req.UserId,
+			MerchantID: req.MerchantId,
+			GameCode:   req.GameCode,
+			BetAmount:  req.BetAmount,
+			WinAmount:  outcome.WinAmount.Minor(),
+			Multiplier: outcome.Multiplier.Minor(),
+			RtpTier:    outcome.RtpTier,
+			Balance:    balance.Minor(),
+			SettledAt:  time.Now().UTC(),
+		}
+		env, err := outbox.NewEnvelopeWithID(
+			outbox.EventTopic(kafka.TopicRoundSettled), "rgs-api", trace.ID(l.ctx), settledID, settled, time.Now().UTC())
+		if err != nil {
+			return fmt.Errorf("build settled envelope: %w", err)
+		}
+		if err := l.svcCtx.Outbox.InsertInTx(ctx, session, &outbox.Record{
+			ID:           settledID,
+			Topic:        kafka.TopicRoundSettled,
+			PartitionKey: req.UserId, // 同玩家进同一分区，保证时序
+			Payload:      env,
+		}); err != nil {
+			return fmt.Errorf("outbox insert settled: %w", err)
+		}
+
+		// 4) 大奖广播单独一个 topic（倍率 >= 50x）
+		if outcome.Multiplier >= money.Multiplier(500000) {
+			bigwinID, err := outbox.NewEventID()
+			if err != nil {
+				return fmt.Errorf("generate bigwin event id: %w", err)
+			}
+			bigwin := kafka.BigWinEvent{
+				EventID:    bigwinID,
+				TraceID:    trace.ID(l.ctx),
+				RoundID:    req.RoundId,
+				UserID:     req.UserId,
+				MerchantID: req.MerchantId,
+				GameCode:   req.GameCode,
+				WinAmount:  outcome.WinAmount.Minor(),
+				Multiplier: outcome.Multiplier.Minor(),
+				OccurredAt: time.Now().UTC(),
+			}
+			bwEnv, err := outbox.NewEnvelopeWithID(
+				outbox.EventTopic(kafka.TopicEventBigwin), "rgs-api", trace.ID(l.ctx), bigwinID, bigwin, time.Now().UTC())
+			if err != nil {
+				return fmt.Errorf("build bigwin envelope: %w", err)
+			}
+			if err := l.svcCtx.Outbox.InsertInTx(ctx, session, &outbox.Record{
+				ID:           bigwinID,
+				Topic:        kafka.TopicEventBigwin,
+				PartitionKey: req.UserId,
+				Payload:      bwEnv,
+			}); err != nil {
+				return fmt.Errorf("outbox insert bigwin: %w", err)
+			}
+		}
+		return nil
 	})
-	if err != nil {
-		logx.Errorf("publish round settled event failed: roundId=%s err=%v", req.RoundId, err)
-	}
-}
-
-func (l *BetLogic) publishBigWinEvent(req *types.BetReq, outcome prng.Outcome) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	err := l.svcCtx.Kafka.PublishBigWin(ctx, kafka.BigWinEvent{
-		RoundID:    req.RoundId,
-		UserID:     req.UserId,
-		MerchantID: req.MerchantId,
-		GameCode:   req.GameCode,
-		WinAmount:  outcome.WinAmount.Minor(),
-		Multiplier: outcome.Multiplier.Minor(),
-	})
-	if err != nil {
-		logx.Errorf("publish bigwin event failed: roundId=%s err=%v", req.RoundId, err)
-	}
 }
 
 func status(err error) string {

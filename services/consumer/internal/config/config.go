@@ -16,6 +16,9 @@ type KafkaConf struct {
 	Brokers []string
 	GroupID string
 	Topic   string
+	// RequireEnvelope 为 true 时要求消息是 outbox 信封格式（含 eventId/payload），
+	// 用于防止"有人往 topic 里塞裸 JSON"绕过幂等与追踪。默认 false 以兼容旧消息。
+	RequireEnvelope bool `json:",default=false"`
 }
 
 type ClickHouseConf struct {
