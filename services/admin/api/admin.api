@@ -9,18 +9,29 @@ info (
 
 type (
 	LoginReq {
-		Username string `json:"username" validate:"required"`
-		Password string `json:"password" validate:"required"`
+		Username     string `json:"username" validate:"required"`
+		Password     string `json:"password" validate:"required"`
+		TotpCode     string `json:"totpCode,optional"`
+		RecoveryCode string `json:"recoveryCode,optional"`
 	}
 	LoginResp {
-		AccessToken string `json:"accessToken"`
-		ExpireAt    int64  `json:"expireAt"`
+		AccessToken       string `json:"accessToken"`
+		ExpireAt          int64  `json:"expireAt"`
+		RoleName          string `json:"roleName"`
+		RequiresTotpSetup bool   `json:"requiresTotpSetup,omitempty"`
 	}
 	MerchantItem {
 		Id           uint64 `json:"id"`
 		MerchantCode string `json:"merchantCode"`
 		Name         string `json:"name"`
 		Status       int64  `json:"status"`
+	}
+	CreateMerchantResp {
+		Id           uint64 `json:"id"`
+		MerchantCode string `json:"merchantCode"`
+		Name         string `json:"name"`
+		Status       int64  `json:"status"`
+		PrivateKey   string `json:"privateKey"`
 	}
 	MerchantListReq {
 		Page     int `form:"page,default=1"`
@@ -69,7 +80,7 @@ type (
 		ListValue string `json:"listValue"`
 		Reason    string `json:"reason"`
 		Status    int64  `json:"status"`
-		ExpiresAt string `json:"expiresAt,optional"`
+		ExpiresAt string `json:"expiresAt,omitempty"`
 		CreatedAt int64  `json:"createdAt"`
 	}
 	BlacklistListReq {
@@ -114,6 +125,9 @@ type (
 		RtpTier     string `json:"rtpTier,optional"`
 		Status      int64  `json:"status,default=1"`
 	}
+	DeleteGameConfigReq {
+		Id uint64 `path:"id"`
+	}
 	RtpReportReq {
 		MerchantId uint64 `form:"merchantId,optional"`
 		GameCode   string `form:"gameCode,optional"`
@@ -134,6 +148,9 @@ type (
 	TraceLookupReq {
 		TraceId string `path:"traceId"`
 	}
+	TraceByRoundReq {
+		RoundId string `path:"roundId"`
+	}
 	TraceSpanItem {
 		SpanId     string `json:"spanId"`
 		Service    string `json:"service"`
@@ -145,20 +162,334 @@ type (
 		OccurredAt int64  `json:"occurredAt"`
 	}
 	PendingTxItem {
-		RoundId        string  `json:"roundId"`
-		Phase          string  `json:"phase"`
-		Status         string  `json:"status"`
-		BetAmount      float64 `json:"betAmount"`
-		WinAmount      float64 `json:"winAmount"`
-		ExpectedAction string  `json:"expectedAction"`
-		RetryCount     int64   `json:"retryCount"`
-		LastError      string  `json:"lastError,optional"`
-		CreatedAt      int64   `json:"createdAt"`
+		RoundId        string `json:"roundId"`
+		Phase          string `json:"phase"`
+		Status         string `json:"status"`
+		BetAmount      int64  `json:"betAmount"`
+		WinAmount      int64  `json:"winAmount"`
+		ExpectedAction string `json:"expectedAction"`
+		RetryCount     int64  `json:"retryCount"`
+		LastError      string `json:"lastError,omitempty"`
+		CreatedAt      int64  `json:"createdAt"`
 	}
 	TraceLookupResp {
 		TraceId             string          `json:"traceId"`
+		RoundId             string          `json:"roundId,omitempty"`
 		Spans               []TraceSpanItem `json:"spans"`
 		PendingTransactions []PendingTxItem `json:"pendingTransactions"`
+	}
+	RiskAlertsReq {
+		Limit int `form:"limit,default=50"`
+	}
+	RiskAlertItem {
+		Id           uint64 `json:"id"`
+		AlertType    string `json:"alertType"`
+		ScopeType    string `json:"scopeType"`
+		ScopeValue   string `json:"scopeValue"`
+		MerchantCode string `json:"merchantCode"`
+		GameCode     string `json:"gameCode"`
+		RtpPPM       int64  `json:"rtpPpm"`
+		TotalBet     int64  `json:"totalBet"`
+		TotalWin     int64  `json:"totalWin"`
+		SampleSize   int64  `json:"sampleSize"`
+		ActionTaken  string `json:"actionTaken"`
+		Status       string `json:"status"`
+		CreatedAt    int64  `json:"createdAt"`
+	}
+	RiskAlertsResp {
+		List []RiskAlertItem `json:"list"`
+	}
+	AckRiskAlertReq {
+		Id uint64 `path:"id"`
+	}
+	TotpSetupResp {
+		ProvisioningUri string `json:"provisioningUri"`
+		Secret          string `json:"secret"`
+	}
+	TotpConfirmReq {
+		TotpCode string `json:"totpCode" validate:"required"`
+	}
+	TotpConfirmResp {
+		AccessToken   string   `json:"accessToken"`
+		ExpireAt      int64    `json:"expireAt"`
+		RoleName      string   `json:"roleName"`
+		RecoveryCodes []string `json:"recoveryCodes"`
+	}
+	WalletBreakerItem {
+		MerchantCode string `json:"merchantCode"`
+		Open         bool   `json:"open"`
+		OpenedAt     int64  `json:"openedAt,omitempty"`
+		Overridden   bool   `json:"overridden"`
+	}
+	WalletBreakersResp {
+		List []WalletBreakerItem `json:"list"`
+	}
+	ResetWalletBreakerReq {
+		MerchantCode string `json:"merchantCode" validate:"required"`
+	}
+	AdminUserItem {
+		Id       uint64 `json:"id"`
+		Username string `json:"username"`
+		RoleId   uint64 `json:"roleId"`
+		RoleName string `json:"roleName"`
+		Status   int64  `json:"status"`
+	}
+	AdminUserListReq {
+		Page     int `form:"page,default=1"`
+		PageSize int `form:"pageSize,default=20"`
+	}
+	AdminUserListResp {
+		Total int64           `json:"total"`
+		List  []AdminUserItem `json:"list"`
+	}
+	CreateAdminUserReq {
+		Username string `json:"username" validate:"required"`
+		Password string `json:"password" validate:"required"`
+		RoleId   uint64 `json:"roleId" validate:"required"`
+		Status   int64  `json:"status,default=1"`
+	}
+	UpdateAdminUserReq {
+		Id       uint64 `path:"id"`
+		RoleId   uint64 `json:"roleId,optional"`
+		Status   int64  `json:"status,optional"`
+		Password string `json:"password,optional"`
+	}
+	RoleItem {
+		Id          uint64 `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	RoleListResp {
+		List []RoleItem `json:"list"`
+	}
+	DailySettlementItem {
+		Id           uint64  `json:"id"`
+		MerchantId   uint64  `json:"merchantId"`
+		MerchantCode string  `json:"merchantCode"`
+		SettleDate   string  `json:"settleDate"`
+		TotalBet     float64 `json:"totalBet"`
+		TotalWin     float64 `json:"totalWin"`
+		TotalRounds  uint64  `json:"totalRounds"`
+		ActualRtp    float64 `json:"actualRtp"`
+		Status       int64   `json:"status"`
+	}
+	DailySettlementListReq {
+		MerchantId uint64 `form:"merchantId,optional"`
+		Page       int    `form:"page,default=1"`
+		PageSize   int    `form:"pageSize,default=20"`
+	}
+	DailySettlementListResp {
+		Total int64                 `json:"total"`
+		List  []DailySettlementItem `json:"list"`
+	}
+	SyncDailySettlementReq {
+		MerchantId uint64 `json:"merchantId,optional"`
+		Days       int    `json:"days,default=7"`
+	}
+	SyncDailySettlementResp {
+		Synced int `json:"synced"`
+	}
+	ConfirmDailySettlementReq {
+		Id uint64 `path:"id"`
+	}
+	SettlementPeriodItem {
+		Id           uint64  `json:"id"`
+		MerchantId   uint64  `json:"merchantId"`
+		MerchantCode string  `json:"merchantCode"`
+		PeriodType   string  `json:"periodType"`
+		PeriodStart  string  `json:"periodStart"`
+		PeriodEnd    string  `json:"periodEnd"`
+		CurrencyCode string  `json:"currencyCode"`
+		TotalBet     float64 `json:"totalBet"`
+		TotalWin     float64 `json:"totalWin"`
+		Ggr          float64 `json:"ggr"`
+		Commission   float64 `json:"commission"`
+		NetPayable   float64 `json:"netPayable"`
+		TotalRounds  uint64  `json:"totalRounds"`
+		Status       string  `json:"status"`
+		ConfirmedBy  uint64  `json:"confirmedBy,omitempty"`
+		ConfirmedAt  string  `json:"confirmedAt,omitempty"`
+		Notes        string  `json:"notes,omitempty"`
+	}
+	SettlementPeriodListReq {
+		MerchantId uint64 `form:"merchantId,optional"`
+		PeriodType string `form:"periodType,optional"`
+		Page       int    `form:"page,default=1"`
+		PageSize   int    `form:"pageSize,default=20"`
+	}
+	SettlementPeriodListResp {
+		Total int64                  `json:"total"`
+		List  []SettlementPeriodItem `json:"list"`
+	}
+	RollupSettlementPeriodReq {
+		Id uint64 `path:"id"`
+	}
+	RollupSettlementPeriodResp {
+		RolledUp int `json:"rolledUp"`
+	}
+	LocaleItem {
+		Code       string `json:"code"`
+		Name       string `json:"name"`
+		NativeName string `json:"nativeName"`
+		IsDefault  bool   `json:"isDefault"`
+	}
+	LocaleListResp {
+		List []LocaleItem `json:"list"`
+	}
+	I18nDictionaryReq {
+		Bundle string `form:"bundle" validate:"required"`
+		Locale string `form:"locale,optional"`
+	}
+	I18nDictionaryResp {
+		Bundle   string            `json:"bundle"`
+		Locale   string            `json:"locale"`
+		Messages map[string]string `json:"messages"`
+	}
+	GameCategoryItem {
+		Id   uint64 `json:"id"`
+		Code string `json:"code"`
+		Name string `json:"name"`
+	}
+	GameCategoryListResp {
+		List []GameCategoryItem `json:"list"`
+	}
+	PlatformGameItem {
+		Id            uint64 `json:"id"`
+		GameCode      string `json:"gameCode"`
+		Name          string `json:"name"`
+		CategoryId    uint64 `json:"categoryId,omitempty"`
+		CategoryCode  string `json:"categoryCode"`
+		CategoryName  string `json:"categoryName"`
+		GameType      string `json:"gameType"`
+		DefaultRtpPpm int64  `json:"defaultRtpPpm"`
+		Volatility    string `json:"volatility,omitempty"`
+		MinBetMinor   int64  `json:"minBetMinor"`
+		MaxBetMinor   int64  `json:"maxBetMinor"`
+		ClientVersion string `json:"clientVersion,omitempty"`
+		ThumbnailUrl  string `json:"thumbnailUrl,omitempty"`
+		Status        int64  `json:"status"`
+	}
+	PlatformGameListReq {
+		Page     int    `form:"page,default=1"`
+		PageSize int    `form:"pageSize,default=20"`
+		GameType string `form:"gameType,optional"`
+	}
+	PlatformGameListResp {
+		Total int64              `json:"total"`
+		List  []PlatformGameItem `json:"list"`
+	}
+	CreatePlatformGameReq {
+		GameCode      string `json:"gameCode" validate:"required"`
+		Name          string `json:"name" validate:"required"`
+		CategoryId    uint64 `json:"categoryId,optional"`
+		GameType      string `json:"gameType" validate:"required"`
+		DefaultRtpPpm int64  `json:"defaultRtpPpm,optional"`
+		Volatility    string `json:"volatility,optional"`
+		MinBetMinor   int64  `json:"minBetMinor,optional"`
+		MaxBetMinor   int64  `json:"maxBetMinor,optional"`
+		ClientVersion string `json:"clientVersion,optional"`
+		ThumbnailUrl  string `json:"thumbnailUrl,optional"`
+		Status        int64  `json:"status,default=1"`
+	}
+	UpdatePlatformGameReq {
+		Id            uint64 `path:"id"`
+		Name          string `json:"name,optional"`
+		CategoryId    uint64 `json:"categoryId,optional"`
+		DefaultRtpPpm int64  `json:"defaultRtpPpm,optional"`
+		Volatility    string `json:"volatility,optional"`
+		MinBetMinor   int64  `json:"minBetMinor,optional"`
+		MaxBetMinor   int64  `json:"maxBetMinor,optional"`
+		ClientVersion string `json:"clientVersion,optional"`
+		ThumbnailUrl  string `json:"thumbnailUrl,optional"`
+		Status        int64  `json:"status,optional"`
+	}
+	GameRtpTierItem {
+		Id           uint64 `json:"id"`
+		GameId       uint64 `json:"gameId"`
+		TierCode     string `json:"tierCode"`
+		TargetRtpPpm int64  `json:"targetRtpPpm"`
+		ParSheetRef  string `json:"parSheetRef,omitempty"`
+		Weight       int64  `json:"weight"`
+	}
+	GameRtpTierListReq {
+		Id uint64 `path:"id"`
+	}
+	GameRtpTierListResp {
+		List []GameRtpTierItem `json:"list"`
+	}
+	MerchantGameItem {
+		Id            uint64 `json:"id"`
+		MerchantId    uint64 `json:"merchantId"`
+		MerchantCode  string `json:"merchantCode"`
+		GameId        uint64 `json:"gameId"`
+		GameCode      string `json:"gameCode"`
+		GameName      string `json:"gameName"`
+		GameType      string `json:"gameType"`
+		GameStatus    int64  `json:"gameStatus"`
+		RtpTierCode   string `json:"rtpTierCode"`
+		MinBetMinor   int64  `json:"minBetMinor,omitempty"`
+		MaxBetMinor   int64  `json:"maxBetMinor,omitempty"`
+		SortOrder     int64  `json:"sortOrder"`
+		Status        int64  `json:"status"`
+		DefaultRtpPpm int64  `json:"defaultRtpPpm"`
+	}
+	MerchantGameListReq {
+		MerchantId uint64 `form:"merchantId" validate:"required"`
+		Page       int    `form:"page,default=1"`
+		PageSize   int    `form:"pageSize,default=50"`
+	}
+	MerchantGameListResp {
+		Total int64              `json:"total"`
+		List  []MerchantGameItem `json:"list"`
+	}
+	CreateMerchantGameReq {
+		MerchantId  uint64 `json:"merchantId" validate:"required"`
+		GameId      uint64 `json:"gameId" validate:"required"`
+		RtpTierCode string `json:"rtpTierCode,optional"`
+		MinBetMinor int64  `json:"minBetMinor,optional"`
+		MaxBetMinor int64  `json:"maxBetMinor,optional"`
+		SortOrder   int64  `json:"sortOrder,optional"`
+	}
+	UpdateMerchantGameReq {
+		Id          uint64 `path:"id"`
+		RtpTierCode string `json:"rtpTierCode,optional"`
+		MinBetMinor int64  `json:"minBetMinor,optional"`
+		MaxBetMinor int64  `json:"maxBetMinor,optional"`
+		SortOrder   int64  `json:"sortOrder,optional"`
+		Status      int64  `json:"status,optional"`
+	}
+	DeleteMerchantGameReq {
+		Id uint64 `path:"id"`
+	}
+	FileUploadResp {
+		URL      string `json:"url"`
+		Filename string `json:"filename"`
+		Size     int64  `json:"size"`
+	}
+	AuditLogListReq {
+		Page     int    `form:"page,default=1"`
+		PageSize int    `form:"pageSize,default=20"`
+		Action   string `form:"action,optional"`
+		Username string `form:"username,optional"`
+	}
+	AuditLogItem {
+		Id           uint64 `json:"id"`
+		AdminUserId  uint64 `json:"adminUserId,omitempty"`
+		Username     string `json:"username"`
+		RoleName     string `json:"roleName"`
+		Action       string `json:"action"`
+		ResourceType string `json:"resourceType"`
+		ResourceId   string `json:"resourceId"`
+		HttpMethod   string `json:"httpMethod,omitempty"`
+		RequestPath  string `json:"requestPath,omitempty"`
+		Detail       string `json:"detail,omitempty"`
+		ClientIp     string `json:"clientIp,omitempty"`
+		StatusCode   int    `json:"statusCode,omitempty"`
+		CreatedAt    int64  `json:"createdAt"`
+	}
+	AuditLogListResp {
+		Total int64          `json:"total"`
+		List  []AuditLogItem `json:"list"`
 	}
 )
 
@@ -168,6 +499,12 @@ type (
 service admin-api {
 	@handler Login
 	post /login (LoginReq) returns (LoginResp)
+
+	@handler LocaleList
+	get /locales returns (LocaleListResp)
+
+	@handler I18nDictionary
+	get /i18n/dictionary (I18nDictionaryReq) returns (I18nDictionaryResp)
 }
 
 @server (
@@ -176,11 +513,20 @@ service admin-api {
 	middleware: AuthMiddleware
 )
 service admin-api {
+	@handler GameConfigList
+	get /game-configs (GameConfigListReq) returns (GameConfigListResp)
+
+	@handler UpsertGameConfig
+	post /game-configs (UpsertGameConfigReq) returns (GameConfigItem)
+
+	@handler DeleteGameConfig
+	delete /game-configs/:id (DeleteGameConfigReq)
+
 	@handler MerchantList
 	get /merchants (MerchantListReq) returns (MerchantListResp)
 
 	@handler CreateMerchant
-	post /merchants (CreateMerchantReq) returns (MerchantItem)
+	post /merchants (CreateMerchantReq) returns (CreateMerchantResp)
 
 	@handler UpdateMerchant
 	put /merchants/:id (UpdateMerchantReq) returns (MerchantItem)
@@ -203,16 +549,106 @@ service admin-api {
 	@handler DeleteBlacklist
 	delete /risk-blacklist/:id (DeleteBlacklistReq)
 
-	@handler GameConfigList
-	get /game-configs (GameConfigListReq) returns (GameConfigListResp)
-
-	@handler UpsertGameConfig
-	post /game-configs (UpsertGameConfigReq) returns (GameConfigItem)
-
 	@handler RtpReport
 	get /reports/rtp (RtpReportReq) returns (RtpReportResp)
 
+	@handler DailySettlementList
+	get /reports/daily-settlements (DailySettlementListReq) returns (DailySettlementListResp)
+
+	@handler SyncDailySettlement
+	post /reports/daily-settlements/sync (SyncDailySettlementReq) returns (SyncDailySettlementResp)
+
+	@handler ConfirmDailySettlement
+	post /reports/daily-settlements/:id/confirm (ConfirmDailySettlementReq)
+
+	@handler SettlementPeriodList
+	get /reports/settlement-periods (SettlementPeriodListReq) returns (SettlementPeriodListResp)
+
+	@handler RollupSettlementPeriod
+	post /reports/settlement-periods/:id/rollup (RollupSettlementPeriodReq) returns (RollupSettlementPeriodResp)
+
 	@handler GetTrace
 	get /traces/:traceId (TraceLookupReq) returns (TraceLookupResp)
+
+	@handler RiskAlerts
+	get /risk-alerts (RiskAlertsReq) returns (RiskAlertsResp)
+
+	@handler AckRiskAlert
+	post /risk-alerts/:id/ack (AckRiskAlertReq)
+
+	@handler GetTraceByRound
+	get /traces/by-round/:roundId (TraceByRoundReq) returns (TraceLookupResp)
+
+	@handler TotpSetup
+	post /totp/setup returns (TotpSetupResp)
+
+	@handler TotpConfirm
+	post /totp/confirm (TotpConfirmReq) returns (TotpConfirmResp)
+
+	@handler ListWalletBreakers
+	get /wallet/breakers returns (WalletBreakersResp)
+
+	@handler ResetWalletBreaker
+	post /wallet/breaker/reset (ResetWalletBreakerReq)
+
+	@handler AdminUserList
+	get /users (AdminUserListReq) returns (AdminUserListResp)
+
+	@handler CreateAdminUser
+	post /users (CreateAdminUserReq) returns (AdminUserItem)
+
+	@handler UpdateAdminUser
+	put /users/:id (UpdateAdminUserReq) returns (AdminUserItem)
+
+	@handler RoleList
+	get /roles returns (RoleListResp)
+
+	@handler AuditLogList
+	get /audit-logs (AuditLogListReq) returns (AuditLogListResp)
+
+	@handler GameCategoryList
+	get /platform/game-categories returns (GameCategoryListResp)
+
+	@handler PlatformGameList
+	get /platform/games (PlatformGameListReq) returns (PlatformGameListResp)
+
+	@handler CreatePlatformGame
+	post /platform/games (CreatePlatformGameReq) returns (PlatformGameItem)
+
+	@handler UpdatePlatformGame
+	put /platform/games/:id (UpdatePlatformGameReq) returns (PlatformGameItem)
+
+	@handler GameRtpTierList
+	get /platform/games/:id/rtp-tiers (GameRtpTierListReq) returns (GameRtpTierListResp)
+
+	@handler MerchantGameList
+	get /merchant-games (MerchantGameListReq) returns (MerchantGameListResp)
+
+	@handler CreateMerchantGame
+	post /merchant-games (CreateMerchantGameReq) returns (MerchantGameItem)
+
+	@handler UpdateMerchantGame
+	put /merchant-games/:id (UpdateMerchantGameReq) returns (MerchantGameItem)
+
+	@handler DeleteMerchantGame
+	delete /merchant-games/:id (DeleteMerchantGameReq)
+
+	@handler UploadAsset
+	post /files/upload returns (FileUploadResp)
+
+	@handler ExportMerchants
+	get /export/merchants
+
+	@handler ExportPlatformGames
+	get /export/platform-games
+
+	@handler ExportMerchantGames
+	get /export/merchant-games
+
+	@handler ImportMerchantGames
+	post /import/merchant-games
+
+	@handler ImportPlatformGames
+	post /import/platform-games
 }
 

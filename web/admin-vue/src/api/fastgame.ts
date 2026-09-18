@@ -61,6 +61,12 @@ export const syncDailySettlements = (data: object) =>
 export const confirmDailySettlement = (id: number) =>
   http.post<any, any>(`/reports/daily-settlements/${id}/confirm`);
 
+export const listSettlementPeriods = (params: object) =>
+  http.get<any, any>("/reports/settlement-periods", { params });
+
+export const rollupSettlementPeriod = (id: number) =>
+  http.post<any, any>(`/reports/settlement-periods/${id}/rollup`);
+
 export const listRiskAlerts = (limit = 50) =>
   http.get<any, any>("/risk-alerts", { params: { limit } });
 

@@ -3,144 +3,54 @@
 
 package types
 
-type CreateMerchantReq struct {
-	MerchantCode string `json:"merchantCode" validate:"required"`
-	Name         string `json:"name" validate:"required"`
-	Status       int64  `json:"status,default=1"`
+type AckRiskAlertReq struct {
+	Id uint64 `path:"id"`
 }
 
-type CreateMerchantResp struct {
-	Id           uint64 `json:"id"`
-	MerchantCode string `json:"merchantCode"`
-	Name         string `json:"name"`
-	Status       int64  `json:"status"`
-	PrivateKey   string `json:"privateKey"`
+type AdminUserItem struct {
+	Id       uint64 `json:"id"`
+	Username string `json:"username"`
+	RoleId   uint64 `json:"roleId"`
+	RoleName string `json:"roleName"`
+	Status   int64  `json:"status"`
 }
 
-type GameConfigItem struct {
-	Id          uint64 `json:"id"`
-	MerchantId  uint64 `json:"merchantId"`
-	GameCode    string `json:"gameCode"`
-	ConfigKey   string `json:"configKey"`
-	ConfigValue string `json:"configValue"`
-	RtpTier     string `json:"rtpTier"`
-	Status      int64  `json:"status"`
-}
-
-type GameConfigListReq struct {
-	MerchantId uint64 `form:"merchantId" validate:"required"`
-	GameCode   string `form:"gameCode,optional"`
-}
-
-type GameConfigListResp struct {
-	List []GameConfigItem `json:"list"`
-}
-
-type LoginReq struct {
-	Username     string `json:"username" validate:"required"`
-	Password     string `json:"password" validate:"required"`
-	TotpCode     string `json:"totpCode,optional"`
-	RecoveryCode string `json:"recoveryCode,optional"`
-}
-
-type RiskAlertsReq struct {
-	Limit int `form:"limit,default=50"`
-}
-
-type RiskAlertItem struct {
-	Id           uint64 `json:"id"`
-	AlertType    string `json:"alertType"`
-	ScopeType    string `json:"scopeType"`
-	ScopeValue   string `json:"scopeValue"`
-	MerchantCode string `json:"merchantCode"`
-	GameCode     string `json:"gameCode"`
-	RtpPPM       int64  `json:"rtpPpm"`
-	TotalBet     int64  `json:"totalBet"`
-	TotalWin     int64  `json:"totalWin"`
-	SampleSize   int64  `json:"sampleSize"`
-	ActionTaken  string `json:"actionTaken"`
-	Status       string `json:"status"`
-	CreatedAt    int64  `json:"createdAt"`
-}
-
-type RiskAlertsResp struct {
-	List []RiskAlertItem `json:"list"`
-}
-
-type LoginResp struct {
-	AccessToken       string `json:"accessToken"`
-	ExpireAt          int64  `json:"expireAt"`
-	RoleName          string `json:"roleName"`
-	RequiresTotpSetup bool   `json:"requiresTotpSetup,omitempty"`
-}
-
-type MerchantItem struct {
-	Id           uint64 `json:"id"`
-	MerchantCode string `json:"merchantCode"`
-	Name         string `json:"name"`
-	Status       int64  `json:"status"`
-}
-
-type MerchantListReq struct {
+type AdminUserListReq struct {
 	Page     int `form:"page,default=1"`
 	PageSize int `form:"pageSize,default=20"`
 }
 
-type MerchantListResp struct {
+type AdminUserListResp struct {
+	Total int64           `json:"total"`
+	List  []AdminUserItem `json:"list"`
+}
+
+type AuditLogItem struct {
+	Id           uint64 `json:"id"`
+	AdminUserId  uint64 `json:"adminUserId,omitempty"`
+	Username     string `json:"username"`
+	RoleName     string `json:"roleName"`
+	Action       string `json:"action"`
+	ResourceType string `json:"resourceType"`
+	ResourceId   string `json:"resourceId"`
+	HttpMethod   string `json:"httpMethod,omitempty"`
+	RequestPath  string `json:"requestPath,omitempty"`
+	Detail       string `json:"detail,omitempty"`
+	ClientIp     string `json:"clientIp,omitempty"`
+	StatusCode   int    `json:"statusCode,omitempty"`
+	CreatedAt    int64  `json:"createdAt"`
+}
+
+type AuditLogListReq struct {
+	Page     int    `form:"page,default=1"`
+	PageSize int    `form:"pageSize,default=20"`
+	Action   string `form:"action,optional"`
+	Username string `form:"username,optional"`
+}
+
+type AuditLogListResp struct {
 	Total int64          `json:"total"`
-	List  []MerchantItem `json:"list"`
-}
-
-type RtpReportItem struct {
-	MerchantId  uint64  `json:"merchantId"`
-	GameCode    string  `json:"gameCode"`
-	Hour        string  `json:"hour"`
-	TotalBet    float64 `json:"totalBet"`
-	TotalWin    float64 `json:"totalWin"`
-	TotalRounds uint64  `json:"totalRounds"`
-	ActualRtp   float64 `json:"actualRtp"`
-}
-
-type RtpReportReq struct {
-	MerchantId uint64 `form:"merchantId,optional"`
-	GameCode   string `form:"gameCode,optional"`
-	Hours      int    `form:"hours,default=24"`
-}
-
-type RtpReportResp struct {
-	List []RtpReportItem `json:"list"`
-}
-
-type UpdateMerchantReq struct {
-	Id     uint64 `path:"id"`
-	Name   string `json:"name,optional"`
-	Status int64  `json:"status,optional"`
-}
-
-type UpsertGameConfigReq struct {
-	MerchantId  uint64 `json:"merchantId" validate:"required"`
-	GameCode    string `json:"gameCode" validate:"required"`
-	ConfigKey   string `json:"configKey" validate:"required"`
-	ConfigValue string `json:"configValue" validate:"required"`
-	RtpTier     string `json:"rtpTier,optional"`
-	Status      int64  `json:"status,default=1"`
-}
-
-type DeleteGameConfigReq struct {
-	Id uint64 `path:"id"`
-}
-
-type RotateMerchantKeyReq struct {
-	Id               uint64 `path:"id"`
-	GracePeriodHours int64  `json:"gracePeriodHours,optional"`
-}
-
-type RotateMerchantKeyResp struct {
-	MerchantId       uint64 `json:"merchantId"`
-	MerchantCode     string `json:"merchantCode"`
-	NewPrivateKey    string `json:"newPrivateKey"`
-	GracePeriodHours int64  `json:"gracePeriodHours"`
-	RotatedAt        int64  `json:"rotatedAt"`
+	List  []AuditLogItem `json:"list"`
 }
 
 type BlacklistItem struct {
@@ -164,121 +74,8 @@ type BlacklistListResp struct {
 	List  []BlacklistItem `json:"list"`
 }
 
-type CreateBlacklistReq struct {
-	ListType  string `json:"listType" validate:"required"`
-	ListValue string `json:"listValue" validate:"required"`
-	Reason    string `json:"reason,optional"`
-	ExpiresAt string `json:"expiresAt,optional"`
-}
-
-type DeleteBlacklistReq struct {
+type ConfirmDailySettlementReq struct {
 	Id uint64 `path:"id"`
-}
-
-type MerchantAllowedIPsReq struct {
-	Id uint64 `path:"id"`
-}
-
-type MerchantAllowedIPsResp struct {
-	MerchantId   uint64   `json:"merchantId"`
-	MerchantCode string   `json:"merchantCode"`
-	AllowedIps   []string `json:"allowedIps"`
-}
-
-type UpdateMerchantAllowedIPsReq struct {
-	Id         uint64   `path:"id"`
-	AllowedIps []string `json:"allowedIps"`
-}
-
-type TraceLookupReq struct {
-	TraceId string `path:"traceId"`
-}
-
-type TraceSpanItem struct {
-	SpanId     string `json:"spanId"`
-	Service    string `json:"service"`
-	Operation  string `json:"operation"`
-	RoundId    string `json:"roundId"`
-	Status     string `json:"status"`
-	Detail     string `json:"detail"`
-	DurationMs uint32 `json:"durationMs"`
-	OccurredAt int64  `json:"occurredAt"`
-}
-
-type PendingTxItem struct {
-	RoundId        string  `json:"roundId"`
-	Phase          string  `json:"phase"`
-	Status         string  `json:"status"`
-	BetAmount      int64   `json:"betAmount"`
-	WinAmount      int64   `json:"winAmount"`
-	ExpectedAction string  `json:"expectedAction"`
-	RetryCount     int64   `json:"retryCount"`
-	LastError      string  `json:"lastError,omitempty"`
-	CreatedAt      int64   `json:"createdAt"`
-}
-
-type TraceLookupResp struct {
-	TraceId             string          `json:"traceId"`
-	RoundId             string          `json:"roundId,omitempty"`
-	Spans               []TraceSpanItem `json:"spans"`
-	PendingTransactions []PendingTxItem `json:"pendingTransactions"`
-}
-
-type TraceByRoundReq struct {
-	RoundId string `path:"roundId"`
-}
-
-type TotpSetupResp struct {
-	ProvisioningUri string `json:"provisioningUri"`
-	Secret          string `json:"secret"`
-}
-
-type TotpConfirmReq struct {
-	TotpCode string `json:"totpCode" validate:"required"`
-}
-
-type TotpConfirmResp struct {
-	AccessToken   string   `json:"accessToken"`
-	ExpireAt      int64    `json:"expireAt"`
-	RoleName      string   `json:"roleName"`
-	RecoveryCodes []string `json:"recoveryCodes"`
-}
-
-type WalletBreakerItem struct {
-	MerchantCode string `json:"merchantCode"`
-	Open         bool   `json:"open"`
-	OpenedAt     int64  `json:"openedAt,omitempty"`
-	Overridden   bool   `json:"overridden"`
-}
-
-type WalletBreakersResp struct {
-	List []WalletBreakerItem `json:"list"`
-}
-
-type AckRiskAlertReq struct {
-	Id uint64 `path:"id"`
-}
-
-type ResetWalletBreakerReq struct {
-	MerchantCode string `json:"merchantCode" validate:"required"`
-}
-
-type AdminUserItem struct {
-	Id       uint64 `json:"id"`
-	Username string `json:"username"`
-	RoleId   uint64 `json:"roleId"`
-	RoleName string `json:"roleName"`
-	Status   int64  `json:"status"`
-}
-
-type AdminUserListReq struct {
-	Page     int `form:"page,default=1"`
-	PageSize int `form:"pageSize,default=20"`
-}
-
-type AdminUserListResp struct {
-	Total int64           `json:"total"`
-	List  []AdminUserItem `json:"list"`
 }
 
 type CreateAdminUserReq struct {
@@ -288,21 +85,48 @@ type CreateAdminUserReq struct {
 	Status   int64  `json:"status,default=1"`
 }
 
-type UpdateAdminUserReq struct {
-	Id       uint64 `path:"id"`
-	RoleId   uint64 `json:"roleId,optional"`
-	Status   int64  `json:"status,optional"`
-	Password string `json:"password,optional"`
+type CreateBlacklistReq struct {
+	ListType  string `json:"listType" validate:"required"`
+	ListValue string `json:"listValue" validate:"required"`
+	Reason    string `json:"reason,optional"`
+	ExpiresAt string `json:"expiresAt,optional"`
 }
 
-type RoleItem struct {
-	Id          uint64 `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+type CreateMerchantGameReq struct {
+	MerchantId  uint64 `json:"merchantId" validate:"required"`
+	GameId      uint64 `json:"gameId" validate:"required"`
+	RtpTierCode string `json:"rtpTierCode,optional"`
+	MinBetMinor int64  `json:"minBetMinor,optional"`
+	MaxBetMinor int64  `json:"maxBetMinor,optional"`
+	SortOrder   int64  `json:"sortOrder,optional"`
 }
 
-type RoleListResp struct {
-	List []RoleItem `json:"list"`
+type CreateMerchantReq struct {
+	MerchantCode string `json:"merchantCode" validate:"required"`
+	Name         string `json:"name" validate:"required"`
+	Status       int64  `json:"status,default=1"`
+}
+
+type CreateMerchantResp struct {
+	Id           uint64 `json:"id"`
+	MerchantCode string `json:"merchantCode"`
+	Name         string `json:"name"`
+	Status       int64  `json:"status"`
+	PrivateKey   string `json:"privateKey"`
+}
+
+type CreatePlatformGameReq struct {
+	GameCode      string `json:"gameCode" validate:"required"`
+	Name          string `json:"name" validate:"required"`
+	CategoryId    uint64 `json:"categoryId,optional"`
+	GameType      string `json:"gameType" validate:"required"`
+	DefaultRtpPpm int64  `json:"defaultRtpPpm,optional"`
+	Volatility    string `json:"volatility,optional"`
+	MinBetMinor   int64  `json:"minBetMinor,optional"`
+	MaxBetMinor   int64  `json:"maxBetMinor,optional"`
+	ClientVersion string `json:"clientVersion,optional"`
+	ThumbnailUrl  string `json:"thumbnailUrl,optional"`
+	Status        int64  `json:"status,default=1"`
 }
 
 type DailySettlementItem struct {
@@ -328,39 +152,22 @@ type DailySettlementListResp struct {
 	List  []DailySettlementItem `json:"list"`
 }
 
-type SyncDailySettlementReq struct {
-	MerchantId uint64 `json:"merchantId,optional"`
-	Days       int    `json:"days,default=7"`
-}
-
-type SyncDailySettlementResp struct {
-	Synced int `json:"synced"`
-}
-
-type ConfirmDailySettlementReq struct {
+type DeleteBlacklistReq struct {
 	Id uint64 `path:"id"`
 }
 
-type LocaleItem struct {
-	Code       string `json:"code"`
-	Name       string `json:"name"`
-	NativeName string `json:"nativeName"`
-	IsDefault  bool   `json:"isDefault"`
+type DeleteGameConfigReq struct {
+	Id uint64 `path:"id"`
 }
 
-type LocaleListResp struct {
-	List []LocaleItem `json:"list"`
+type DeleteMerchantGameReq struct {
+	Id uint64 `path:"id"`
 }
 
-type I18nDictionaryReq struct {
-	Bundle string `form:"bundle" validate:"required"`
-	Locale string `form:"locale,optional"`
-}
-
-type I18nDictionaryResp struct {
-	Bundle   string            `json:"bundle"`
-	Locale   string            `json:"locale"`
-	Messages map[string]string `json:"messages"`
+type FileUploadResp struct {
+	URL      string `json:"url"`
+	Filename string `json:"filename"`
+	Size     int64  `json:"size"`
 }
 
 type GameCategoryItem struct {
@@ -373,59 +180,23 @@ type GameCategoryListResp struct {
 	List []GameCategoryItem `json:"list"`
 }
 
-type PlatformGameItem struct {
-	Id            uint64 `json:"id"`
-	GameCode      string `json:"gameCode"`
-	Name          string `json:"name"`
-	CategoryId    uint64 `json:"categoryId,omitempty"`
-	CategoryCode  string `json:"categoryCode"`
-	CategoryName  string `json:"categoryName"`
-	GameType      string `json:"gameType"`
-	DefaultRtpPpm int64  `json:"defaultRtpPpm"`
-	Volatility    string `json:"volatility,omitempty"`
-	MinBetMinor   int64  `json:"minBetMinor"`
-	MaxBetMinor   int64  `json:"maxBetMinor"`
-	ClientVersion string `json:"clientVersion,omitempty"`
-	ThumbnailUrl  string `json:"thumbnailUrl,omitempty"`
-	Status        int64  `json:"status"`
+type GameConfigItem struct {
+	Id          uint64 `json:"id"`
+	MerchantId  uint64 `json:"merchantId"`
+	GameCode    string `json:"gameCode"`
+	ConfigKey   string `json:"configKey"`
+	ConfigValue string `json:"configValue"`
+	RtpTier     string `json:"rtpTier"`
+	Status      int64  `json:"status"`
 }
 
-type PlatformGameListReq struct {
-	Page     int    `form:"page,default=1"`
-	PageSize int    `form:"pageSize,default=20"`
-	GameType string `form:"gameType,optional"`
+type GameConfigListReq struct {
+	MerchantId uint64 `form:"merchantId" validate:"required"`
+	GameCode   string `form:"gameCode,optional"`
 }
 
-type PlatformGameListResp struct {
-	Total int64              `json:"total"`
-	List  []PlatformGameItem `json:"list"`
-}
-
-type CreatePlatformGameReq struct {
-	GameCode      string `json:"gameCode" validate:"required"`
-	Name          string `json:"name" validate:"required"`
-	CategoryId    uint64 `json:"categoryId,optional"`
-	GameType      string `json:"gameType" validate:"required"`
-	DefaultRtpPpm int64  `json:"defaultRtpPpm,optional"`
-	Volatility    string `json:"volatility,optional"`
-	MinBetMinor   int64  `json:"minBetMinor,optional"`
-	MaxBetMinor   int64  `json:"maxBetMinor,optional"`
-	ClientVersion string `json:"clientVersion,optional"`
-	ThumbnailUrl  string `json:"thumbnailUrl,optional"`
-	Status        int64  `json:"status,default=1"`
-}
-
-type UpdatePlatformGameReq struct {
-	Id            uint64 `path:"id"`
-	Name          string `json:"name,optional"`
-	CategoryId    uint64 `json:"categoryId,optional"`
-	DefaultRtpPpm int64  `json:"defaultRtpPpm,optional"`
-	Volatility    string `json:"volatility,optional"`
-	MinBetMinor   int64  `json:"minBetMinor,optional"`
-	MaxBetMinor   int64  `json:"maxBetMinor,optional"`
-	ClientVersion string `json:"clientVersion,optional"`
-	ThumbnailUrl  string `json:"thumbnailUrl,optional"`
-	Status        int64  `json:"status,optional"`
+type GameConfigListResp struct {
+	List []GameConfigItem `json:"list"`
 }
 
 type GameRtpTierItem struct {
@@ -443,6 +214,52 @@ type GameRtpTierListReq struct {
 
 type GameRtpTierListResp struct {
 	List []GameRtpTierItem `json:"list"`
+}
+
+type I18nDictionaryReq struct {
+	Bundle string `form:"bundle" validate:"required"`
+	Locale string `form:"locale,optional"`
+}
+
+type I18nDictionaryResp struct {
+	Bundle   string            `json:"bundle"`
+	Locale   string            `json:"locale"`
+	Messages map[string]string `json:"messages"`
+}
+
+type LocaleItem struct {
+	Code       string `json:"code"`
+	Name       string `json:"name"`
+	NativeName string `json:"nativeName"`
+	IsDefault  bool   `json:"isDefault"`
+}
+
+type LocaleListResp struct {
+	List []LocaleItem `json:"list"`
+}
+
+type LoginReq struct {
+	Username     string `json:"username" validate:"required"`
+	Password     string `json:"password" validate:"required"`
+	TotpCode     string `json:"totpCode,optional"`
+	RecoveryCode string `json:"recoveryCode,optional"`
+}
+
+type LoginResp struct {
+	AccessToken       string `json:"accessToken"`
+	ExpireAt          int64  `json:"expireAt"`
+	RoleName          string `json:"roleName"`
+	RequiresTotpSetup bool   `json:"requiresTotpSetup,omitempty"`
+}
+
+type MerchantAllowedIPsReq struct {
+	Id uint64 `path:"id"`
+}
+
+type MerchantAllowedIPsResp struct {
+	MerchantId   uint64   `json:"merchantId"`
+	MerchantCode string   `json:"merchantCode"`
+	AllowedIps   []string `json:"allowedIps"`
 }
 
 type MerchantGameItem struct {
@@ -473,13 +290,235 @@ type MerchantGameListResp struct {
 	List  []MerchantGameItem `json:"list"`
 }
 
-type CreateMerchantGameReq struct {
-	MerchantId  uint64 `json:"merchantId" validate:"required"`
-	GameId      uint64 `json:"gameId" validate:"required"`
-	RtpTierCode string `json:"rtpTierCode,optional"`
-	MinBetMinor int64  `json:"minBetMinor,optional"`
-	MaxBetMinor int64  `json:"maxBetMinor,optional"`
-	SortOrder   int64  `json:"sortOrder,optional"`
+type MerchantItem struct {
+	Id           uint64 `json:"id"`
+	MerchantCode string `json:"merchantCode"`
+	Name         string `json:"name"`
+	Status       int64  `json:"status"`
+}
+
+type MerchantListReq struct {
+	Page     int `form:"page,default=1"`
+	PageSize int `form:"pageSize,default=20"`
+}
+
+type MerchantListResp struct {
+	Total int64          `json:"total"`
+	List  []MerchantItem `json:"list"`
+}
+
+type PendingTxItem struct {
+	RoundId        string `json:"roundId"`
+	Phase          string `json:"phase"`
+	Status         string `json:"status"`
+	BetAmount      int64  `json:"betAmount"`
+	WinAmount      int64  `json:"winAmount"`
+	ExpectedAction string `json:"expectedAction"`
+	RetryCount     int64  `json:"retryCount"`
+	LastError      string `json:"lastError,omitempty"`
+	CreatedAt      int64  `json:"createdAt"`
+}
+
+type PlatformGameItem struct {
+	Id            uint64 `json:"id"`
+	GameCode      string `json:"gameCode"`
+	Name          string `json:"name"`
+	CategoryId    uint64 `json:"categoryId,omitempty"`
+	CategoryCode  string `json:"categoryCode"`
+	CategoryName  string `json:"categoryName"`
+	GameType      string `json:"gameType"`
+	DefaultRtpPpm int64  `json:"defaultRtpPpm"`
+	Volatility    string `json:"volatility,omitempty"`
+	MinBetMinor   int64  `json:"minBetMinor"`
+	MaxBetMinor   int64  `json:"maxBetMinor"`
+	ClientVersion string `json:"clientVersion,omitempty"`
+	ThumbnailUrl  string `json:"thumbnailUrl,omitempty"`
+	Status        int64  `json:"status"`
+}
+
+type PlatformGameListReq struct {
+	Page     int    `form:"page,default=1"`
+	PageSize int    `form:"pageSize,default=20"`
+	GameType string `form:"gameType,optional"`
+}
+
+type PlatformGameListResp struct {
+	Total int64              `json:"total"`
+	List  []PlatformGameItem `json:"list"`
+}
+
+type ResetWalletBreakerReq struct {
+	MerchantCode string `json:"merchantCode" validate:"required"`
+}
+
+type RiskAlertItem struct {
+	Id           uint64 `json:"id"`
+	AlertType    string `json:"alertType"`
+	ScopeType    string `json:"scopeType"`
+	ScopeValue   string `json:"scopeValue"`
+	MerchantCode string `json:"merchantCode"`
+	GameCode     string `json:"gameCode"`
+	RtpPPM       int64  `json:"rtpPpm"`
+	TotalBet     int64  `json:"totalBet"`
+	TotalWin     int64  `json:"totalWin"`
+	SampleSize   int64  `json:"sampleSize"`
+	ActionTaken  string `json:"actionTaken"`
+	Status       string `json:"status"`
+	CreatedAt    int64  `json:"createdAt"`
+}
+
+type RiskAlertsReq struct {
+	Limit int `form:"limit,default=50"`
+}
+
+type RiskAlertsResp struct {
+	List []RiskAlertItem `json:"list"`
+}
+
+type RoleItem struct {
+	Id          uint64 `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type RoleListResp struct {
+	List []RoleItem `json:"list"`
+}
+
+type RollupSettlementPeriodReq struct {
+	Id uint64 `path:"id"`
+}
+
+type RollupSettlementPeriodResp struct {
+	RolledUp int `json:"rolledUp"`
+}
+
+type RotateMerchantKeyReq struct {
+	Id               uint64 `path:"id"`
+	GracePeriodHours int64  `json:"gracePeriodHours,optional"`
+}
+
+type RotateMerchantKeyResp struct {
+	MerchantId       uint64 `json:"merchantId"`
+	MerchantCode     string `json:"merchantCode"`
+	NewPrivateKey    string `json:"newPrivateKey"`
+	GracePeriodHours int64  `json:"gracePeriodHours"`
+	RotatedAt        int64  `json:"rotatedAt"`
+}
+
+type RtpReportItem struct {
+	MerchantId  uint64  `json:"merchantId"`
+	GameCode    string  `json:"gameCode"`
+	Hour        string  `json:"hour"`
+	TotalBet    float64 `json:"totalBet"`
+	TotalWin    float64 `json:"totalWin"`
+	TotalRounds uint64  `json:"totalRounds"`
+	ActualRtp   float64 `json:"actualRtp"`
+}
+
+type RtpReportReq struct {
+	MerchantId uint64 `form:"merchantId,optional"`
+	GameCode   string `form:"gameCode,optional"`
+	Hours      int    `form:"hours,default=24"`
+}
+
+type RtpReportResp struct {
+	List []RtpReportItem `json:"list"`
+}
+
+type SettlementPeriodItem struct {
+	Id           uint64  `json:"id"`
+	MerchantId   uint64  `json:"merchantId"`
+	MerchantCode string  `json:"merchantCode"`
+	PeriodType   string  `json:"periodType"`
+	PeriodStart  string  `json:"periodStart"`
+	PeriodEnd    string  `json:"periodEnd"`
+	CurrencyCode string  `json:"currencyCode"`
+	TotalBet     float64 `json:"totalBet"`
+	TotalWin     float64 `json:"totalWin"`
+	Ggr          float64 `json:"ggr"`
+	Commission   float64 `json:"commission"`
+	NetPayable   float64 `json:"netPayable"`
+	TotalRounds  uint64  `json:"totalRounds"`
+	Status       string  `json:"status"`
+	ConfirmedBy  uint64  `json:"confirmedBy,omitempty"`
+	ConfirmedAt  string  `json:"confirmedAt,omitempty"`
+	Notes        string  `json:"notes,omitempty"`
+}
+
+type SettlementPeriodListReq struct {
+	MerchantId uint64 `form:"merchantId,optional"`
+	PeriodType string `form:"periodType,optional"`
+	Page       int    `form:"page,default=1"`
+	PageSize   int    `form:"pageSize,default=20"`
+}
+
+type SettlementPeriodListResp struct {
+	Total int64                  `json:"total"`
+	List  []SettlementPeriodItem `json:"list"`
+}
+
+type SyncDailySettlementReq struct {
+	MerchantId uint64 `json:"merchantId,optional"`
+	Days       int    `json:"days,default=7"`
+}
+
+type SyncDailySettlementResp struct {
+	Synced int `json:"synced"`
+}
+
+type TotpConfirmReq struct {
+	TotpCode string `json:"totpCode" validate:"required"`
+}
+
+type TotpConfirmResp struct {
+	AccessToken   string   `json:"accessToken"`
+	ExpireAt      int64    `json:"expireAt"`
+	RoleName      string   `json:"roleName"`
+	RecoveryCodes []string `json:"recoveryCodes"`
+}
+
+type TotpSetupResp struct {
+	ProvisioningUri string `json:"provisioningUri"`
+	Secret          string `json:"secret"`
+}
+
+type TraceByRoundReq struct {
+	RoundId string `path:"roundId"`
+}
+
+type TraceLookupReq struct {
+	TraceId string `path:"traceId"`
+}
+
+type TraceLookupResp struct {
+	TraceId             string          `json:"traceId"`
+	RoundId             string          `json:"roundId,omitempty"`
+	Spans               []TraceSpanItem `json:"spans"`
+	PendingTransactions []PendingTxItem `json:"pendingTransactions"`
+}
+
+type TraceSpanItem struct {
+	SpanId     string `json:"spanId"`
+	Service    string `json:"service"`
+	Operation  string `json:"operation"`
+	RoundId    string `json:"roundId"`
+	Status     string `json:"status"`
+	Detail     string `json:"detail"`
+	DurationMs uint32 `json:"durationMs"`
+	OccurredAt int64  `json:"occurredAt"`
+}
+
+type UpdateAdminUserReq struct {
+	Id       uint64 `path:"id"`
+	RoleId   uint64 `json:"roleId,optional"`
+	Status   int64  `json:"status,optional"`
+	Password string `json:"password,optional"`
+}
+
+type UpdateMerchantAllowedIPsReq struct {
+	Id         uint64   `path:"id"`
+	AllowedIps []string `json:"allowedIps"`
 }
 
 type UpdateMerchantGameReq struct {
@@ -491,40 +530,41 @@ type UpdateMerchantGameReq struct {
 	Status      int64  `json:"status,optional"`
 }
 
-type DeleteMerchantGameReq struct {
-	Id uint64 `path:"id"`
+type UpdateMerchantReq struct {
+	Id     uint64 `path:"id"`
+	Name   string `json:"name,optional"`
+	Status int64  `json:"status,optional"`
 }
 
-type FileUploadResp struct {
-	URL      string `json:"url"`
-	Filename string `json:"filename"`
-	Size     int64  `json:"size"`
+type UpdatePlatformGameReq struct {
+	Id            uint64 `path:"id"`
+	Name          string `json:"name,optional"`
+	CategoryId    uint64 `json:"categoryId,optional"`
+	DefaultRtpPpm int64  `json:"defaultRtpPpm,optional"`
+	Volatility    string `json:"volatility,optional"`
+	MinBetMinor   int64  `json:"minBetMinor,optional"`
+	MaxBetMinor   int64  `json:"maxBetMinor,optional"`
+	ClientVersion string `json:"clientVersion,optional"`
+	ThumbnailUrl  string `json:"thumbnailUrl,optional"`
+	Status        int64  `json:"status,optional"`
 }
 
-type AuditLogListReq struct {
-	Page     int    `form:"page,default=1"`
-	PageSize int    `form:"pageSize,default=20"`
-	Action   string `form:"action,optional"`
-	Username string `form:"username,optional"`
+type UpsertGameConfigReq struct {
+	MerchantId  uint64 `json:"merchantId" validate:"required"`
+	GameCode    string `json:"gameCode" validate:"required"`
+	ConfigKey   string `json:"configKey" validate:"required"`
+	ConfigValue string `json:"configValue" validate:"required"`
+	RtpTier     string `json:"rtpTier,optional"`
+	Status      int64  `json:"status,default=1"`
 }
 
-type AuditLogItem struct {
-	Id           uint64 `json:"id"`
-	AdminUserId  uint64 `json:"adminUserId,omitempty"`
-	Username     string `json:"username"`
-	RoleName     string `json:"roleName"`
-	Action       string `json:"action"`
-	ResourceType string `json:"resourceType"`
-	ResourceId   string `json:"resourceId"`
-	HttpMethod   string `json:"httpMethod,omitempty"`
-	RequestPath  string `json:"requestPath,omitempty"`
-	Detail       string `json:"detail,omitempty"`
-	ClientIp     string `json:"clientIp,omitempty"`
-	StatusCode   int    `json:"statusCode,omitempty"`
-	CreatedAt    int64  `json:"createdAt"`
+type WalletBreakerItem struct {
+	MerchantCode string `json:"merchantCode"`
+	Open         bool   `json:"open"`
+	OpenedAt     int64  `json:"openedAt,omitempty"`
+	Overridden   bool   `json:"overridden"`
 }
 
-type AuditLogListResp struct {
-	Total int64          `json:"total"`
-	List  []AuditLogItem `json:"list"`
+type WalletBreakersResp struct {
+	List []WalletBreakerItem `json:"list"`
 }

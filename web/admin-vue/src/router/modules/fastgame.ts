@@ -132,6 +132,16 @@ export default [
         }
       },
       {
+        path: "/finance/settlement-periods",
+        name: "SettlementPeriods",
+        component: () => import("@/views/fastgame/settlement-periods/index.vue"),
+        meta: {
+          title: "结算周期",
+          i18nKey: "nav.settlement_periods",
+          roles: ["admin", "operator", "viewer"]
+        }
+      },
+      {
         path: "/finance/rtp",
         name: "RtpReport",
         component: () => import("@/views/fastgame/rtpreport/index.vue"),

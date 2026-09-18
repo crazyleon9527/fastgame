@@ -36,6 +36,7 @@ type ServiceContext struct {
 	Reporter       *clickhouse.Writer
 	PendingTx          model.PendingTransactionsModel
 	DailySettlements   model.DailySettlementsModel
+	SettlementPeriods  model.SettlementPeriodsModel
 	I18n               model.I18nModel
 	PlatformGames      model.PlatformGamesModel
 	AuditLogs          model.AuditLogsModel
@@ -92,9 +93,10 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		Suspend:        security.NewSuspendStore(rdb),
 		IPWhitelist:    security.NewIPWhitelist(merchantsModel, rdb),
 		Reporter:       reporter,
-		PendingTx:        model.NewPendingTransactionsModel(conn),
-		DailySettlements: model.NewDailySettlementsModel(conn),
-		I18n:             model.NewI18nModel(conn),
+		PendingTx:          model.NewPendingTransactionsModel(conn),
+		DailySettlements:   model.NewDailySettlementsModel(conn),
+		SettlementPeriods:  model.NewSettlementPeriodsModel(conn),
+		I18n:               model.NewI18nModel(conn),
 		PlatformGames:    model.NewPlatformGamesModel(conn),
 		AuditLogs:        model.NewAuditLogsModel(conn),
 		UploadDir:        uploadDir,

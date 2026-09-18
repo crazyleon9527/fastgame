@@ -16,9 +16,9 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
-				Method:  http.MethodPost,
-				Path:    "/login",
-				Handler: LoginHandler(serverCtx),
+				Method:  http.MethodGet,
+				Path:    "/i18n/dictionary",
+				Handler: I18nDictionaryHandler(serverCtx),
 			},
 			{
 				Method:  http.MethodGet,
@@ -26,9 +26,9 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: LocaleListHandler(serverCtx),
 			},
 			{
-				Method:  http.MethodGet,
-				Path:    "/i18n/dictionary",
-				Handler: I18nDictionaryHandler(serverCtx),
+				Method:  http.MethodPost,
+				Path:    "/login",
+				Handler: LoginHandler(serverCtx),
 			},
 		},
 		rest.WithPrefix("/api/v1/admin"),
@@ -38,6 +38,31 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 		rest.WithMiddlewares(
 			[]rest.Middleware{serverCtx.AuthMiddleware, middleware.TotpGateMiddleware()},
 			[]rest.Route{
+				{
+					Method:  http.MethodGet,
+					Path:    "/audit-logs",
+					Handler: AuditLogListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/export/merchant-games",
+					Handler: ExportMerchantGamesHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/export/merchants",
+					Handler: ExportMerchantsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/export/platform-games",
+					Handler: ExportPlatformGamesHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/files/upload",
+					Handler: UploadAssetHandler(serverCtx),
+				},
 				{
 					Method:  http.MethodGet,
 					Path:    "/game-configs",
@@ -52,6 +77,36 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Method:  http.MethodDelete,
 					Path:    "/game-configs/:id",
 					Handler: DeleteGameConfigHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/import/merchant-games",
+					Handler: ImportMerchantGamesHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/import/platform-games",
+					Handler: ImportPlatformGamesHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/merchant-games",
+					Handler: MerchantGameListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/merchant-games",
+					Handler: CreateMerchantGameHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPut,
+					Path:    "/merchant-games/:id",
+					Handler: UpdateMerchantGameHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodDelete,
+					Path:    "/merchant-games/:id",
+					Handler: DeleteMerchantGameHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodGet,
@@ -69,11 +124,6 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Handler: UpdateMerchantHandler(serverCtx),
 				},
 				{
-					Method:  http.MethodPost,
-					Path:    "/merchants/:id/rotate-key",
-					Handler: RotateMerchantKeyHandler(serverCtx),
-				},
-				{
 					Method:  http.MethodGet,
 					Path:    "/merchants/:id/allowed-ips",
 					Handler: GetMerchantAllowedIPsHandler(serverCtx),
@@ -84,104 +134,9 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Handler: UpdateMerchantAllowedIPsHandler(serverCtx),
 				},
 				{
-					Method:  http.MethodGet,
-					Path:    "/risk-blacklist",
-					Handler: BlacklistListHandler(serverCtx),
-				},
-				{
 					Method:  http.MethodPost,
-					Path:    "/risk-blacklist",
-					Handler: CreateBlacklistHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodDelete,
-					Path:    "/risk-blacklist/:id",
-					Handler: DeleteBlacklistHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodGet,
-					Path:    "/reports/rtp",
-					Handler: RtpReportHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodGet,
-					Path:    "/reports/daily-settlements",
-					Handler: DailySettlementListHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodPost,
-					Path:    "/reports/daily-settlements/sync",
-					Handler: SyncDailySettlementHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodPost,
-					Path:    "/reports/daily-settlements/:id/confirm",
-					Handler: ConfirmDailySettlementHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodGet,
-					Path:    "/traces/:traceId",
-					Handler: GetTraceHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodGet,
-					Path:    "/risk-alerts",
-					Handler: RiskAlertsHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodPost,
-					Path:    "/risk-alerts/:id/ack",
-					Handler: AckRiskAlertHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodGet,
-					Path:    "/traces/by-round/:roundId",
-					Handler: GetTraceByRoundHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodPost,
-					Path:    "/totp/setup",
-					Handler: TotpSetupHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodPost,
-					Path:    "/totp/confirm",
-					Handler: TotpConfirmHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodGet,
-					Path:    "/wallet/breakers",
-					Handler: ListWalletBreakersHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodPost,
-					Path:    "/wallet/breaker/reset",
-					Handler: ResetWalletBreakerHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodGet,
-					Path:    "/users",
-					Handler: AdminUserListHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodPost,
-					Path:    "/users",
-					Handler: CreateAdminUserHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodPut,
-					Path:    "/users/:id",
-					Handler: UpdateAdminUserHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodGet,
-					Path:    "/roles",
-					Handler: RoleListHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodGet,
-					Path:    "/audit-logs",
-					Handler: AuditLogListHandler(serverCtx),
+					Path:    "/merchants/:id/rotate-key",
+					Handler: RotateMerchantKeyHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodGet,
@@ -210,53 +165,108 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				},
 				{
 					Method:  http.MethodGet,
-					Path:    "/merchant-games",
-					Handler: MerchantGameListHandler(serverCtx),
+					Path:    "/reports/daily-settlements",
+					Handler: DailySettlementListHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodPost,
-					Path:    "/merchant-games",
-					Handler: CreateMerchantGameHandler(serverCtx),
+					Path:    "/reports/daily-settlements/:id/confirm",
+					Handler: ConfirmDailySettlementHandler(serverCtx),
 				},
 				{
-					Method:  http.MethodPut,
-					Path:    "/merchant-games/:id",
-					Handler: UpdateMerchantGameHandler(serverCtx),
+					Method:  http.MethodPost,
+					Path:    "/reports/daily-settlements/sync",
+					Handler: SyncDailySettlementHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/reports/rtp",
+					Handler: RtpReportHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/reports/settlement-periods",
+					Handler: SettlementPeriodListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/reports/settlement-periods/:id/rollup",
+					Handler: RollupSettlementPeriodHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/risk-alerts",
+					Handler: RiskAlertsHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/risk-alerts/:id/ack",
+					Handler: AckRiskAlertHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/risk-blacklist",
+					Handler: BlacklistListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/risk-blacklist",
+					Handler: CreateBlacklistHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodDelete,
-					Path:    "/merchant-games/:id",
-					Handler: DeleteMerchantGameHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodPost,
-					Path:    "/files/upload",
-					Handler: UploadAssetHandler(serverCtx),
+					Path:    "/risk-blacklist/:id",
+					Handler: DeleteBlacklistHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodGet,
-					Path:    "/export/merchants",
-					Handler: ExportMerchantsHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodGet,
-					Path:    "/export/platform-games",
-					Handler: ExportPlatformGamesHandler(serverCtx),
-				},
-				{
-					Method:  http.MethodGet,
-					Path:    "/export/merchant-games",
-					Handler: ExportMerchantGamesHandler(serverCtx),
+					Path:    "/roles",
+					Handler: RoleListHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodPost,
-					Path:    "/import/merchant-games",
-					Handler: ImportMerchantGamesHandler(serverCtx),
+					Path:    "/totp/confirm",
+					Handler: TotpConfirmHandler(serverCtx),
 				},
 				{
 					Method:  http.MethodPost,
-					Path:    "/import/platform-games",
-					Handler: ImportPlatformGamesHandler(serverCtx),
+					Path:    "/totp/setup",
+					Handler: TotpSetupHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/traces/:traceId",
+					Handler: GetTraceHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/traces/by-round/:roundId",
+					Handler: GetTraceByRoundHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/users",
+					Handler: AdminUserListHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/users",
+					Handler: CreateAdminUserHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPut,
+					Path:    "/users/:id",
+					Handler: UpdateAdminUserHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/wallet/breaker/reset",
+					Handler: ResetWalletBreakerHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/wallet/breakers",
+					Handler: ListWalletBreakersHandler(serverCtx),
 				},
 			}...,
 		),
