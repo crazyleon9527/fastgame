@@ -43,6 +43,9 @@ Game:
 Security:
   SkipMerchantSign: true
   SkipSessionEnvelope: true
+  # 必填：config.SecurityConf.MerchantKeyCipher 无 optional 标签，缺失会导致启动直接失败。
+  # 用于解密 merchants.private_key，须与 admin-api.yaml 一致；生产用 .prod.yaml 覆盖。
+  MerchantKeyCipher: fastgame-dev-cipher-change-me-in-prod
   TimestampWindowSec: 60
   MaxClockSkewSec: 5
   UserLimitPerSec: 5
