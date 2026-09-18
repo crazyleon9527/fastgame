@@ -2,7 +2,9 @@ package wallet
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
 
 	"fastgame/pkg/money"
@@ -30,11 +32,11 @@ func NewMockClient(initialBalance money.Amount) *MockClient {
 	}
 }
 
-func (m *MockClient) accountKey(merchantID string, userID uint64) string {
-	return fmt.Sprintf("%s:%d", merchantID, userID)
+func (m *MockClient) accountKey(merchantID string, userID string) string {
+	return fmt.Sprintf("%s:%s", merchantID, userID)
 }
 
-func (m *MockClient) GetBalance(ctx context.Context, merchantID string, userID uint64) (money.Amount, error) {
+func (m *MockClient) GetBalance(ctx context.Context, merchantID string, userID string) (money.Amount, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -97,7 +99,7 @@ func (m *MockClient) Rollback(ctx context.Context, req RollbackReq) error {
 	return nil
 }
 
-func (m *MockClient) CheckTransaction(ctx context.Context, merchantID string, userID uint64, roundID string) (*TxCheckResult, error) {
+func (m *MockClient) CheckTransaction(ctx context.Context, merchantID string, userID string, roundID string) (*TxCheckResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -111,4 +113,112 @@ func (m *MockClient) CheckTransaction(ctx context.Context, merchantID string, us
 		BetAmount: rs.betAmount,
 		WinAmount: rs.winAmount,
 	}, nil
+}
+
+// -----------------------------------------------------------------------------
+// HTTP 服务端 Handler 实现 (供独立 Mock HTTP 服务直接挂载)
+// -----------------------------------------------------------------------------
+
+func (m *MockClient) RegisterHTTPRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/v1/wallet/balance", m.handleHTTPBalance)
+	mux.HandleFunc("/api/v1/wallet/bet", m.handleHTTPBet)
+	mux.HandleFunc("/api/v1/wallet/win", m.handleHTTPWin)
+	mux.HandleFunc("/api/v1/wallet/rollback", m.handleHTTPRollback)
+	mux.HandleFunc("/api/v1/wallet/check-transaction", m.handleHTTPCheckTransaction)
+}
+
+func (m *MockClient) handleHTTPBalance(w http.ResponseWriter, r *http.Request) {
+	var req balanceReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	bal, err := m.GetBalance(r.Context(), req.MerchantID, req.UserID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(balanceResp{Balance: bal.Minor()})
+}
+
+func (m *MockClient) handleHTTPBet(w http.ResponseWriter, r *http.Request) {
+	var req txReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := m.Bet(r.Context(), BetReq{
+		MerchantID: req.MerchantID,
+		UserID:     req.UserID,
+		RoundID:    req.RoundID,
+		Amount:     money.AmountFromMinor(req.Amount),
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(txResp{Balance: res.Balance.Minor()})
+}
+
+func (m *MockClient) handleHTTPWin(w http.ResponseWriter, r *http.Request) {
+	var req txReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := m.Win(r.Context(), WinReq{
+		MerchantID: req.MerchantID,
+		UserID:     req.UserID,
+		RoundID:    req.RoundID,
+		Amount:     money.AmountFromMinor(req.Amount),
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(txResp{Balance: res.Balance.Minor()})
+}
+
+func (m *MockClient) handleHTTPRollback(w http.ResponseWriter, r *http.Request) {
+	var req txReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err := m.Rollback(r.Context(), RollbackReq{
+		MerchantID: req.MerchantID,
+		UserID:     req.UserID,
+		RoundID:    req.RoundID,
+		Amount:     money.AmountFromMinor(req.Amount),
+		Reason:     req.Reason,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(txResp{})
+}
+
+func (m *MockClient) handleHTTPCheckTransaction(w http.ResponseWriter, r *http.Request) {
+	var req checkTxReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := m.CheckTransaction(r.Context(), req.MerchantID, req.UserID, req.RoundID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(checkTxResp{
+		RoundID:   res.RoundID,
+		Status:    res.Status,
+		BetAmount: res.BetAmount.Minor(),
+		WinAmount: res.WinAmount.Minor(),
+	})
 }

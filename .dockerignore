@@ -1,0 +1,9 @@
+.git
+.env
+bin/
+client/
+web/
+docs/
+deploy/
+*.md
+**/*_test.go

@@ -78,8 +78,16 @@ migrate-schema-optimize:
 migrate-pending:
 	$(MAKE) migrate-player-profiles migrate-api-governance migrate-game-versions migrate-index-optimize migrate-schema-optimize
 
+migrate-user-id-string:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/10-user-id-string-migration.sql
+
+migrate-ch-user-id:
+	chmod +x scripts/migrate_ch_user_id.sh
+	./scripts/migrate_ch_user_id.sh
+
+
 migrate-all:
-	$(MAKE) migrate-security migrate-wallet migrate-replay migrate-orphan-trace migrate-antiabuse migrate-totp migrate-rbac migrate-money
+	$(MAKE) migrate-security migrate-wallet migrate-replay migrate-orphan-trace migrate-antiabuse migrate-totp migrate-rbac migrate-money migrate-user-id-string migrate-ch-user-id migrate-comment-repair migrate-comment-zh
 
 verify-staging-money:
 	chmod +x scripts/verify_staging_money.sh
@@ -102,8 +110,29 @@ install-goctl:
 codegen:
 	cd services/rgs && goctl api go -api api/rgs.api -dir . -style goZero
 
+apply-biz-schema:
+	chmod +x scripts/apply_docs_database_mysql.sh
+	./scripts/apply_docs_database_mysql.sh
+
+apply-platform-schema:
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docs/database/platform.sql
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docs/database/risk.sql
+
+gen-biz-models:
+	chmod +x scripts/gen_biz_models.sh scripts/verify_biz_models.sh
+	./scripts/gen_biz_models.sh
+	./scripts/verify_biz_models.sh
+	go build ./internal/model/biz/...
+
 up:
 	docker compose up -d
+
+deploy-tools:
+	@test -f .env || cp .env.example .env
+	docker compose up -d mysql redis kafka clickhouse gateway kafka-ui adminer redisinsight
+	docker compose run --rm kafka-init
+	docker compose run --rm clickhouse-init
+	@echo "Mock wallet: 本机 8089 已占用时可跳过；否则 docker compose --profile wallet up -d mock-wallet"
 
 down:
 	docker compose down

@@ -136,6 +136,62 @@ func TestSchemaCustomModelStructsSubsetOfLive(t *testing.T) {
 	}
 }
 
+// liveColumnTypes 读取实际列的 data_type（小写）
+func liveColumnTypes(t *testing.T, db *sql.DB, table string) map[string]string {
+	t.Helper()
+	rows, err := db.Query(`SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.COLUMNS
+		WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`, table)
+	if err != nil {
+		t.Fatalf("查询 %s 列类型失败: %v", table, err)
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var c, ty string
+		if err := rows.Scan(&c, &ty); err != nil {
+			t.Fatal(err)
+		}
+		out[strings.ToLower(c)] = strings.ToLower(ty)
+	}
+	return out
+}
+
+// TestSchemaStringIDColumnsAreVarchar
+//
+// 类型级校验：Go 模型里声明为 string 的 ID 列，数据库必须是字符型。
+// 只比对列名不够——把 Go 的 uint64 改成 string 而库里仍是 BIGINT 时，
+// 列名比对会通过，但运行期 Scan 会失败（这就是 platform-api 里
+// user.status 声明 varchar(191) 而 Go 用 uint8 的同类漂移）。
+func TestSchemaStringIDColumnsAreVarchar(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	// Go 侧为 string 的 ID 列 —— 与 migration 10-user-id-string（USER_ID 统一为 VARCHAR(64)）对应
+	requirements := []struct {
+		table  string
+		column string
+	}{
+		{"pending_transactions", "user_id"},
+		{"wallet_pending_ops", "user_id"},
+		{"game_round_replay", "user_id"},
+	}
+
+	charTypes := map[string]bool{"varchar": true, "char": true, "text": true, "longtext": true, "mediumtext": true}
+	for _, r := range requirements {
+		types := liveColumnTypes(t, db, r.table)
+		got, ok := types[r.column]
+		if !ok {
+			t.Errorf("表 %s 缺少列 %s", r.table, r.column)
+			continue
+		}
+		if !charTypes[got] {
+			t.Errorf("表 %s.%s 数据库类型是 %s，但 Go 模型声明为 string —— "+
+				"运行期 Scan 会失败。请应用 docker/mysql/init/10-user-id-string-migration.sql",
+				r.table, r.column, got)
+		}
+	}
+}
+
 // TestSchemaGeneratedSQLExecutes 真跑一遍生成的 SQL，确保列名与占位符数量都正确。
 // goctl 生成代码里 Insert/Update 的 "?, ?, ?" 是硬编码的，加字段时极易漏改。
 func TestSchemaGeneratedSQLExecutes(t *testing.T) {

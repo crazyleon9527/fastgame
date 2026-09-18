@@ -28,8 +28,8 @@ CH:
 
 Wallet:
   Mock: true
-  BaseURL: ""
-  APIKey: ""
+  BaseURL: "http://127.0.0.1:8089"
+  APIKey: "test_key"
   SignSecret: dev-wallet-hmac-secret
   SignEnabled: false
   VerifyResponse: false
@@ -42,8 +42,7 @@ Game:
 
 Security:
   SkipMerchantSign: true
-  SkipSessionEnvelope: false
-  MerchantKeyCipher: fastgame-dev-cipher-change-me-in-prod
+  SkipSessionEnvelope: true
   TimestampWindowSec: 60
   MaxClockSkewSec: 5
   UserLimitPerSec: 5

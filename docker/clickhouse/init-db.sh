@@ -27,9 +27,7 @@ clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --multiqu
 if [ -f /scripts/02-trace-migration.sql ]; then
   clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --multiquery < /scripts/02-trace-migration.sql
 fi
-if [ -f /scripts/03-money-migration.sql ]; then
-  clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --multiquery < /scripts/03-money-migration.sql
-fi
+# 03/04 为存量库增量迁移，请用 make migrate-ch-money / migrate-ch-user-id
 
 echo "ClickHouse tables:"
 clickhouse-client --host "$HOST" --user "$USER" --password "$PASSWORD" --query "SHOW TABLES FROM fastgame"

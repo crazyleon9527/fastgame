@@ -57,8 +57,8 @@ func (e *Enforcer) Handle(ctx context.Context, alert Alert) error {
 		logx.Errorf("risk alert insert failed: %v", err)
 	}
 
-	if alert.ScopeType == "user" && alert.UserID > 0 {
-		key := fmt.Sprintf("rtp:suspend:user:%d", alert.UserID)
+	if alert.ScopeType == "user" && alert.UserID != "" {
+		key := fmt.Sprintf("rtp:suspend:user:%s", alert.UserID)
 		if err := e.redis.Set(ctx, key, "1", suspendTTL).Err(); err != nil {
 			return err
 		}

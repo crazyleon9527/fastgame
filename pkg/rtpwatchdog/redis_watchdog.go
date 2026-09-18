@@ -28,7 +28,7 @@ func (w *RedisWatchdog) Record(ctx context.Context, in RecordInput) ([]Alert, er
 		return nil, nil
 	}
 	sample := fmt.Sprintf("%d|%d", in.BetMinor, in.WinMinor)
-	userKey := fmt.Sprintf("%s:user:%d", w.prefix, in.UserID)
+	userKey := fmt.Sprintf("%s:user:%s", w.prefix, in.UserID)
 	gameKey := fmt.Sprintf("%s:game:%s:%s", w.prefix, in.MerchantCode, in.GameCode)
 
 	if err := w.pushSample(ctx, userKey, sample, w.cfg.PlayerMax); err != nil {
@@ -39,7 +39,7 @@ func (w *RedisWatchdog) Record(ctx context.Context, in RecordInput) ([]Alert, er
 	}
 
 	var alerts []Alert
-	if alert, ok, err := w.evalKey(ctx, userKey, "user", fmt.Sprintf("%d", in.UserID), in); err != nil {
+	if alert, ok, err := w.evalKey(ctx, userKey, "user", in.UserID, in); err != nil {
 		return nil, err
 	} else if ok {
 		alerts = append(alerts, alert)

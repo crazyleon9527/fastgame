@@ -267,6 +267,19 @@ services:
     networks:
       - fastgame
 
+  mock-wallet:
+    profiles: ["wallet"]
+    build:
+      context: .
+      dockerfile: docker/mockwallet/Dockerfile
+    image: fastgame-mock-wallet:latest
+    container_name: fastgame-mock-wallet
+    restart: unless-stopped
+    ports:
+      - "${MOCK_WALLET_PORT:-8089}:8089"
+    networks:
+      - fastgame
+
 volumes:
   mysql_data:
   redis_data:

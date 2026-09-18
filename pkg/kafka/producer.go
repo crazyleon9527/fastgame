@@ -23,7 +23,7 @@ type RoundSettledEvent struct {
 	EventID    string    `json:"eventId"`
 	TraceID    string    `json:"traceId"`
 	RoundID    string    `json:"roundId"`
-	UserID     uint64    `json:"userId"`
+	UserID     string    `json:"userId"`
 	MerchantID string    `json:"merchantId"`
 	GameCode   string    `json:"gameCode"`
 	BetAmount  int64     `json:"betAmount"`
@@ -38,7 +38,7 @@ type BigWinEvent struct {
 	EventID    string    `json:"eventId"`
 	TraceID    string    `json:"traceId,omitempty"`
 	RoundID    string    `json:"roundId"`
-	UserID     uint64    `json:"userId"`
+	UserID     string    `json:"userId"`
 	MerchantID string    `json:"merchantId"`
 	GameCode   string    `json:"gameCode"`
 	WinAmount  int64     `json:"winAmount"`
@@ -51,7 +51,7 @@ type ReconcileDLQEvent struct {
 	RecordID     uint64    `json:"recordId"`
 	RoundID      string    `json:"roundId"`
 	MerchantCode string    `json:"merchantCode"`
-	UserID       uint64    `json:"userId,omitempty"`
+	UserID       string    `json:"userId,omitempty"`
 	OpType       string    `json:"opType"`
 	RetryCount   int64     `json:"retryCount"`
 	LastError    string    `json:"lastError"`
@@ -62,7 +62,7 @@ type WalletRollbackEvent struct {
 	EventID      string    `json:"eventId"`
 	TraceID      string    `json:"traceId"`
 	RoundID      string    `json:"roundId"`
-	UserID       uint64    `json:"userId"`
+	UserID       string    `json:"userId"`
 	MerchantID   string    `json:"merchantId"`
 	RollbackType string    `json:"rollbackType"`
 	Amount       int64     `json:"amount"`
@@ -90,7 +90,7 @@ func (p *Producer) PublishRoundSettled(ctx context.Context, evt RoundSettledEven
 	if evt.SettledAt.IsZero() {
 		evt.SettledAt = time.Now().UTC()
 	}
-	return p.publish(ctx, TopicRoundSettled, fmt.Sprintf("%d", evt.UserID), evt)
+	return p.publish(ctx, TopicRoundSettled, evt.UserID, evt)
 }
 
 func (p *Producer) PublishBigWin(ctx context.Context, evt BigWinEvent) error {
@@ -121,7 +121,7 @@ func (p *Producer) PublishWalletRollback(ctx context.Context, evt WalletRollback
 	if evt.OccurredAt.IsZero() {
 		evt.OccurredAt = time.Now().UTC()
 	}
-	return p.publish(ctx, TopicWalletRollback, fmt.Sprintf("%d", evt.UserID), evt)
+	return p.publish(ctx, TopicWalletRollback, evt.UserID, evt)
 }
 
 func (p *Producer) publish(ctx context.Context, topic, key string, payload any) error {

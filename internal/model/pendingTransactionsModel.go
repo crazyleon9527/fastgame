@@ -26,23 +26,23 @@ const (
 
 // PendingTransaction 对应表 pending_transactions：孤儿注单自动对账补偿
 type PendingTransaction struct {
-	Id              uint64         `db:"id"`                // 主键
-	TraceID         string         `db:"trace_id"`          // 全链路 TraceID
-	RoundID         string         `db:"round_id"`          // 局 ID，同时作为 nonce
-	MerchantCode    string         `db:"merchant_code"`     // 商户编码
-	UserID          uint64         `db:"user_id"`           // 玩家 ID
-	GameCode        string         `db:"game_code"`         // 游戏编码
-	Phase           string         `db:"phase"`             // 阶段：bet_debited/win_pending/settled/orphan
-	Status          string         `db:"status"`            // 状态：pending/done/failed
-	BetAmount       int64          `db:"bet_amount"`        // 下注额，minor units（scale=10000）
-	WinAmount       int64          `db:"win_amount"`        // 派彩额，minor units
-	ExpectedAction  string         `db:"expected_action"`   // 期望补偿动作：settle_win/rollback_bet/none
+	Id              uint64         `db:"id"` // 主键
+	TraceID         string         `db:"trace_id"` // 全链路 TraceID
+	RoundID         string         `db:"round_id"` // 局 ID，同时作为 nonce
+	MerchantCode    string         `db:"merchant_code"` // 商户编码
+	UserID          string         `db:"user_id"` // 玩家 ID
+	GameCode        string         `db:"game_code"` // 游戏编码
+	Phase           string         `db:"phase"` // 阶段：bet_debited/win_pending/settled/orphan
+	Status          string         `db:"status"` // 状态：pending/done/failed
+	BetAmount       int64          `db:"bet_amount"` // 下注额，minor units（scale=10000）
+	WinAmount       int64          `db:"win_amount"` // 派彩额，minor units
+	ExpectedAction  string         `db:"expected_action"` // 期望补偿动作：settle_win/rollback_bet/none
 	WalletBetStatus string         `db:"wallet_bet_status"` // 钱包扣款状态
 	WalletWinStatus string         `db:"wallet_win_status"` // 钱包派彩状态
-	RetryCount      int64          `db:"retry_count"`       // 已重试次数
-	LastError       sql.NullString `db:"last_error"`        // 最近一次错误信息
-	CreatedAt       time.Time      `db:"created_at"`        // 创建时间（UTC）
-	UpdatedAt       time.Time      `db:"updated_at"`        // 更新时间（UTC）
+	RetryCount      int64          `db:"retry_count"` // 已重试次数
+	LastError       sql.NullString `db:"last_error"`
+	CreatedAt       time.Time      `db:"created_at"`
+	UpdatedAt       time.Time      `db:"updated_at"`
 }
 
 type PendingTransactionsModel interface {
