@@ -79,7 +79,7 @@ migrate-pending:
 	$(MAKE) migrate-player-profiles migrate-api-governance migrate-game-versions migrate-index-optimize migrate-schema-optimize
 
 migrate-user-id-string:
-	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/10-user-id-string-migration.sql
+	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/31-user-id-string-migration.sql
 
 migrate-ch-user-id:
 	chmod +x scripts/migrate_ch_user_id.sh
