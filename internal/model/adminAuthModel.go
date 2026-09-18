@@ -8,15 +8,16 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
+// AdminAuthRecord 对应表 admin_users：管理后台用户
 type AdminAuthRecord struct {
-	Id           uint64         `db:"id"`
-	Username     string         `db:"username"`
-	PasswordHash string         `db:"password_hash"`
-	RoleId       uint64         `db:"role_id"`
-	Status       int64          `db:"status"`
-	TotpSecret          sql.NullString `db:"totp_secret"`
-	TotpEnabled         int64          `db:"totp_enabled"`
-	TotpRecoveryHashes  sql.NullString `db:"totp_recovery_hashes"`
+	Id                 uint64         `db:"id"`                   // 主键
+	Username           string         `db:"username"`             // 用户名
+	PasswordHash       string         `db:"password_hash"`        // 密码哈希（bcrypt）
+	RoleId             uint64         `db:"role_id"`              // 角色 ID（roles.id）
+	Status             int64          `db:"status"`               // 状态：1=启用 0=停用
+	TotpSecret         sql.NullString `db:"totp_secret"`          // TOTP 密钥（加密存储）
+	TotpEnabled        int64          `db:"totp_enabled"`         // 1=已启用二次验证 0=未启用
+	TotpRecoveryHashes sql.NullString `db:"totp_recovery_hashes"` // 一次性恢复码的 bcrypt 哈希
 }
 
 type AdminAuthModel interface {

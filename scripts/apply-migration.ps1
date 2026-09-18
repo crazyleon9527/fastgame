@@ -1,4 +1,4 @@
-# 应用 MySQL 迁移脚本
+﻿# 应用 MySQL 迁移脚本
 # 用法:
 #   .\scripts\apply-migration.ps1 11-platform-games
 #   .\scripts\apply-migration.ps1 all
@@ -46,7 +46,9 @@ if ($Version -eq "all") {
     Apply-SqlFile (Join-Path $InitDir "02-seed.sql")
 } else {
     $pattern = "*$Version*"
-    $files = Get-ChildItem $InitDir -Filter $pattern
+    # 排除回滚脚本：*29-repair-column-comments* 会同时匹配到 -rollback.sql，
+    # 若按名称升序执行会先回滚再修复（虽然最终状态正确，但会产生无谓的反复 ALTER）
+    $files = Get-ChildItem $InitDir -Filter $pattern | Where-Object { $_.Name -notmatch '-rollback\.sql$' }
     if (-not $files) {
         Write-Host "ERROR: No migration matching '$Version' in $InitDir" -ForegroundColor Red
         exit 1

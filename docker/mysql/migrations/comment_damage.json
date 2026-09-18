@@ -1,0 +1,585 @@
+{
+    "generated_at_note":  "comments damaged by wrong charset at table-creation time",
+    "total_damaged_columns":  73,
+    "total_damaged_tables":  27,
+    "unrepairable":  [
+
+                     ],
+    "table_details":  [
+                          {
+                              "table":  "api_rate_limits",
+                              "before":  "商户 API 限流",
+                              "after":  "Merchant API rate limits"
+                          },
+                          {
+                              "table":  "audit_logs",
+                              "before":  "后台操作审计日志",
+                              "after":  "Admin audit log"
+                          },
+                          {
+                              "table":  "commission_rules",
+                              "before":  "商户分润规则",
+                              "after":  "Merchant commission rules"
+                          },
+                          {
+                              "table":  "currencies",
+                              "before":  "币种主数据",
+                              "after":  "Currency master"
+                          },
+                          {
+                              "table":  "game_categories",
+                              "before":  "游戏分类",
+                              "after":  "Game categories"
+                          },
+                          {
+                              "table":  "game_client_versions",
+                              "before":  "游戏客户端版本发布",
+                              "after":  "Game client version releases"
+                          },
+                          {
+                              "table":  "game_maintenance_windows",
+                              "before":  "游戏维护窗口",
+                              "after":  "Game maintenance schedule"
+                          },
+                          {
+                              "table":  "game_round_replay",
+                              "before":  "确定性回放输入",
+                              "after":  "Deterministic replay inputs"
+                          },
+                          {
+                              "table":  "game_rtp_tiers",
+                              "before":  "游戏 RTP 档位",
+                              "after":  "Game RTP tiers"
+                          },
+                          {
+                              "table":  "game_sessions",
+                              "before":  "玩家会话登记",
+                              "after":  "Player session registry"
+                          },
+                          {
+                              "table":  "games",
+                              "before":  "平台游戏目录",
+                              "after":  "Platform game catalog"
+                          },
+                          {
+                              "table":  "i18n_bundles",
+                              "before":  "i18n 词典命名空间",
+                              "after":  "i18n message bundle namespaces"
+                          },
+                          {
+                              "table":  "i18n_entity_translations",
+                              "before":  "业务实体字段翻译",
+                              "after":  "Entity field translations"
+                          },
+                          {
+                              "table":  "i18n_message_translations",
+                              "before":  "i18n 词典译文",
+                              "after":  "i18n message translations"
+                          },
+                          {
+                              "table":  "i18n_messages",
+                              "before":  "i18n 词典键",
+                              "after":  "i18n dictionary keys"
+                          },
+                          {
+                              "table":  "locales",
+                              "before":  "平台支持语言",
+                              "after":  "Supported language locales"
+                          },
+                          {
+                              "table":  "merchant_currencies",
+                              "before":  "商户币种",
+                              "after":  "Merchant currencies"
+                          },
+                          {
+                              "table":  "merchant_game_versions",
+                              "before":  "商户游戏版本策略",
+                              "after":  "Merchant game version policy"
+                          },
+                          {
+                              "table":  "merchant_games",
+                              "before":  "商户游戏开通",
+                              "after":  "Merchant game bindings"
+                          },
+                          {
+                              "table":  "merchant_locales",
+                              "before":  "商户启用语言",
+                              "after":  "Merchant enabled locales"
+                          },
+                          {
+                              "table":  "merchant_settlement_lines",
+                              "before":  "结算周期明细行",
+                              "after":  "Settlement period line items"
+                          },
+                          {
+                              "table":  "merchant_wallet_configs",
+                              "before":  "商户钱包配置",
+                              "after":  "Merchant wallet config"
+                          },
+                          {
+                              "table":  "merchant_webhooks",
+                              "before":  "商户出站 Webhook",
+                              "after":  "Merchant outbound webhooks"
+                          },
+                          {
+                              "table":  "player_merchant_profiles",
+                              "before":  "商户下玩家档案",
+                              "after":  "Player profile per merchant"
+                          },
+                          {
+                              "table":  "schema_archive_policies",
+                              "before":  "表归档保留策略",
+                              "after":  "Table archival retention policies"
+                          },
+                          {
+                              "table":  "schema_migrations",
+                              "before":  "数据库迁移登记",
+                              "after":  "Schema migration registry"
+                          },
+                          {
+                              "table":  "settlement_periods",
+                              "before":  "商户结算周期账单",
+                              "after":  "Merchant settlement billing period"
+                          }
+                      ],
+    "column_details":  [
+                           {
+                               "table":  "api_rate_limits",
+                               "column":  "burst",
+                               "before":  "令牌桶突发容量",
+                               "after":  "token bucket burst"
+                           },
+                           {
+                               "table":  "api_rate_limits",
+                               "column":  "limit_scope",
+                               "before":  "限流范围：global/bet/session/ip",
+                               "after":  "global/bet/session/ip"
+                           },
+                           {
+                               "table":  "api_rate_limits",
+                               "column":  "limit_type",
+                               "before":  "限流类型：rps/daily_quota/concurrent",
+                               "after":  "rps/daily_quota/concurrent"
+                           },
+                           {
+                               "table":  "audit_logs",
+                               "column":  "action",
+                               "before":  "操作动作，如 create_merchant/rotate_key/confirm_settlement",
+                               "after":  "create_merchant/rotate_key/confirm_settlement etc"
+                           },
+                           {
+                               "table":  "audit_logs",
+                               "column":  "detail",
+                               "before":  "请求快照或变更差异",
+                               "after":  "request snapshot / diff"
+                           },
+                           {
+                               "table":  "audit_logs",
+                               "column":  "resource_type",
+                               "before":  "资源类型：merchant/game/config/user/settlement",
+                               "after":  "merchant/game/config/user/settlement"
+                           },
+                           {
+                               "table":  "commission_rules",
+                               "column":  "rule_type",
+                               "before":  "分润方式：ggr_share/fixed_fee",
+                               "after":  "ggr_share/fixed_fee"
+                           },
+                           {
+                               "table":  "game_categories",
+                               "column":  "code",
+                               "before":  "分类编码：fishing/slot/crash/table",
+                               "after":  "fishing/slot/crash/table"
+                           },
+                           {
+                               "table":  "game_client_versions",
+                               "column":  "bundle_hash",
+                               "before":  "包体 SHA-256",
+                               "after":  "SHA-256 of bundle"
+                           },
+                           {
+                               "table":  "game_client_versions",
+                               "column":  "bundle_url",
+                               "before":  "CDN 路径或产物地址",
+                               "after":  "CDN path or artifact URL"
+                           },
+                           {
+                               "table":  "game_client_versions",
+                               "column":  "min_engine_version",
+                               "before":  "要求的引擎版本（Cocos）",
+                               "after":  "Cocos/engine requirement"
+                           },
+                           {
+                               "table":  "game_client_versions",
+                               "column":  "status",
+                               "before":  "状态：draft/published/deprecated",
+                               "after":  "draft/published/deprecated"
+                           },
+                           {
+                               "table":  "game_client_versions",
+                               "column":  "version",
+                               "before":  "语义化版本，如 1.2.0",
+                               "after":  "semver e.g. 1.2.0"
+                           },
+                           {
+                               "table":  "game_maintenance_windows",
+                               "column":  "created_by",
+                               "before":  "创建人（admin_users.id）",
+                               "after":  "admin_users.id"
+                           },
+                           {
+                               "table":  "game_maintenance_windows",
+                               "column":  "game_id",
+                               "before":  "NULL=全部游戏",
+                               "after":  "NULL=all games"
+                           },
+                           {
+                               "table":  "game_maintenance_windows",
+                               "column":  "merchant_id",
+                               "before":  "NULL=平台级维护",
+                               "after":  "NULL=platform-wide"
+                           },
+                           {
+                               "table":  "game_maintenance_windows",
+                               "column":  "status",
+                               "before":  "状态：scheduled/active/completed/cancelled",
+                               "after":  "scheduled/active/completed/cancelled"
+                           },
+                           {
+                               "table":  "game_round_replay",
+                               "column":  "round_id",
+                               "before":  "局 ID，同时作为 nonce",
+                               "after":  "Nonce / Round ID"
+                           },
+                           {
+                               "table":  "game_sessions",
+                               "column":  "client_ip",
+                               "before":  "客户端 IP（IPv4 或 IPv6）",
+                               "after":  "IPv4 or IPv6"
+                           },
+                           {
+                               "table":  "game_sessions",
+                               "column":  "round_count",
+                               "before":  "本次会话内的下注局数",
+                               "after":  "bet rounds in this session"
+                           },
+                           {
+                               "table":  "game_sessions",
+                               "column":  "session_token_hash",
+                               "before":  "会话令牌的 SHA-256，禁止存明文令牌",
+                               "after":  "SHA-256 of session token, never store raw token"
+                           },
+                           {
+                               "table":  "game_sessions",
+                               "column":  "status",
+                               "before":  "状态：active/expired/revoked",
+                               "after":  "active/expired/revoked"
+                           },
+                           {
+                               "table":  "games",
+                               "column":  "game_type",
+                               "before":  "游戏类型：fishing/slot/crash/table",
+                               "after":  "fishing/slot/crash/table"
+                           },
+                           {
+                               "table":  "games",
+                               "column":  "volatility",
+                               "before":  "波动性：low/medium/high",
+                               "after":  "low/medium/high"
+                           },
+                           {
+                               "table":  "i18n_bundles",
+                               "column":  "bundle_code",
+                               "before":  "命名空间，如 ui.admin",
+                               "after":  "namespace e.g. ui.admin"
+                           },
+                           {
+                               "table":  "i18n_entity_translations",
+                               "column":  "entity_type",
+                               "before":  "实体类型：game/category/merchant/role",
+                               "after":  "game/category/merchant/role"
+                           },
+                           {
+                               "table":  "i18n_entity_translations",
+                               "column":  "field_name",
+                               "before":  "字段名：name/description/title",
+                               "after":  "name/description/title"
+                           },
+                           {
+                               "table":  "i18n_message_translations",
+                               "column":  "status",
+                               "before":  "1=已发布 0=草稿",
+                               "after":  "1=published 0=draft"
+                           },
+                           {
+                               "table":  "i18n_messages",
+                               "column":  "default_value",
+                               "before":  "缺少译文时的回退文案",
+                               "after":  "fallback when translation missing"
+                           },
+                           {
+                               "table":  "i18n_messages",
+                               "column":  "description",
+                               "before":  "给译者的上下文说明",
+                               "after":  "translator context"
+                           },
+                           {
+                               "table":  "i18n_messages",
+                               "column":  "message_key",
+                               "before":  "点分路径，如 nav.merchants",
+                               "after":  "dot path e.g. nav.merchants"
+                           },
+                           {
+                               "table":  "locales",
+                               "column":  "code",
+                               "before":  "BCP 47 语言标签，如 en-US、zh-CN",
+                               "after":  "BCP 47 e.g. en-US zh-CN"
+                           },
+                           {
+                               "table":  "locales",
+                               "column":  "direction",
+                               "before":  "书写方向：ltr 或 rtl",
+                               "after":  "ltr or rtl"
+                           },
+                           {
+                               "table":  "locales",
+                               "column":  "is_default",
+                               "before":  "平台默认回退语言",
+                               "after":  "platform fallback locale"
+                           },
+                           {
+                               "table":  "locales",
+                               "column":  "name",
+                               "before":  "英文显示名",
+                               "after":  "English display name"
+                           },
+                           {
+                               "table":  "locales",
+                               "column":  "native_name",
+                               "before":  "该语言自身的名称",
+                               "after":  "Name in own language"
+                           },
+                           {
+                               "table":  "merchant_game_versions",
+                               "column":  "min_version_id",
+                               "before":  "低于此版本强制升级",
+                               "after":  "force upgrade below this version"
+                           },
+                           {
+                               "table":  "merchant_game_versions",
+                               "column":  "rollout_percent",
+                               "before":  "灰度发布比例 0-100",
+                               "after":  "canary rollout 0-100"
+                           },
+                           {
+                               "table":  "merchant_locales",
+                               "column":  "is_default",
+                               "before":  "商户默认语言",
+                               "after":  "merchant default language"
+                           },
+                           {
+                               "table":  "merchant_settlement_lines",
+                               "column":  "amount_minor",
+                               "before":  "带符号的明细金额",
+                               "after":  "signed line amount"
+                           },
+                           {
+                               "table":  "merchant_settlement_lines",
+                               "column":  "commission_rate_ppm",
+                               "before":  "结算时的费率快照",
+                               "after":  "snapshot of rate at close"
+                           },
+                           {
+                               "table":  "merchant_settlement_lines",
+                               "column":  "daily_settlement_id",
+                               "before":  "关联 daily_settlements.id",
+                               "after":  "link to daily_settlements.id"
+                           },
+                           {
+                               "table":  "merchant_settlement_lines",
+                               "column":  "ref_date",
+                               "before":  "daily_aggregate 类型对应的日期",
+                               "after":  "for daily_aggregate lines"
+                           },
+                           {
+                               "table":  "merchant_wallet_configs",
+                               "column":  "wallet_type",
+                               "before":  "钱包类型：seamless/transfer/mock",
+                               "after":  "seamless/transfer/mock"
+                           },
+                           {
+                               "table":  "merchant_webhooks",
+                               "column":  "event_type",
+                               "before":  "事件类型：settlement.confirmed/bigwin/risk.alert",
+                               "after":  "settlement.confirmed/bigwin/risk.alert"
+                           },
+                           {
+                               "table":  "merchant_webhooks",
+                               "column":  "headers",
+                               "before":  "附加 HTTP 请求头",
+                               "after":  "extra HTTP headers"
+                           },
+                           {
+                               "table":  "merchant_webhooks",
+                               "column":  "secret",
+                               "before":  "HMAC 签名密钥",
+                               "after":  "HMAC signing secret"
+                           },
+                           {
+                               "table":  "merchant_webhooks",
+                               "column":  "status",
+                               "before":  "1=启用 0=停用",
+                               "after":  "1=active 0=disabled"
+                           },
+                           {
+                               "table":  "pending_transactions",
+                               "column":  "expected_action",
+                               "before":  "期望补偿动作：settle_win/rollback_bet/none",
+                               "after":  "settle_win|rollback_bet|none"
+                           },
+                           {
+                               "table":  "pending_transactions",
+                               "column":  "phase",
+                               "before":  "阶段：bet_debited/win_pending/settled/orphan",
+                               "after":  "bet_debited|win_pending|settled|orphan"
+                           },
+                           {
+                               "table":  "pending_transactions",
+                               "column":  "round_id",
+                               "before":  "局 ID，同时作为 nonce",
+                               "after":  "Round / Nonce"
+                           },
+                           {
+                               "table":  "pending_transactions",
+                               "column":  "status",
+                               "before":  "状态：pending/done/failed",
+                               "after":  "pending|done|failed"
+                           },
+                           {
+                               "table":  "player_merchant_profiles",
+                               "column":  "bet_limit_override",
+                               "before":  "注额上限覆盖，如 {\"min\":10000,\"max\":5000000}",
+                               "after":  "{\"min\":10000,\"max\":5000000}"
+                           },
+                           {
+                               "table":  "player_merchant_profiles",
+                               "column":  "external_user_ref",
+                               "before":  "商户侧的玩家字符串 ID（可选）",
+                               "after":  "optional merchant-side string id"
+                           },
+                           {
+                               "table":  "player_merchant_profiles",
+                               "column":  "risk_level",
+                               "before":  "风险等级：0=正常，9=封禁",
+                               "after":  "0=normal, 9=blocked"
+                           },
+                           {
+                               "table":  "player_merchant_profiles",
+                               "column":  "status",
+                               "before":  "1=正常 0=暂停",
+                               "after":  "1=active 0=suspended"
+                           },
+                           {
+                               "table":  "player_merchant_profiles",
+                               "column":  "tags",
+                               "before":  "标签，如 [\"high_roller\",\"test\"]",
+                               "after":  "[\"high_roller\",\"test\"]"
+                           },
+                           {
+                               "table":  "player_merchant_profiles",
+                               "column":  "user_id",
+                               "before":  "商户体系内的玩家 ID",
+                               "after":  "player id in merchant system"
+                           },
+                           {
+                               "table":  "player_merchant_profiles",
+                               "column":  "vip_level",
+                               "before":  "VIP 等级：0=普通，越大越高",
+                               "after":  "0=normal, higher=better"
+                           },
+                           {
+                               "table":  "risk_alerts",
+                               "column":  "scope_type",
+                               "before":  "作用域：user 或 game",
+                               "after":  "user | game"
+                           },
+                           {
+                               "table":  "risk_blacklist",
+                               "column":  "list_type",
+                               "before":  "名单类型：ip / user_id / merchant",
+                               "after":  "ip / user_id / merchant"
+                           },
+                           {
+                               "table":  "schema_archive_policies",
+                               "column":  "archive_strategy",
+                               "before":  "归档方式：delete/export_to_s3/partition_drop",
+                               "after":  "delete/export_to_s3/partition_drop"
+                           },
+                           {
+                               "table":  "schema_archive_policies",
+                               "column":  "cold_retention_days",
+                               "before":  "清理前的冷存储保留天数（可选）",
+                               "after":  "optional cold storage before purge"
+                           },
+                           {
+                               "table":  "schema_archive_policies",
+                               "column":  "hot_retention_days",
+                               "before":  "MySQL 热层保留天数",
+                               "after":  "keep in MySQL hot tier"
+                           },
+                           {
+                               "table":  "schema_archive_policies",
+                               "column":  "partition_column",
+                               "before":  "分区列，如按月分区的 created_at",
+                               "after":  "e.g. created_at for monthly partitions"
+                           },
+                           {
+                               "table":  "settlement_periods",
+                               "column":  "commission_minor",
+                               "before":  "平台从 GGR 中抽取的分成",
+                               "after":  "platform share from GGR"
+                           },
+                           {
+                               "table":  "settlement_periods",
+                               "column":  "confirmed_by",
+                               "before":  "确认人（admin_users.id）",
+                               "after":  "admin_users.id"
+                           },
+                           {
+                               "table":  "settlement_periods",
+                               "column":  "ggr_minor",
+                               "before":  "GGR = 总下注 − 总派彩",
+                               "after":  "total_bet - total_win"
+                           },
+                           {
+                               "table":  "settlement_periods",
+                               "column":  "net_payable_minor",
+                               "before":  "应付净额（平台应收）",
+                               "after":  "amount due (platform receivable)"
+                           },
+                           {
+                               "table":  "settlement_periods",
+                               "column":  "period_type",
+                               "before":  "周期类型：daily/weekly/monthly",
+                               "after":  "daily/weekly/monthly"
+                           },
+                           {
+                               "table":  "settlement_periods",
+                               "column":  "status",
+                               "before":  "状态：draft/pending_review/confirmed/invoiced/paid",
+                               "after":  "draft/pending_review/confirmed/invoiced/paid"
+                           },
+                           {
+                               "table":  "wallet_pending_ops",
+                               "column":  "op_type",
+                               "before":  "操作类型：win_failed / win_timeout / rollback",
+                               "after":  "win_failed / win_timeout / rollback"
+                           },
+                           {
+                               "table":  "wallet_pending_ops",
+                               "column":  "status",
+                               "before":  "状态：pending / done / failed",
+                               "after":  "pending / done / failed"
+                           }
+                       ]
+}

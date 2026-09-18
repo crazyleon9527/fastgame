@@ -15,15 +15,16 @@ const (
 	BlacklistTypeMerchant = "merchant"
 )
 
+// RiskBlacklist 对应表 risk_blacklist：风控黑名单
 type RiskBlacklist struct {
-	Id        uint64       `db:"id"`
-	ListType  string       `db:"list_type"`
-	ListValue string       `db:"list_value"`
-	Reason    string       `db:"reason"`
-	Status    int64        `db:"status"`
-	ExpiresAt sql.NullTime `db:"expires_at"`
-	CreatedAt time.Time    `db:"created_at"`
-	UpdatedAt time.Time    `db:"updated_at"`
+	Id        uint64       `db:"id"`         // 主键
+	ListType  string       `db:"list_type"`  // 名单类型：ip / user_id / merchant
+	ListValue string       `db:"list_value"` // 黑名单值
+	Reason    string       `db:"reason"`     // 封禁原因
+	Status    int64        `db:"status"`     // 1=生效 0=解除
+	ExpiresAt sql.NullTime `db:"expires_at"` // NULL=永久
+	CreatedAt time.Time    `db:"created_at"` // 创建时间（UTC）
+	UpdatedAt time.Time    `db:"updated_at"` // 更新时间（UTC）
 }
 
 type RiskBlacklistModel interface {

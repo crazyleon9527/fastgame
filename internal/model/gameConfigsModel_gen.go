@@ -37,16 +37,17 @@ type (
 		table string
 	}
 
+	// GameConfigs 对应表 game_configs：游戏参数配置
 	GameConfigs struct {
-		Id          uint64         `db:"id"`
-		MerchantId  uint64         `db:"merchant_id"`
-		GameCode    string         `db:"game_code"`
-		ConfigKey   string         `db:"config_key"`
-		ConfigValue string         `db:"config_value"`
-		RtpTier     sql.NullString `db:"rtp_tier"`
-		Status      int64          `db:"status"`
-		CreatedAt   time.Time      `db:"created_at"`
-		UpdatedAt   time.Time      `db:"updated_at"`
+		Id          uint64         `db:"id"`           // 主键
+		MerchantId  uint64         `db:"merchant_id"`  // 商户 ID（merchants.id）
+		GameCode    string         `db:"game_code"`    // 游戏标识
+		ConfigKey   string         `db:"config_key"`   // 配置键
+		ConfigValue string         `db:"config_value"` // 配置值
+		RtpTier     sql.NullString `db:"rtp_tier"`     // RTP 档位
+		Status      int64          `db:"status"`       // 状态：1=启用 0=停用
+		CreatedAt   time.Time      `db:"created_at"`   // 创建时间（UTC）
+		UpdatedAt   time.Time      `db:"updated_at"`   // 更新时间（UTC）
 	}
 )
 

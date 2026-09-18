@@ -7,10 +7,11 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
+// RoleRow 对应表 games：平台游戏目录
 type RoleRow struct {
-	Id          uint64 `db:"id"`
-	Name        string `db:"name"`
-	Description string `db:"description"`
+	Id          uint64 `db:"id"`          // 主键
+	Name        string `db:"name"`        // 名称
+	Description string `db:"description"` // 说明
 }
 
 type RolesModel interface {

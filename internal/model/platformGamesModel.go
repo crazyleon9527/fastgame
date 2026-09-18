@@ -9,12 +9,13 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
+// GameCategory 对应表 game_categories：游戏分类
 type GameCategory struct {
-	Id        uint64 `db:"id"`
-	Code      string `db:"code"`
-	Name      string `db:"name"`
-	SortOrder int64  `db:"sort_order"`
-	Status    int64  `db:"status"`
+	Id        uint64 `db:"id"`         // 主键
+	Code      string `db:"code"`       // 分类编码：fishing/slot/crash/table
+	Name      string `db:"name"`       // 名称
+	SortOrder int64  `db:"sort_order"` // 排序序号
+	Status    int64  `db:"status"`     // 状态：1=启用 0=停用
 }
 
 type PlatformGame struct {
@@ -37,14 +38,15 @@ type PlatformGame struct {
 	UpdatedAt     time.Time      `db:"updated_at"`
 }
 
+// GameRtpTier 对应表 game_rtp_tiers：游戏 RTP 档位
 type GameRtpTier struct {
-	Id           uint64 `db:"id"`
-	GameId       uint64 `db:"game_id"`
-	TierCode     string `db:"tier_code"`
-	TargetRtpPpm int64  `db:"target_rtp_ppm"`
-	ParSheetRef  string `db:"par_sheet_ref"`
-	Weight       int64  `db:"weight"`
-	Status       int64  `db:"status"`
+	Id           uint64 `db:"id"`             // 主键
+	GameId       uint64 `db:"game_id"`        // 游戏 ID（games.id）
+	TierCode     string `db:"tier_code"`      // default/high/low 等
+	TargetRtpPpm int64  `db:"target_rtp_ppm"` // 目标 RTP ppm
+	ParSheetRef  string `db:"par_sheet_ref"`  // PAR 表文件/版本引用
+	Weight       int64  `db:"weight"`         // 随机权重
+	Status       int64  `db:"status"`         // 状态：1=启用 0=停用
 }
 
 type MerchantGameRow struct {

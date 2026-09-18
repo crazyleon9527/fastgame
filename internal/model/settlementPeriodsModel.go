@@ -9,25 +9,26 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
+// SettlementPeriod 对应表 settlement_periods：商户结算周期账单
 type SettlementPeriod struct {
-	Id              uint64    `db:"id"`
-	MerchantId      uint64    `db:"merchant_id"`
-	PeriodType      string    `db:"period_type"`
-	PeriodStart     time.Time `db:"period_start"`
-	PeriodEnd       time.Time `db:"period_end"`
-	CurrencyCode    string    `db:"currency_code"`
-	TotalBetMinor   int64     `db:"total_bet_minor"`
-	TotalWinMinor   int64     `db:"total_win_minor"`
-	GgrMinor        int64     `db:"ggr_minor"`
-	CommissionMinor int64     `db:"commission_minor"`
-	NetPayableMinor int64     `db:"net_payable_minor"`
-	TotalRounds     uint64    `db:"total_rounds"`
-	Status          string    `db:"status"`
-	ConfirmedBy     sql.NullInt64  `db:"confirmed_by"`
-	ConfirmedAt     sql.NullTime   `db:"confirmed_at"`
-	Notes           sql.NullString `db:"notes"`
-	CreatedAt       time.Time `db:"created_at"`
-	UpdatedAt       time.Time `db:"updated_at"`
+	Id              uint64         `db:"id"`                // 主键
+	MerchantId      uint64         `db:"merchant_id"`       // 商户 ID（merchants.id）
+	PeriodType      string         `db:"period_type"`       // 周期类型：daily/weekly/monthly
+	PeriodStart     time.Time      `db:"period_start"`      // 结算周期开始（UTC）
+	PeriodEnd       time.Time      `db:"period_end"`        // 结算周期结束（UTC）
+	CurrencyCode    string         `db:"currency_code"`     // 币种编码（currencies.code）
+	TotalBetMinor   int64          `db:"total_bet_minor"`   // 总下注额，minor units
+	TotalWinMinor   int64          `db:"total_win_minor"`   // 总派彩额，minor units
+	GgrMinor        int64          `db:"ggr_minor"`         // GGR = 总下注 − 总派彩
+	CommissionMinor int64          `db:"commission_minor"`  // 平台从 GGR 中抽取的分成
+	NetPayableMinor int64          `db:"net_payable_minor"` // 应付净额（平台应收）
+	TotalRounds     uint64         `db:"total_rounds"`      // 总局数
+	Status          string         `db:"status"`            // 状态：draft/pending_review/confirmed/invoiced/paid
+	ConfirmedBy     sql.NullInt64  `db:"confirmed_by"`      // 确认人（admin_users.id）
+	ConfirmedAt     sql.NullTime   `db:"confirmed_at"`      // 确认时间（UTC）
+	Notes           sql.NullString `db:"notes"`             // 备注
+	CreatedAt       time.Time      `db:"created_at"`        // 创建时间（UTC）
+	UpdatedAt       time.Time      `db:"updated_at"`        // 更新时间（UTC）
 }
 
 type SettlementPeriodsModel interface {

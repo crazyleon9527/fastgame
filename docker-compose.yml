@@ -173,6 +173,54 @@ services:
     networks:
       - fastgame
 
+  # phpMyAdmin — MySQL 图形化面板 (SQL 编辑器 / 表结构 / 导入导出)
+  phpmyadmin:
+    profiles:
+      - dev-tools
+    image: phpmyadmin:5
+    container_name: fastgame-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PHPMYADMIN_PORT:-18082}:80"
+    environment:
+      # 主机/端口由环境变量写死，登录页不再要求填写服务器（PMA_ARBITRARY 会
+      # 多出一个"服务器"输入框，且默认值 127.0.0.1 在容器内指向容器自身，会连不上）
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 256M
+      MEMORY_LIMIT: 512M
+      # 空密码登录在本地开发面板上没必要放开，默认关闭更安全
+      PMA_ALLOW_NO_PASSWORD: 0
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - fastgame
+
+  # CH-UI — ClickHouse 图形化面板 (SQL 编辑器 / 库表浏览 / 图表)
+  # 首次登录用 ClickHouse 账号: fastgame / fastgame_pass
+  ch-ui:
+    profiles:
+      - dev-tools
+    image: ghcr.io/caioricciuti/ch-ui:latest
+    container_name: fastgame-ch-ui
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CH_UI_PORT:-18124}:3488"
+    environment:
+      PORT: 3488
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CONNECTION_NAME: FastGame ClickHouse
+      DATABASE_PATH: /app/data/ch-ui.db
+      APP_SECRET_KEY: ${CH_UI_SECRET:-fastgame-ch-ui-dev-secret}
+    volumes:
+      - ch_ui_data:/app/data
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - fastgame
+
   gateway:
     build:
       context: ./docker/nginx
@@ -225,6 +273,7 @@ volumes:
   clickhouse_data:
   kafka_data:
   redisinsight_data:
+  ch_ui_data:
 
 networks:
   fastgame:

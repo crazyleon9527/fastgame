@@ -9,16 +9,17 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
+// DailySettlement 对应表 daily_settlements：每日结算对账单
 type DailySettlement struct {
-	Id          uint64    `db:"id"`
-	MerchantId  uint64    `db:"merchant_id"`
-	SettleDate  time.Time `db:"settle_date"`
-	TotalBet    int64     `db:"total_bet"`
-	TotalWin    int64     `db:"total_win"`
-	TotalRounds uint64    `db:"total_rounds"`
-	Status      int64     `db:"status"`
-	CreatedAt   time.Time `db:"created_at"`
-	UpdatedAt   time.Time `db:"updated_at"`
+	Id          uint64    `db:"id"`           // 主键
+	MerchantId  uint64    `db:"merchant_id"`  // 商户 ID（merchants.id）
+	SettleDate  time.Time `db:"settle_date"`  // 结算日期 UTC
+	TotalBet    int64     `db:"total_bet"`    // 总下注额，minor units
+	TotalWin    int64     `db:"total_win"`    // 总派彩额，minor units
+	TotalRounds uint64    `db:"total_rounds"` // 总局数
+	Status      int64     `db:"status"`       // 0=待确认 1=已确认
+	CreatedAt   time.Time `db:"created_at"`   // 创建时间（UTC）
+	UpdatedAt   time.Time `db:"updated_at"`   // 更新时间（UTC）
 }
 
 type DailySettlementsModel interface {

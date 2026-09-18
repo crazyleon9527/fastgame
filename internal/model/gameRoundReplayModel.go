@@ -8,18 +8,19 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
+// GameRoundReplay 对应表 game_round_replay：确定性回放输入
 type GameRoundReplay struct {
-	Id           uint64    `db:"id"`
-	RoundID      string    `db:"round_id"`
-	MerchantCode string    `db:"merchant_code"`
-	UserID       uint64    `db:"user_id"`
-	GameCode     string    `db:"game_code"`
-	ServerSeed   string    `db:"server_seed"`
-	ClientSeed   string    `db:"client_seed"`
-	Nonce        string    `db:"nonce"`
-	BetAmount    int64     `db:"bet_amount"`
-	SequenceID   uint64    `db:"sequence_id"`
-	CreatedAt    time.Time `db:"created_at"`
+	Id           uint64    `db:"id"`            // 主键
+	RoundID      string    `db:"round_id"`      // 局 ID，同时作为 nonce
+	MerchantCode string    `db:"merchant_code"` // 商户编码
+	UserID       uint64    `db:"user_id"`       // 玩家 ID
+	GameCode     string    `db:"game_code"`     // 游戏编码
+	ServerSeed   string    `db:"server_seed"`   // 服务端种子（hex）
+	ClientSeed   string    `db:"client_seed"`   // 客户端种子
+	Nonce        string    `db:"nonce"`         // 局 ID（provably-fair 的 nonce）
+	BetAmount    int64     `db:"bet_amount"`    // 下注额，minor units
+	SequenceID   uint64    `db:"sequence_id"`   // 会话内单调递增序号
+	CreatedAt    time.Time `db:"created_at"`    // 创建时间（UTC）
 }
 
 type GameRoundReplayModel interface {

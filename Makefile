@@ -59,6 +59,15 @@ migrate-index-optimize:
 migrate-i18n:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/24-i18n-dictionary-migration.sql
 
+# 修复被错误 charset 毁掉的表/列注释（内容取自迁移文件，只改 COMMENT 不改类型）
+# 回滚: docker/mysql/init/29-repair-column-comments-rollback.sql
+migrate-comment-repair:
+	docker exec -i fastgame-mysql mysql --default-character-set=utf8mb4 -ufastgame -pfastgame_pass fastgame < docker/mysql/init/29-repair-column-comments-migration.sql
+
+# 把英文表/列注释改为简体中文
+migrate-comment-zh:
+	docker exec -i fastgame-mysql mysql --default-character-set=utf8mb4 -ufastgame -pfastgame_pass fastgame < docker/mysql/init/30-translate-comments-migration.sql
+
 migrate-schema-optimize:
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/19-normalize-merchant-refs-migration.sql
 	docker exec -i fastgame-mysql mysql -ufastgame -pfastgame_pass fastgame < docker/mysql/init/20-audit-archive-policy-migration.sql

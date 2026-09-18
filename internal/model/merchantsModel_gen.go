@@ -37,15 +37,19 @@ type (
 		table string
 	}
 
+	// Merchants 对应表 merchants：商户主体
 	Merchants struct {
-		Id           uint64         `db:"id"`
-		MerchantCode string         `db:"merchant_code"`
-		Name         string         `db:"name"`
-		PublicKey    sql.NullString `db:"public_key"`
-		PrivateKey   sql.NullString `db:"private_key"`
-		Status       int64          `db:"status"`
-		CreatedAt    time.Time      `db:"created_at"`
-		UpdatedAt    time.Time      `db:"updated_at"`
+		Id                      uint64         `db:"id"`                          // 主键
+		MerchantCode            string         `db:"merchant_code"`               // 商户唯一编码
+		Name                    string         `db:"name"`                        // 商户名称
+		PublicKey               sql.NullString `db:"public_key"`                  // API 公钥
+		PrivateKey              sql.NullString `db:"private_key"`                 // API 私钥 (加密存储)
+		PrivateKeyPrev          sql.NullString `db:"private_key_prev"`            // 轮换过渡期旧私钥
+		PrivateKeyPrevExpiresAt sql.NullTime   `db:"private_key_prev_expires_at"` // 旧私钥失效时间
+		AllowedIPs              sql.NullString `db:"allowed_ips"`                 // 聚合器报备公网 IP 白名单
+		Status                  int64          `db:"status"`                      // 1=启用 0=禁用
+		CreatedAt               time.Time      `db:"created_at"`                  // 创建时间（UTC）
+		UpdatedAt               time.Time      `db:"updated_at"`                  // 更新时间（UTC）
 	}
 )
 
@@ -91,14 +95,14 @@ func (m *defaultMerchantsModel) FindOneByMerchantCode(ctx context.Context, merch
 }
 
 func (m *defaultMerchantsModel) Insert(ctx context.Context, data *Merchants) (sql.Result, error) {
-	query := fmt.Sprintf("insert into %s (%s) values (?, ?, ?, ?, ?)", m.table, merchantsRowsExpectAutoSet)
-	ret, err := m.conn.ExecCtx(ctx, query, data.MerchantCode, data.Name, data.PublicKey, data.PrivateKey, data.Status)
+	query := fmt.Sprintf("insert into %s (%s) values (?, ?, ?, ?, ?, ?, ?, ?)", m.table, merchantsRowsExpectAutoSet)
+	ret, err := m.conn.ExecCtx(ctx, query, data.MerchantCode, data.Name, data.PublicKey, data.PrivateKey, data.PrivateKeyPrev, data.PrivateKeyPrevExpiresAt, data.AllowedIPs, data.Status)
 	return ret, err
 }
 
 func (m *defaultMerchantsModel) Update(ctx context.Context, newData *Merchants) error {
 	query := fmt.Sprintf("update %s set %s where `id` = ?", m.table, merchantsRowsWithPlaceHolder)
-	_, err := m.conn.ExecCtx(ctx, query, newData.MerchantCode, newData.Name, newData.PublicKey, newData.PrivateKey, newData.Status, newData.Id)
+	_, err := m.conn.ExecCtx(ctx, query, newData.MerchantCode, newData.Name, newData.PublicKey, newData.PrivateKey, newData.PrivateKeyPrev, newData.PrivateKeyPrevExpiresAt, newData.AllowedIPs, newData.Status, newData.Id)
 	return err
 }
 

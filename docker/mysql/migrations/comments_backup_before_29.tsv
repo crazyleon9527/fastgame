@@ -1,0 +1,393 @@
+﻿admin_users	id	
+admin_users	username	
+admin_users	password_hash	
+admin_users	role_id	
+admin_users	status	
+admin_users	created_at	
+admin_users	updated_at	
+admin_users	totp_secret	
+admin_users	totp_enabled	
+admin_users	totp_recovery_hashes	bcrypt hashes of one-time recovery codes
+api_rate_limits	id	
+api_rate_limits	merchant_id	
+api_rate_limits	limit_scope	global/bet/session/ip
+api_rate_limits	limit_type	rps/daily_quota/concurrent
+api_rate_limits	limit_value	
+api_rate_limits	window_seconds	
+api_rate_limits	burst	token bucket burst
+api_rate_limits	status	
+api_rate_limits	created_at	
+api_rate_limits	updated_at	
+audit_logs	id	
+audit_logs	admin_user_id	
+audit_logs	username	
+audit_logs	role_name	
+audit_logs	action	create_merchant/rotate_key/confirm_settlement etc
+audit_logs	resource_type	merchant/game/config/user/settlement
+audit_logs	resource_id	
+audit_logs	http_method	
+audit_logs	request_path	
+audit_logs	detail	request snapshot / diff
+audit_logs	client_ip	
+audit_logs	status_code	
+audit_logs	created_at	
+commission_rules	id	
+commission_rules	merchant_id	
+commission_rules	game_id	NULL=????
+commission_rules	rule_type	ggr_share/fixed_fee
+commission_rules	rate_ppm	150000=15% ??
+commission_rules	min_fee_minor	
+commission_rules	effective_from	
+commission_rules	effective_to	NULL=????
+commission_rules	status	
+commission_rules	created_at	
+commission_rules	updated_at	
+currencies	code	ISO ?????? USD CNY USDT
+currencies	name	
+currencies	symbol	
+currencies	minor_units	??????? money.Scale=10000 ?? 4
+currencies	status	1=?? 0=??
+currencies	created_at	
+currencies	updated_at	
+daily_settlements	id	
+daily_settlements	merchant_id	
+daily_settlements	settle_date	结算日期 UTC
+daily_settlements	total_bet	minor units
+daily_settlements	total_win	minor units
+daily_settlements	total_rounds	
+daily_settlements	status	0=待确认 1=已确认
+daily_settlements	settlement_period_id	FK to settlement_periods when rolled up
+daily_settlements	created_at	
+daily_settlements	updated_at	
+game_categories	id	
+game_categories	code	fishing/slot/crash/table
+game_categories	name	
+game_categories	sort_order	
+game_categories	status	
+game_categories	created_at	
+game_categories	updated_at	
+game_client_versions	id	
+game_client_versions	game_id	
+game_client_versions	version	semver e.g. 1.2.0
+game_client_versions	bundle_url	CDN path or artifact URL
+game_client_versions	bundle_hash	SHA-256 of bundle
+game_client_versions	changelog	
+game_client_versions	min_engine_version	Cocos/engine requirement
+game_client_versions	status	draft/published/deprecated
+game_client_versions	published_at	
+game_client_versions	created_at	
+game_client_versions	updated_at	
+game_configs	id	
+game_configs	merchant_id	
+game_configs	game_code	游戏标识
+game_configs	config_key	配置键
+game_configs	config_value	配置值
+game_configs	rtp_tier	RTP 档位
+game_configs	status	
+game_configs	created_at	
+game_configs	updated_at	
+game_maintenance_windows	id	
+game_maintenance_windows	game_id	NULL=all games
+game_maintenance_windows	merchant_id	NULL=platform-wide
+game_maintenance_windows	title	
+game_maintenance_windows	reason	
+game_maintenance_windows	starts_at	
+game_maintenance_windows	ends_at	
+game_maintenance_windows	status	scheduled/active/completed/cancelled
+game_maintenance_windows	created_by	admin_users.id
+game_maintenance_windows	cancelled_by	
+game_maintenance_windows	cancelled_at	
+game_maintenance_windows	created_at	
+game_maintenance_windows	updated_at	
+game_round_replay	id	
+game_round_replay	round_id	Nonce / Round ID
+game_round_replay	merchant_id	
+game_round_replay	merchant_code	
+game_round_replay	user_id	
+game_round_replay	game_code	
+game_round_replay	server_seed	
+game_round_replay	client_seed	
+game_round_replay	nonce	
+game_round_replay	bet_amount	minor units
+game_round_replay	sequence_id	
+game_round_replay	created_at	
+game_rtp_tiers	id	
+game_rtp_tiers	game_id	
+game_rtp_tiers	tier_code	default/high/low ?
+game_rtp_tiers	target_rtp_ppm	?? RTP ppm
+game_rtp_tiers	par_sheet_ref	PAR ???/????
+game_rtp_tiers	weight	????
+game_rtp_tiers	status	
+game_rtp_tiers	created_at	
+game_rtp_tiers	updated_at	
+game_sessions	id	
+game_sessions	session_token_hash	SHA-256 of session token, never store raw token
+game_sessions	merchant_id	
+game_sessions	merchant_code	
+game_sessions	user_id	
+game_sessions	game_id	
+game_sessions	game_code	
+game_sessions	currency_code	
+game_sessions	client_seed	
+game_sessions	server_seed_hash	
+game_sessions	client_ip	IPv4 or IPv6
+game_sessions	user_agent	
+game_sessions	status	active/expired/revoked
+game_sessions	round_count	bet rounds in this session
+game_sessions	expires_at	
+game_sessions	last_active_at	
+game_sessions	created_at	
+game_sessions	updated_at	
+games	id	
+games	game_code	????????
+games	name	
+games	category_id	
+games	game_type	fishing/slot/crash/table
+games	default_rtp_ppm	?? RTP?96%=960000
+games	volatility	low/medium/high
+games	min_bet_minor	????? minor units
+games	max_bet_minor	????? minor units
+games	client_version	???????
+games	thumbnail_url	
+games	description	
+games	status	1=?? 0=?? 2=??
+games	launched_at	
+games	created_at	
+games	updated_at	
+i18n_bundles	id	
+i18n_bundles	bundle_code	namespace e.g. ui.admin
+i18n_bundles	description	
+i18n_bundles	status	
+i18n_bundles	created_at	
+i18n_bundles	updated_at	
+i18n_entity_translations	id	
+i18n_entity_translations	entity_type	game/category/merchant/role
+i18n_entity_translations	entity_id	
+i18n_entity_translations	field_name	name/description/title
+i18n_entity_translations	locale_code	
+i18n_entity_translations	translated_value	
+i18n_entity_translations	status	
+i18n_entity_translations	created_at	
+i18n_entity_translations	updated_at	
+i18n_message_translations	id	
+i18n_message_translations	message_id	
+i18n_message_translations	locale_code	
+i18n_message_translations	translated_value	
+i18n_message_translations	status	1=published 0=draft
+i18n_message_translations	created_at	
+i18n_message_translations	updated_at	
+i18n_messages	id	
+i18n_messages	bundle_id	
+i18n_messages	message_key	dot path e.g. nav.merchants
+i18n_messages	default_value	fallback when translation missing
+i18n_messages	description	translator context
+i18n_messages	status	
+i18n_messages	created_at	
+i18n_messages	updated_at	
+locales	code	BCP 47 e.g. en-US zh-CN
+locales	name	English display name
+locales	native_name	Name in own language
+locales	direction	ltr or rtl
+locales	sort_order	
+locales	is_default	platform fallback locale
+locales	status	
+locales	created_at	
+locales	updated_at	
+merchant_currencies	id	
+merchant_currencies	merchant_id	
+merchant_currencies	currency_code	
+merchant_currencies	is_default	1=????
+merchant_currencies	status	
+merchant_currencies	created_at	
+merchant_currencies	updated_at	
+merchant_game_versions	id	
+merchant_game_versions	merchant_id	
+merchant_game_versions	game_id	
+merchant_game_versions	client_version_id	
+merchant_game_versions	min_version_id	force upgrade below this version
+merchant_game_versions	force_upgrade	
+merchant_game_versions	rollout_percent	canary rollout 0-100
+merchant_game_versions	status	
+merchant_game_versions	effective_from	
+merchant_game_versions	created_at	
+merchant_game_versions	updated_at	
+merchant_games	id	
+merchant_games	merchant_id	
+merchant_games	game_id	
+merchant_games	rtp_tier_code	???? RTP ??
+merchant_games	min_bet_minor	??????NULL=?????
+merchant_games	max_bet_minor	?????
+merchant_games	sort_order	??????
+merchant_games	status	1=?? 0=??
+merchant_games	opened_at	????
+merchant_games	created_at	
+merchant_games	updated_at	
+merchant_locales	id	
+merchant_locales	merchant_id	
+merchant_locales	locale_code	
+merchant_locales	is_default	merchant default language
+merchant_locales	sort_order	
+merchant_locales	status	
+merchant_locales	created_at	
+merchant_locales	updated_at	
+merchant_settlement_lines	id	
+merchant_settlement_lines	settlement_period_id	
+merchant_settlement_lines	merchant_id	
+merchant_settlement_lines	line_type	daily_aggregate/game_breakdown/commission/adjustment
+merchant_settlement_lines	ref_date	for daily_aggregate lines
+merchant_settlement_lines	game_id	
+merchant_settlement_lines	daily_settlement_id	link to daily_settlements.id
+merchant_settlement_lines	description	
+merchant_settlement_lines	total_bet_minor	
+merchant_settlement_lines	total_win_minor	
+merchant_settlement_lines	total_rounds	
+merchant_settlement_lines	commission_rate_ppm	snapshot of rate at close
+merchant_settlement_lines	commission_minor	
+merchant_settlement_lines	amount_minor	signed line amount
+merchant_settlement_lines	sort_order	
+merchant_settlement_lines	created_at	
+merchant_wallet_configs	id	
+merchant_wallet_configs	merchant_id	
+merchant_wallet_configs	wallet_type	seamless/transfer/mock
+merchant_wallet_configs	base_url	
+merchant_wallet_configs	api_key	
+merchant_wallet_configs	sign_secret	HMAC ?????????
+merchant_wallet_configs	sign_enabled	
+merchant_wallet_configs	verify_response	
+merchant_wallet_configs	timeout_ms	
+merchant_wallet_configs	mock	1=Mock ??
+merchant_wallet_configs	status	
+merchant_wallet_configs	created_at	
+merchant_wallet_configs	updated_at	
+merchant_webhooks	id	
+merchant_webhooks	merchant_id	
+merchant_webhooks	event_type	settlement.confirmed/bigwin/risk.alert
+merchant_webhooks	target_url	
+merchant_webhooks	secret	HMAC signing secret
+merchant_webhooks	headers	extra HTTP headers
+merchant_webhooks	retry_max	
+merchant_webhooks	timeout_ms	
+merchant_webhooks	status	1=active 0=disabled
+merchant_webhooks	last_triggered_at	
+merchant_webhooks	last_status_code	
+merchant_webhooks	created_at	
+merchant_webhooks	updated_at	
+merchants	id	
+merchants	merchant_code	商户唯一编码
+merchants	name	商户名称
+merchants	public_key	API 公钥
+merchants	private_key	API 私钥 (加密存储)
+merchants	private_key_prev	轮换过渡期旧私钥
+merchants	private_key_prev_expires_at	旧私钥失效时间
+merchants	allowed_ips	聚合器报备公网 IP 白名单
+merchants	status	1=启用 0=禁用
+merchants	created_at	
+merchants	updated_at	
+pending_transactions	id	
+pending_transactions	trace_id	å…¨é“¾è·¯ TraceID
+pending_transactions	round_id	Round / Nonce
+pending_transactions	merchant_id	
+pending_transactions	merchant_code	
+pending_transactions	user_id	
+pending_transactions	game_code	
+pending_transactions	phase	bet_debited|win_pending|settled|orphan
+pending_transactions	status	pending|done|failed
+pending_transactions	bet_amount	minor units, scale=10000
+pending_transactions	win_amount	minor units
+pending_transactions	expected_action	settle_win|rollback_bet|none
+pending_transactions	wallet_bet_status	
+pending_transactions	wallet_win_status	
+pending_transactions	retry_count	
+pending_transactions	last_error	
+pending_transactions	created_at	
+pending_transactions	updated_at	
+player_merchant_profiles	id	
+player_merchant_profiles	merchant_id	
+player_merchant_profiles	user_id	player id in merchant system
+player_merchant_profiles	external_user_ref	optional merchant-side string id
+player_merchant_profiles	display_name	
+player_merchant_profiles	vip_level	0=normal, higher=better
+player_merchant_profiles	risk_level	0=normal, 9=blocked
+player_merchant_profiles	tags	["high_roller","test"]
+player_merchant_profiles	bet_limit_override	{"min":10000,"max":5000000}
+player_merchant_profiles	currency_code	
+player_merchant_profiles	lifetime_bet_minor	
+player_merchant_profiles	lifetime_win_minor	
+player_merchant_profiles	lifetime_rounds	
+player_merchant_profiles	last_played_at	
+player_merchant_profiles	status	1=active 0=suspended
+player_merchant_profiles	created_at	
+player_merchant_profiles	updated_at	
+risk_alerts	id	
+risk_alerts	merchant_id	
+risk_alerts	alert_type	
+risk_alerts	scope_type	user | game
+risk_alerts	scope_value	
+risk_alerts	merchant_code	
+risk_alerts	game_code	
+risk_alerts	rtp_ppm	å®žé™…RTP * 1e6ï¼Œ180%=1800000
+risk_alerts	total_bet	
+risk_alerts	total_win	
+risk_alerts	sample_size	
+risk_alerts	action_taken	
+risk_alerts	status	
+risk_alerts	created_at	
+risk_blacklist	id	
+risk_blacklist	list_type	ip / user_id / merchant
+risk_blacklist	list_value	黑名单值
+risk_blacklist	reason	封禁原因
+risk_blacklist	status	1=生效 0=解除
+risk_blacklist	expires_at	NULL=永久
+risk_blacklist	created_at	
+risk_blacklist	updated_at	
+roles	id	
+roles	name	
+roles	description	
+roles	created_at	
+roles	updated_at	
+schema_archive_policies	id	
+schema_archive_policies	table_name	
+schema_archive_policies	hot_retention_days	keep in MySQL hot tier
+schema_archive_policies	cold_retention_days	optional cold storage before purge
+schema_archive_policies	archive_strategy	delete/export_to_s3/partition_drop
+schema_archive_policies	partition_column	e.g. created_at for monthly partitions
+schema_archive_policies	last_archived_at	
+schema_archive_policies	notes	
+schema_archive_policies	status	
+schema_archive_policies	created_at	
+schema_archive_policies	updated_at	
+schema_migrations	id	
+schema_migrations	version	?????
+schema_migrations	description	
+schema_migrations	applied_at	
+settlement_periods	id	
+settlement_periods	merchant_id	
+settlement_periods	period_type	daily/weekly/monthly
+settlement_periods	period_start	
+settlement_periods	period_end	
+settlement_periods	currency_code	
+settlement_periods	total_bet_minor	
+settlement_periods	total_win_minor	
+settlement_periods	ggr_minor	total_bet - total_win
+settlement_periods	commission_minor	platform share from GGR
+settlement_periods	net_payable_minor	amount due (platform receivable)
+settlement_periods	total_rounds	
+settlement_periods	status	draft/pending_review/confirmed/invoiced/paid
+settlement_periods	confirmed_by	admin_users.id
+settlement_periods	confirmed_at	
+settlement_periods	notes	
+settlement_periods	created_at	
+settlement_periods	updated_at	
+wallet_pending_ops	id	
+wallet_pending_ops	round_id	
+wallet_pending_ops	merchant_id	
+wallet_pending_ops	merchant_code	
+wallet_pending_ops	user_id	
+wallet_pending_ops	op_type	win_failed / win_timeout / rollback
+wallet_pending_ops	bet_amount	minor units
+wallet_pending_ops	win_amount	minor units
+wallet_pending_ops	status	pending / done / failed
+wallet_pending_ops	retry_count	
+wallet_pending_ops	last_error	
+wallet_pending_ops	created_at	
+wallet_pending_ops	updated_at	

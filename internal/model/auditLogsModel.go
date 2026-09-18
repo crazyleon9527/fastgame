@@ -9,20 +9,21 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
+// AuditLog 对应表 audit_logs：后台操作审计日志
 type AuditLog struct {
-	Id           uint64         `db:"id"`
-	AdminUserId  sql.NullInt64  `db:"admin_user_id"`
-	Username     string         `db:"username"`
-	RoleName     string         `db:"role_name"`
-	Action       string         `db:"action"`
-	ResourceType string         `db:"resource_type"`
-	ResourceId   string         `db:"resource_id"`
-	HttpMethod   sql.NullString `db:"http_method"`
-	RequestPath  sql.NullString `db:"request_path"`
-	Detail       sql.NullString `db:"detail"`
-	ClientIp     sql.NullString `db:"client_ip"`
-	StatusCode   sql.NullInt64  `db:"status_code"`
-	CreatedAt    time.Time      `db:"created_at"`
+	Id           uint64         `db:"id"`            // 主键
+	AdminUserId  sql.NullInt64  `db:"admin_user_id"` // 后台用户 ID（admin_users.id）
+	Username     string         `db:"username"`      // 用户名
+	RoleName     string         `db:"role_name"`     // 角色名
+	Action       string         `db:"action"`        // 操作动作，如 create_merchant/rotate_key/confirm_settlement
+	ResourceType string         `db:"resource_type"` // 资源类型：merchant/game/config/user/settlement
+	ResourceId   string         `db:"resource_id"`   // 资源 ID
+	HttpMethod   sql.NullString `db:"http_method"`   // HTTP 方法
+	RequestPath  sql.NullString `db:"request_path"`  // 请求路径
+	Detail       sql.NullString `db:"detail"`        // 请求快照或变更差异
+	ClientIp     sql.NullString `db:"client_ip"`     // 客户端 IP
+	StatusCode   sql.NullInt64  `db:"status_code"`   // HTTP 状态码
+	CreatedAt    time.Time      `db:"created_at"`    // 创建时间（UTC）
 }
 
 type AuditLogsModel interface {

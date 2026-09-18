@@ -34,6 +34,7 @@ type (
 		RotatePrivateKey(ctx context.Context, id uint64, newKey string, gracePeriod time.Duration) error
 	}
 
+	// customMerchantsModel 对应表 merchants：商户主体
 	customMerchantsModel struct {
 		*defaultMerchantsModel
 	}
@@ -128,8 +129,8 @@ func (m *customMerchantsModel) FindAllowedIPs(ctx context.Context, merchantCode 
 func (m *customMerchantsModel) FindAllowedIPsByID(ctx context.Context, id uint64) (string, []string, error) {
 	query := fmt.Sprintf("select `merchant_code`, `allowed_ips` from %s where `id` = ? limit 1", m.table)
 	var row struct {
-		MerchantCode string         `db:"merchant_code"`
-		AllowedIPs   sql.NullString `db:"allowed_ips"`
+		MerchantCode string         `db:"merchant_code"` // 商户唯一编码
+		AllowedIPs   sql.NullString `db:"allowed_ips"`   // 聚合器报备公网 IP 白名单
 	}
 	err := m.conn.QueryRowCtx(ctx, &row, query, id)
 	switch err {

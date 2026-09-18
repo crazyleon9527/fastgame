@@ -7,11 +7,12 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
+// LocaleRow 对应表 locales：平台支持语言
 type LocaleRow struct {
-	Code       string `db:"code"`
-	Name       string `db:"name"`
-	NativeName string `db:"native_name"`
-	IsDefault  int64  `db:"is_default"`
+	Code       string `db:"code"`        // BCP 47 语言标签，如 en-US、zh-CN
+	Name       string `db:"name"`        // 英文显示名
+	NativeName string `db:"native_name"` // 该语言自身的名称
+	IsDefault  int64  `db:"is_default"`  // 平台默认回退语言
 }
 
 type I18nMessageRow struct {

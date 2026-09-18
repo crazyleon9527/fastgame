@@ -8,20 +8,21 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
+// RiskAlert 对应表 risk_alerts：RTP 风控告警
 type RiskAlert struct {
-	Id           uint64    `db:"id"`
-	AlertType    string    `db:"alert_type"`
-	ScopeType    string    `db:"scope_type"`
-	ScopeValue   string    `db:"scope_value"`
-	MerchantCode string    `db:"merchant_code"`
-	GameCode     string    `db:"game_code"`
-	RtpPPM       int64     `db:"rtp_ppm"`
-	TotalBet     int64     `db:"total_bet"`
-	TotalWin     int64     `db:"total_win"`
-	SampleSize   int64     `db:"sample_size"`
-	ActionTaken  string    `db:"action_taken"`
-	Status       string    `db:"status"`
-	CreatedAt    time.Time `db:"created_at"`
+	Id           uint64    `db:"id"`            // 主键
+	AlertType    string    `db:"alert_type"`    // 告警类型
+	ScopeType    string    `db:"scope_type"`    // 作用域：user 或 game
+	ScopeValue   string    `db:"scope_value"`   // 作用域取值
+	MerchantCode string    `db:"merchant_code"` // 商户编码
+	GameCode     string    `db:"game_code"`     // 游戏编码
+	RtpPPM       int64     `db:"rtp_ppm"`       // 实际RTP * 1e6，180%=1800000
+	TotalBet     int64     `db:"total_bet"`     // 总下注额，minor units
+	TotalWin     int64     `db:"total_win"`     // 总派彩额，minor units
+	SampleSize   int64     `db:"sample_size"`   // 样本局数
+	ActionTaken  string    `db:"action_taken"`  // 已执行的处置动作
+	Status       string    `db:"status"`        // 状态：1=启用 0=停用
+	CreatedAt    time.Time `db:"created_at"`    // 创建时间（UTC）
 }
 
 type RiskAlertsModel interface {

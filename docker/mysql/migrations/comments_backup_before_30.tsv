@@ -1,0 +1,429 @@
+﻿T	admin_users		管理后台用户
+T	api_rate_limits		Merchant API rate limits
+T	audit_logs		Admin audit log
+T	commission_rules		Merchant commission rules
+T	currencies		Currency master
+T	daily_settlements		每日结算对账单
+T	game_categories		Game categories
+T	game_client_versions		Game client version releases
+T	game_configs		游戏参数配置
+T	game_maintenance_windows		Game maintenance schedule
+T	game_round_replay		Deterministic replay inputs
+T	game_rtp_tiers		Game RTP tiers
+T	game_sessions		Player session registry
+T	games		Platform game catalog
+T	i18n_bundles		i18n message bundle namespaces
+T	i18n_entity_translations		Entity field translations
+T	i18n_message_translations		i18n message translations
+T	i18n_messages		i18n dictionary keys
+T	locales		Supported language locales
+T	merchant_currencies		Merchant currencies
+T	merchant_game_versions		Merchant game version policy
+T	merchant_games		Merchant game bindings
+T	merchant_locales		Merchant enabled locales
+T	merchant_settlement_lines		Settlement period line items
+T	merchant_wallet_configs		Merchant wallet config
+T	merchant_webhooks		Merchant outbound webhooks
+T	merchants		商户主体
+T	pending_transactions		孤儿注单自动对账补偿
+T	player_merchant_profiles		Player profile per merchant
+T	risk_alerts		
+T	risk_blacklist		风控黑名单
+T	roles		角色
+T	schema_archive_policies		Table archival retention policies
+T	schema_migrations		Schema migration registry
+T	settlement_periods		Merchant settlement billing period
+T	wallet_pending_ops		钱包待对账
+C	admin_users	created_at	
+C	admin_users	id	
+C	admin_users	password_hash	
+C	admin_users	role_id	
+C	admin_users	status	
+C	admin_users	totp_enabled	
+C	admin_users	totp_recovery_hashes	bcrypt hashes of one-time recovery codes
+C	admin_users	totp_secret	
+C	admin_users	updated_at	
+C	admin_users	username	
+C	api_rate_limits	burst	token bucket burst
+C	api_rate_limits	created_at	
+C	api_rate_limits	id	
+C	api_rate_limits	limit_scope	global/bet/session/ip
+C	api_rate_limits	limit_type	rps/daily_quota/concurrent
+C	api_rate_limits	limit_value	
+C	api_rate_limits	merchant_id	
+C	api_rate_limits	status	
+C	api_rate_limits	updated_at	
+C	api_rate_limits	window_seconds	
+C	audit_logs	action	create_merchant/rotate_key/confirm_settlement etc
+C	audit_logs	admin_user_id	
+C	audit_logs	client_ip	
+C	audit_logs	created_at	
+C	audit_logs	detail	request snapshot / diff
+C	audit_logs	http_method	
+C	audit_logs	id	
+C	audit_logs	request_path	
+C	audit_logs	resource_id	
+C	audit_logs	resource_type	merchant/game/config/user/settlement
+C	audit_logs	role_name	
+C	audit_logs	status_code	
+C	audit_logs	username	
+C	commission_rules	created_at	
+C	commission_rules	effective_from	
+C	commission_rules	effective_to	NULL=长期有效
+C	commission_rules	game_id	NULL=全部游戏
+C	commission_rules	id	
+C	commission_rules	merchant_id	
+C	commission_rules	min_fee_minor	
+C	commission_rules	rate_ppm	150000=15% 分成
+C	commission_rules	rule_type	ggr_share/fixed_fee
+C	commission_rules	status	
+C	commission_rules	updated_at	
+C	currencies	code	ISO 或内部码，如 USD CNY USDT
+C	currencies	created_at	
+C	currencies	minor_units	小数位数，对应 money.Scale=10000 时为 4
+C	currencies	name	
+C	currencies	status	1=启用 0=禁用
+C	currencies	symbol	
+C	currencies	updated_at	
+C	daily_settlements	created_at	
+C	daily_settlements	id	
+C	daily_settlements	merchant_id	
+C	daily_settlements	settle_date	结算日期 UTC
+C	daily_settlements	settlement_period_id	FK to settlement_periods when rolled up
+C	daily_settlements	status	0=待确认 1=已确认
+C	daily_settlements	total_bet	minor units
+C	daily_settlements	total_rounds	
+C	daily_settlements	total_win	minor units
+C	daily_settlements	updated_at	
+C	game_categories	code	fishing/slot/crash/table
+C	game_categories	created_at	
+C	game_categories	id	
+C	game_categories	name	
+C	game_categories	sort_order	
+C	game_categories	status	
+C	game_categories	updated_at	
+C	game_client_versions	bundle_hash	SHA-256 of bundle
+C	game_client_versions	bundle_url	CDN path or artifact URL
+C	game_client_versions	changelog	
+C	game_client_versions	created_at	
+C	game_client_versions	game_id	
+C	game_client_versions	id	
+C	game_client_versions	min_engine_version	Cocos/engine requirement
+C	game_client_versions	published_at	
+C	game_client_versions	status	draft/published/deprecated
+C	game_client_versions	updated_at	
+C	game_client_versions	version	semver e.g. 1.2.0
+C	game_configs	config_key	配置键
+C	game_configs	config_value	配置值
+C	game_configs	created_at	
+C	game_configs	game_code	游戏标识
+C	game_configs	id	
+C	game_configs	merchant_id	
+C	game_configs	rtp_tier	RTP 档位
+C	game_configs	status	
+C	game_configs	updated_at	
+C	game_maintenance_windows	cancelled_at	
+C	game_maintenance_windows	cancelled_by	
+C	game_maintenance_windows	created_at	
+C	game_maintenance_windows	created_by	admin_users.id
+C	game_maintenance_windows	ends_at	
+C	game_maintenance_windows	game_id	NULL=all games
+C	game_maintenance_windows	id	
+C	game_maintenance_windows	merchant_id	NULL=platform-wide
+C	game_maintenance_windows	reason	
+C	game_maintenance_windows	starts_at	
+C	game_maintenance_windows	status	scheduled/active/completed/cancelled
+C	game_maintenance_windows	title	
+C	game_maintenance_windows	updated_at	
+C	game_round_replay	bet_amount	minor units
+C	game_round_replay	client_seed	
+C	game_round_replay	created_at	
+C	game_round_replay	game_code	
+C	game_round_replay	id	
+C	game_round_replay	merchant_code	
+C	game_round_replay	merchant_id	
+C	game_round_replay	nonce	
+C	game_round_replay	round_id	Nonce / Round ID
+C	game_round_replay	sequence_id	
+C	game_round_replay	server_seed	
+C	game_round_replay	user_id	
+C	game_rtp_tiers	created_at	
+C	game_rtp_tiers	game_id	
+C	game_rtp_tiers	id	
+C	game_rtp_tiers	par_sheet_ref	PAR 表文件/版本引用
+C	game_rtp_tiers	status	
+C	game_rtp_tiers	target_rtp_ppm	目标 RTP ppm
+C	game_rtp_tiers	tier_code	default/high/low 等
+C	game_rtp_tiers	updated_at	
+C	game_rtp_tiers	weight	随机权重
+C	game_sessions	client_ip	IPv4 or IPv6
+C	game_sessions	client_seed	
+C	game_sessions	created_at	
+C	game_sessions	currency_code	
+C	game_sessions	expires_at	
+C	game_sessions	game_code	
+C	game_sessions	game_id	
+C	game_sessions	id	
+C	game_sessions	last_active_at	
+C	game_sessions	merchant_code	
+C	game_sessions	merchant_id	
+C	game_sessions	round_count	bet rounds in this session
+C	game_sessions	server_seed_hash	
+C	game_sessions	session_token_hash	SHA-256 of session token, never store raw token
+C	game_sessions	status	active/expired/revoked
+C	game_sessions	updated_at	
+C	game_sessions	user_agent	
+C	game_sessions	user_id	
+C	games	category_id	
+C	games	client_version	当前客户端版本
+C	games	created_at	
+C	games	default_rtp_ppm	默认 RTP，96%=960000
+C	games	description	
+C	games	game_code	全局唯一游戏标识
+C	games	game_type	fishing/slot/crash/table
+C	games	id	
+C	games	launched_at	
+C	games	max_bet_minor	默认最大注 minor units
+C	games	min_bet_minor	默认最小注 minor units
+C	games	name	
+C	games	status	1=上架 0=下架 2=维护
+C	games	thumbnail_url	
+C	games	updated_at	
+C	games	volatility	low/medium/high
+C	i18n_bundles	bundle_code	namespace e.g. ui.admin
+C	i18n_bundles	created_at	
+C	i18n_bundles	description	
+C	i18n_bundles	id	
+C	i18n_bundles	status	
+C	i18n_bundles	updated_at	
+C	i18n_entity_translations	created_at	
+C	i18n_entity_translations	entity_id	
+C	i18n_entity_translations	entity_type	game/category/merchant/role
+C	i18n_entity_translations	field_name	name/description/title
+C	i18n_entity_translations	id	
+C	i18n_entity_translations	locale_code	
+C	i18n_entity_translations	status	
+C	i18n_entity_translations	translated_value	
+C	i18n_entity_translations	updated_at	
+C	i18n_message_translations	created_at	
+C	i18n_message_translations	id	
+C	i18n_message_translations	locale_code	
+C	i18n_message_translations	message_id	
+C	i18n_message_translations	status	1=published 0=draft
+C	i18n_message_translations	translated_value	
+C	i18n_message_translations	updated_at	
+C	i18n_messages	bundle_id	
+C	i18n_messages	created_at	
+C	i18n_messages	default_value	fallback when translation missing
+C	i18n_messages	description	translator context
+C	i18n_messages	id	
+C	i18n_messages	message_key	dot path e.g. nav.merchants
+C	i18n_messages	status	
+C	i18n_messages	updated_at	
+C	locales	code	BCP 47 e.g. en-US zh-CN
+C	locales	created_at	
+C	locales	direction	ltr or rtl
+C	locales	is_default	platform fallback locale
+C	locales	name	English display name
+C	locales	native_name	Name in own language
+C	locales	sort_order	
+C	locales	status	
+C	locales	updated_at	
+C	merchant_currencies	created_at	
+C	merchant_currencies	currency_code	
+C	merchant_currencies	id	
+C	merchant_currencies	is_default	1=默认币种
+C	merchant_currencies	merchant_id	
+C	merchant_currencies	status	
+C	merchant_currencies	updated_at	
+C	merchant_game_versions	client_version_id	
+C	merchant_game_versions	created_at	
+C	merchant_game_versions	effective_from	
+C	merchant_game_versions	force_upgrade	
+C	merchant_game_versions	game_id	
+C	merchant_game_versions	id	
+C	merchant_game_versions	merchant_id	
+C	merchant_game_versions	min_version_id	force upgrade below this version
+C	merchant_game_versions	rollout_percent	canary rollout 0-100
+C	merchant_game_versions	status	
+C	merchant_game_versions	updated_at	
+C	merchant_games	created_at	
+C	merchant_games	game_id	
+C	merchant_games	id	
+C	merchant_games	max_bet_minor	覆盖最大注
+C	merchant_games	merchant_id	
+C	merchant_games	min_bet_minor	覆盖最小注，NULL=用游戏默认
+C	merchant_games	opened_at	开通时间
+C	merchant_games	rtp_tier_code	覆盖默认 RTP 档位
+C	merchant_games	sort_order	商户大厅排序
+C	merchant_games	status	1=开通 0=关闭
+C	merchant_games	updated_at	
+C	merchant_locales	created_at	
+C	merchant_locales	id	
+C	merchant_locales	is_default	merchant default language
+C	merchant_locales	locale_code	
+C	merchant_locales	merchant_id	
+C	merchant_locales	sort_order	
+C	merchant_locales	status	
+C	merchant_locales	updated_at	
+C	merchant_settlement_lines	amount_minor	signed line amount
+C	merchant_settlement_lines	commission_minor	
+C	merchant_settlement_lines	commission_rate_ppm	snapshot of rate at close
+C	merchant_settlement_lines	created_at	
+C	merchant_settlement_lines	daily_settlement_id	link to daily_settlements.id
+C	merchant_settlement_lines	description	
+C	merchant_settlement_lines	game_id	
+C	merchant_settlement_lines	id	
+C	merchant_settlement_lines	line_type	daily_aggregate/game_breakdown/commission/adjustment
+C	merchant_settlement_lines	merchant_id	
+C	merchant_settlement_lines	ref_date	for daily_aggregate lines
+C	merchant_settlement_lines	settlement_period_id	
+C	merchant_settlement_lines	sort_order	
+C	merchant_settlement_lines	total_bet_minor	
+C	merchant_settlement_lines	total_rounds	
+C	merchant_settlement_lines	total_win_minor	
+C	merchant_wallet_configs	api_key	
+C	merchant_wallet_configs	base_url	
+C	merchant_wallet_configs	created_at	
+C	merchant_wallet_configs	id	
+C	merchant_wallet_configs	merchant_id	
+C	merchant_wallet_configs	mock	1=Mock 钱包
+C	merchant_wallet_configs	sign_enabled	
+C	merchant_wallet_configs	sign_secret	HMAC 密钥，建议加密存储
+C	merchant_wallet_configs	status	
+C	merchant_wallet_configs	timeout_ms	
+C	merchant_wallet_configs	updated_at	
+C	merchant_wallet_configs	verify_response	
+C	merchant_wallet_configs	wallet_type	seamless/transfer/mock
+C	merchant_webhooks	created_at	
+C	merchant_webhooks	event_type	settlement.confirmed/bigwin/risk.alert
+C	merchant_webhooks	headers	extra HTTP headers
+C	merchant_webhooks	id	
+C	merchant_webhooks	last_status_code	
+C	merchant_webhooks	last_triggered_at	
+C	merchant_webhooks	merchant_id	
+C	merchant_webhooks	retry_max	
+C	merchant_webhooks	secret	HMAC signing secret
+C	merchant_webhooks	status	1=active 0=disabled
+C	merchant_webhooks	target_url	
+C	merchant_webhooks	timeout_ms	
+C	merchant_webhooks	updated_at	
+C	merchants	allowed_ips	聚合器报备公网 IP 白名单
+C	merchants	created_at	
+C	merchants	id	
+C	merchants	merchant_code	商户唯一编码
+C	merchants	name	商户名称
+C	merchants	private_key	API 私钥 (加密存储)
+C	merchants	private_key_prev	轮换过渡期旧私钥
+C	merchants	private_key_prev_expires_at	旧私钥失效时间
+C	merchants	public_key	API 公钥
+C	merchants	status	1=启用 0=禁用
+C	merchants	updated_at	
+C	pending_transactions	bet_amount	minor units, scale=10000
+C	pending_transactions	created_at	
+C	pending_transactions	expected_action	settle_win|rollback_bet|none
+C	pending_transactions	game_code	
+C	pending_transactions	id	
+C	pending_transactions	last_error	
+C	pending_transactions	merchant_code	
+C	pending_transactions	merchant_id	
+C	pending_transactions	phase	bet_debited|win_pending|settled|orphan
+C	pending_transactions	retry_count	
+C	pending_transactions	round_id	Round / Nonce
+C	pending_transactions	status	pending|done|failed
+C	pending_transactions	trace_id	全链路 TraceID
+C	pending_transactions	updated_at	
+C	pending_transactions	user_id	
+C	pending_transactions	wallet_bet_status	
+C	pending_transactions	wallet_win_status	
+C	pending_transactions	win_amount	minor units
+C	player_merchant_profiles	bet_limit_override	{"min":10000,"max":5000000}
+C	player_merchant_profiles	created_at	
+C	player_merchant_profiles	currency_code	
+C	player_merchant_profiles	display_name	
+C	player_merchant_profiles	external_user_ref	optional merchant-side string id
+C	player_merchant_profiles	id	
+C	player_merchant_profiles	last_played_at	
+C	player_merchant_profiles	lifetime_bet_minor	
+C	player_merchant_profiles	lifetime_rounds	
+C	player_merchant_profiles	lifetime_win_minor	
+C	player_merchant_profiles	merchant_id	
+C	player_merchant_profiles	risk_level	0=normal, 9=blocked
+C	player_merchant_profiles	status	1=active 0=suspended
+C	player_merchant_profiles	tags	["high_roller","test"]
+C	player_merchant_profiles	updated_at	
+C	player_merchant_profiles	user_id	player id in merchant system
+C	player_merchant_profiles	vip_level	0=normal, higher=better
+C	risk_alerts	action_taken	
+C	risk_alerts	alert_type	
+C	risk_alerts	created_at	
+C	risk_alerts	game_code	
+C	risk_alerts	id	
+C	risk_alerts	merchant_code	
+C	risk_alerts	merchant_id	
+C	risk_alerts	rtp_ppm	实际RTP * 1e6，180%=1800000
+C	risk_alerts	sample_size	
+C	risk_alerts	scope_type	user | game
+C	risk_alerts	scope_value	
+C	risk_alerts	status	
+C	risk_alerts	total_bet	
+C	risk_alerts	total_win	
+C	risk_blacklist	created_at	
+C	risk_blacklist	expires_at	NULL=永久
+C	risk_blacklist	id	
+C	risk_blacklist	list_type	ip / user_id / merchant
+C	risk_blacklist	list_value	黑名单值
+C	risk_blacklist	reason	封禁原因
+C	risk_blacklist	status	1=生效 0=解除
+C	risk_blacklist	updated_at	
+C	roles	created_at	
+C	roles	description	
+C	roles	id	
+C	roles	name	
+C	roles	updated_at	
+C	schema_archive_policies	archive_strategy	delete/export_to_s3/partition_drop
+C	schema_archive_policies	cold_retention_days	optional cold storage before purge
+C	schema_archive_policies	created_at	
+C	schema_archive_policies	hot_retention_days	keep in MySQL hot tier
+C	schema_archive_policies	id	
+C	schema_archive_policies	last_archived_at	
+C	schema_archive_policies	notes	
+C	schema_archive_policies	partition_column	e.g. created_at for monthly partitions
+C	schema_archive_policies	status	
+C	schema_archive_policies	table_name	
+C	schema_archive_policies	updated_at	
+C	schema_migrations	applied_at	
+C	schema_migrations	description	
+C	schema_migrations	id	
+C	schema_migrations	version	迁移版本号
+C	settlement_periods	commission_minor	platform share from GGR
+C	settlement_periods	confirmed_at	
+C	settlement_periods	confirmed_by	admin_users.id
+C	settlement_periods	created_at	
+C	settlement_periods	currency_code	
+C	settlement_periods	ggr_minor	total_bet - total_win
+C	settlement_periods	id	
+C	settlement_periods	merchant_id	
+C	settlement_periods	net_payable_minor	amount due (platform receivable)
+C	settlement_periods	notes	
+C	settlement_periods	period_end	
+C	settlement_periods	period_start	
+C	settlement_periods	period_type	daily/weekly/monthly
+C	settlement_periods	status	draft/pending_review/confirmed/invoiced/paid
+C	settlement_periods	total_bet_minor	
+C	settlement_periods	total_rounds	
+C	settlement_periods	total_win_minor	
+C	settlement_periods	updated_at	
+C	wallet_pending_ops	bet_amount	minor units
+C	wallet_pending_ops	created_at	
+C	wallet_pending_ops	id	
+C	wallet_pending_ops	last_error	
+C	wallet_pending_ops	merchant_code	
+C	wallet_pending_ops	merchant_id	
+C	wallet_pending_ops	op_type	win_failed / win_timeout / rollback
+C	wallet_pending_ops	retry_count	
+C	wallet_pending_ops	round_id	
+C	wallet_pending_ops	status	pending / done / failed
+C	wallet_pending_ops	updated_at	
+C	wallet_pending_ops	user_id	
+C	wallet_pending_ops	win_amount	minor units

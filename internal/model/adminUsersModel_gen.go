@@ -37,14 +37,18 @@ type (
 		table string
 	}
 
+	// AdminUsers 对应表 admin_users：管理后台用户
 	AdminUsers struct {
-		Id           uint64    `db:"id"`
-		Username     string    `db:"username"`
-		PasswordHash string    `db:"password_hash"`
-		RoleId       uint64    `db:"role_id"`
-		Status       int64     `db:"status"`
-		CreatedAt    time.Time `db:"created_at"`
-		UpdatedAt    time.Time `db:"updated_at"`
+		Id                 uint64         `db:"id"`                   // 主键
+		Username           string         `db:"username"`             // 用户名
+		PasswordHash       string         `db:"password_hash"`        // 密码哈希（bcrypt）
+		RoleId             uint64         `db:"role_id"`              // 角色 ID（roles.id）
+		Status             int64          `db:"status"`               // 状态：1=启用 0=停用
+		TotpSecret         sql.NullString `db:"totp_secret"`          // TOTP 密钥（加密存储）
+		TotpEnabled        int64          `db:"totp_enabled"`         // 1=已启用二次验证 0=未启用
+		TotpRecoveryHashes sql.NullString `db:"totp_recovery_hashes"` // 一次性恢复码的 bcrypt 哈希
+		CreatedAt          time.Time      `db:"created_at"`           // 创建时间（UTC）
+		UpdatedAt          time.Time      `db:"updated_at"`           // 更新时间（UTC）
 	}
 )
 
@@ -90,14 +94,14 @@ func (m *defaultAdminUsersModel) FindOneByUsername(ctx context.Context, username
 }
 
 func (m *defaultAdminUsersModel) Insert(ctx context.Context, data *AdminUsers) (sql.Result, error) {
-	query := fmt.Sprintf("insert into %s (%s) values (?, ?, ?, ?)", m.table, adminUsersRowsExpectAutoSet)
-	ret, err := m.conn.ExecCtx(ctx, query, data.Username, data.PasswordHash, data.RoleId, data.Status)
+	query := fmt.Sprintf("insert into %s (%s) values (?, ?, ?, ?, ?, ?, ?)", m.table, adminUsersRowsExpectAutoSet)
+	ret, err := m.conn.ExecCtx(ctx, query, data.Username, data.PasswordHash, data.RoleId, data.Status, data.TotpSecret, data.TotpEnabled, data.TotpRecoveryHashes)
 	return ret, err
 }
 
 func (m *defaultAdminUsersModel) Update(ctx context.Context, newData *AdminUsers) error {
 	query := fmt.Sprintf("update %s set %s where `id` = ?", m.table, adminUsersRowsWithPlaceHolder)
-	_, err := m.conn.ExecCtx(ctx, query, newData.Username, newData.PasswordHash, newData.RoleId, newData.Status, newData.Id)
+	_, err := m.conn.ExecCtx(ctx, query, newData.Username, newData.PasswordHash, newData.RoleId, newData.Status, newData.TotpSecret, newData.TotpEnabled, newData.TotpRecoveryHashes, newData.Id)
 	return err
 }
 
