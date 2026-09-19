@@ -64,5 +64,12 @@ create_topic "game.event.bigwin" 3 "compression.type=snappy"
 create_topic "game.wallet.rollback" 3 "compression.type=snappy"
 create_topic "game.reconcile.dlq" 3 "compression.type=snappy"
 
+# 账变事件（pkg/ledger.OutboxSink）。
+# 注意：KAFKA_AUTO_CREATE_TOPICS_ENABLE=false，topic 不存在时投递会一直报
+# "Unknown Topic Or Partition"，outbox 里的事件会按指数退避重试 7 次后才进 FAILED
+# （最长拖 6 小时），而且每笔账变都会插一条注定投不出去的记录。
+# 新增任何 outbox topic 都必须同步加到这里。
+create_topic "game.ledger.posted" 6 "compression.type=snappy"
+
 echo "Kafka topics initialized:"
 $KAFKA_BIN --bootstrap-server "$BOOTSTRAP_SERVER" --list
