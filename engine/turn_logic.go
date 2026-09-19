@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"fastgame/pkg/async"
 	applog "fastgame/pkg/log"
 	"fastgame/pkg/money"
 	"fastgame/pkg/wallet"
@@ -44,6 +45,10 @@ type UniversalHost struct {
 	dlqWriter    DLQWriter
 	producer     KafkaProducer
 	settleTopic  string
+	// kafkaTasks 负责结算事件的异步投递：并发闸门 + panic 兜底 + 可 Drain。
+	// 原来这里是裸 go func，投递任务没有任何上限，panic 会直接打挂进程，
+	// 进程退出时在途投递被静默丢弃（结算事件丢了却没人在日志里看到）。
+	kafkaTasks *async.Runner
 }
 
 func NewUniversalHost(
@@ -59,7 +64,34 @@ func NewUniversalHost(
 		dlqWriter:    dlqWriter,
 		producer:     producer,
 		settleTopic:  settleTopic,
+		kafkaTasks: async.New("engine-settle-dispatch",
+			async.WithMaxConcurrency(engineDispatchConcurrency),
+			async.WithDrainTimeout(engineDispatchDrainTimeout),
+		),
 	}
+}
+
+const (
+	// engineDispatchConcurrency 限制同时在途的结算事件投递数，
+	// 避免 Kafka 抖动时无人限制地堆积 goroutine。
+	engineDispatchConcurrency  = 512
+	engineDispatchDrainTimeout = 2 * time.Second
+)
+
+// Shutdown 等待在途的结算事件投递完成，供进程优雅退出时调用。
+func (h *UniversalHost) Shutdown(ctx context.Context) error {
+	if h == nil || h.kafkaTasks == nil {
+		return nil
+	}
+	return h.kafkaTasks.Shutdown(ctx)
+}
+
+// DispatchStats 暴露投递侧计数（被拒/panic），便于监控结算事件是否在丢弃。
+func (h *UniversalHost) DispatchStats() async.Stats {
+	if h == nil || h.kafkaTasks == nil {
+		return async.Stats{}
+	}
+	return h.kafkaTasks.Stats()
 }
 
 // ExecuteTurn 核心调度单局运转
@@ -227,12 +259,23 @@ func (h *UniversalHost) asyncDispatchSettledEvent(
 	// 注入链路追踪 Header
 	applog.InjectKafkaHeader(ctx, &msg)
 
-	go func() {
-		// 独立 context 避免主请求退出导致 Kafka 丢包
-		dispatchCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// 结算事件投递交给受管 Runner：
+	//   - Detach 保留 trace_id 但摘掉请求取消（主请求退出不应导致 Kafka 丢包）；
+	//   - 入队失败（积压到上限或进程退出中）会记 warn，不再静默丢事件。
+	enqueued := h.kafkaTasks.Go(ctx, func(taskCtx context.Context) {
+		dispatchCtx, cancel := context.WithTimeout(taskCtx, 2*time.Second)
 		defer cancel()
 		if err := h.producer.WriteMessages(dispatchCtx, msg); err != nil {
-			applog.C(ctx).Errorw("kafka_dispatch_settle_failed", logx.Field(applog.KeyErr, err))
+			applog.C(taskCtx).Errorw("kafka_dispatch_settle_failed",
+				logx.Field(applog.KeyErr, err),
+				logx.Field(applog.KeyRoundID, in.RoundID),
+			)
 		}
-	}()
+	})
+	if !enqueued {
+		applog.C(ctx).Errorw("kafka_dispatch_settle_rejected",
+			logx.Field(applog.KeyRoundID, in.RoundID),
+			logx.Field("running", h.kafkaTasks.Running()),
+		)
+	}
 }

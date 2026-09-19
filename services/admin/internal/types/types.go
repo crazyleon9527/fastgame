@@ -485,6 +485,9 @@ type TotpSetupResp struct {
 
 type TraceByRoundReq struct {
 	RoundId string `path:"roundId"`
+	// MerchantId 可选；round_id 只在商户内唯一（唯一键 uk_merchant_round），
+	// 带上可保证查到的是该商户那一局。不传则按 round_id 取最近一条。
+	MerchantId uint64 `form:"merchantId,optional"`
 }
 
 type TraceLookupReq struct {

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"fastgame/pkg/async"
 	"fastgame/pkg/clickhouse"
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/money"
@@ -19,11 +20,15 @@ import (
 type Worker struct {
 	svcCtx *svc.ServiceContext
 	reader *kafkago.Reader
+	// tasks 管理两个对账循环：裸 goroutine 里的 panic 会打挂服务，
+	// 且没有生命周期，退出时在途对账会被直接抛弃。
+	tasks *async.Runner
 }
 
 func NewWorker(svcCtx *svc.ServiceContext) *Worker {
 	return &Worker{
 		svcCtx: svcCtx,
+		tasks:  async.New("rollback-reconciler"),
 		reader: kafkago.NewReader(kafkago.ReaderConfig{
 			Brokers:        svcCtx.Config.Kafka.Brokers,
 			GroupID:        svcCtx.Config.Kafka.GroupID,
@@ -36,8 +41,8 @@ func NewWorker(svcCtx *svc.ServiceContext) *Worker {
 }
 
 func (w *Worker) Run(ctx context.Context) error {
-	go NewReconciler(w.svcCtx).Run(ctx)
-	go NewOrphanReconciler(w.svcCtx).Run(ctx)
+	w.tasks.Run(ctx, NewReconciler(w.svcCtx).Run)
+	w.tasks.Run(ctx, NewOrphanReconciler(w.svcCtx).Run)
 
 	for {
 		msg, err := w.reader.FetchMessage(ctx)
@@ -114,6 +119,12 @@ func (w *Worker) resolveMerchantID(merchantIDOrCode string) (uint64, error) {
 }
 
 func (w *Worker) Close() error {
+	// 先让对账循环收尾，再关 Kafka reader：反过来的话循环会读到已关闭的 reader。
+	drainCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := w.tasks.Shutdown(drainCtx); err != nil {
+		logx.Errorf("rollback reconciler shutdown: %v", err)
+	}
 	if w.reader != nil {
 		return w.reader.Close()
 	}

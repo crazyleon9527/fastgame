@@ -25,7 +25,10 @@ func (l *GetTraceByRoundLogic) GetTraceByRound(req *types.TraceByRoundReq) (*typ
 		return nil, err
 	}
 
-	tx, _ := l.svcCtx.PendingTx.FindByRoundID(l.ctx, req.RoundId)
+	// round_id 只在商户内唯一（唯一键 uk_merchant_round = merchant_id + round_id），
+	// 所以带上 req.MerchantId 才能保证取到的是该商户那一局；不传（0）时退回
+	// 按 round_id 取最近一条，多商户复用同一 roundId 时可能取到别家的记录。
+	tx, _ := l.svcCtx.PendingTx.FindByRoundID(l.ctx, req.MerchantId, req.RoundId)
 	traceID := req.RoundId
 	if len(spans) > 0 && spans[0].TraceID != "" {
 		traceID = spans[0].TraceID

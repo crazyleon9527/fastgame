@@ -22,6 +22,7 @@ const (
 type WalletPendingOp struct {
 	Id           uint64         `db:"id"` // 主键
 	RoundID      string         `db:"round_id"` // 局 ID，同时作为 nonce
+	MerchantID   uint64         `db:"merchant_id"` // 商户 ID（merchants.id），唯一键前导列
 	MerchantCode string         `db:"merchant_code"` // 商户编码
 	UserID       string         `db:"user_id"` // 玩家 ID
 	OpType       string         `db:"op_type"` // 操作类型：win_failed / win_timeout / rollback
@@ -36,7 +37,10 @@ type WalletPendingOp struct {
 
 type WalletPendingOpsModel interface {
 	Insert(ctx context.Context, data *WalletPendingOp) (sql.Result, error)
-	FindByRoundOp(ctx context.Context, roundID, opType string) (*WalletPendingOp, error)
+	// FindByRoundOp 按 (merchant_id, round_id, op_type) 定位待对账操作。
+	// round_id 只在商户内唯一（uk_merchant_round_op），merchantID 传 0 表示不限商户
+	// （只读排障场景）；写路径必须传真实商户，否则会读到别家的记录。
+	FindByRoundOp(ctx context.Context, merchantID uint64, roundID, opType string) (*WalletPendingOp, error)
 	ListPending(ctx context.Context, limit int) ([]*WalletPendingOp, error)
 	MarkDone(ctx context.Context, id uint64) error
 	MarkFailed(ctx context.Context, id uint64, lastError string) error
@@ -57,8 +61,8 @@ func NewWalletPendingOpsModel(conn sqlx.SqlConn) WalletPendingOpsModel {
 
 func (m *defaultWalletPendingOpsModel) Insert(ctx context.Context, data *WalletPendingOp) (sql.Result, error) {
 	query := fmt.Sprintf(`
-insert into %s (round_id, merchant_code, user_id, op_type, bet_amount, win_amount, status, retry_count, last_error)
-values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+insert into %s (round_id, merchant_id, merchant_code, user_id, op_type, bet_amount, win_amount, status, retry_count, last_error)
+values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 on duplicate key update
   status = values(status),
   win_amount = values(win_amount),
@@ -71,15 +75,16 @@ on duplicate key update
 		status = PendingStatusPending
 	}
 	return m.conn.ExecCtx(ctx, query,
-		data.RoundID, data.MerchantCode, data.UserID, data.OpType,
+		data.RoundID, data.MerchantID, data.MerchantCode, data.UserID, data.OpType,
 		data.BetAmount, data.WinAmount, status, data.RetryCount, data.LastError,
 	)
 }
 
-func (m *defaultWalletPendingOpsModel) FindByRoundOp(ctx context.Context, roundID, opType string) (*WalletPendingOp, error) {
-	query := fmt.Sprintf("select * from %s where round_id = ? and op_type = ? limit 1", m.table)
+func (m *defaultWalletPendingOpsModel) FindByRoundOp(ctx context.Context, merchantID uint64, roundID, opType string) (*WalletPendingOp, error) {
+	where, args := roundScope(merchantID, roundID)
+	query := fmt.Sprintf("select * from %s where %s and op_type = ? order by id desc limit 1", m.table, where)
 	var resp WalletPendingOp
-	err := m.conn.QueryRowCtx(ctx, &resp, query, roundID, opType)
+	err := m.conn.QueryRowCtx(ctx, &resp, query, append(args, opType)...)
 	switch err {
 	case nil:
 		return &resp, nil

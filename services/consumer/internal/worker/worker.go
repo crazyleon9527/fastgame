@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"fastgame/pkg/async"
 	"fastgame/pkg/batch"
 	"fastgame/pkg/clickhouse"
 	"fastgame/pkg/kafka"
@@ -48,15 +49,18 @@ type Worker struct {
 	svcCtx *svc.ServiceContext
 	reader *kafkago.Reader
 	batch  *batch.Batcher[batchItem]
+	// tasks 管理批量刷盘循环：裸 goroutine 里的 panic 会打挂消费进程
+	// （Kafka 侧看不到任何错误，只会表现为消费停滞）。
+	tasks *async.Runner
 }
 
 func NewWorker(svcCtx *svc.ServiceContext, maxSize int, interval time.Duration) *Worker {
-	w := &Worker{svcCtx: svcCtx}
+	w := &Worker{svcCtx: svcCtx, tasks: async.New("settle-consumer-batch")}
 	w.batch = batch.NewBatcher(maxSize, interval, w.flush)
 	w.reader = kafkago.NewReader(kafkago.ReaderConfig{
-		Brokers: svcCtx.Config.Kafka.Brokers,
-		GroupID: svcCtx.Config.Kafka.GroupID,
-		Topic:   svcCtx.Config.Kafka.Topic,
+		Brokers:  svcCtx.Config.Kafka.Brokers,
+		GroupID:  svcCtx.Config.Kafka.GroupID,
+		Topic:    svcCtx.Config.Kafka.Topic,
 		MinBytes: 1,
 		MaxBytes: 10e6,
 		// CommitInterval = 0 → 关闭自动提交，改由 flush 成功后手动提交。
@@ -67,7 +71,7 @@ func NewWorker(svcCtx *svc.ServiceContext, maxSize int, interval time.Duration) 
 }
 
 func (w *Worker) Run(ctx context.Context) error {
-	go w.batch.Start(ctx)
+	w.tasks.Run(ctx, func(runCtx context.Context) { w.batch.Start(runCtx) })
 
 	for {
 		msg, err := w.reader.FetchMessage(ctx)
@@ -258,8 +262,16 @@ func (w *Worker) flush(ctx context.Context, items []batchItem) error {
 }
 
 func (w *Worker) Close() error {
+	// 先停 Kafka reader（fetch 循环退出后 Run 会调用 batch.Stop 做最后一次
+	// flush 并提交 offset），再等批量循环收尾，避免刷盘写到一半进程就退了。
+	var readerErr error
 	if w.reader != nil {
-		return w.reader.Close()
+		readerErr = w.reader.Close()
 	}
-	return nil
+	drainCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := w.tasks.Shutdown(drainCtx); err != nil {
+		applog.C(context.Background()).Errorw("batch_loop_shutdown_failed", logx.Field(applog.KeyErr, err))
+	}
+	return readerErr
 }

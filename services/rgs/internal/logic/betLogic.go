@@ -127,6 +127,7 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 		if err := l.svcCtx.PendingTx.Insert(l.ctx, &model.PendingTransaction{
 			TraceID:         trace.ID(l.ctx),
 			RoundID:         req.RoundId,
+			MerchantID:      gameCfg.MerchantID,
 			MerchantCode:    req.MerchantId,
 			UserID:          req.UserId,
 			GameCode:        req.GameCode,
@@ -171,8 +172,8 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 				if wallet.IsTimeoutErr(err) {
 					opType = model.PendingOpWinTimeout
 				}
-				l.recordPending(req, betAmount, outcome, opType, err)
-				if err := l.svcCtx.PendingTx.MarkWinPending(l.ctx, req.RoundId, outcome.WinAmount.Minor(), err.Error()); err != nil {
+				l.recordPending(req, betAmount, outcome, opType, err, gameCfg.MerchantID)
+				if err := l.svcCtx.PendingTx.MarkWinPending(l.ctx, gameCfg.MerchantID, req.RoundId, outcome.WinAmount.Minor(), err.Error()); err != nil {
 					logx.Errorf("mark win pending failed: roundId=%s err=%v", req.RoundId, err)
 				}
 				settlementStatus = "pending"
@@ -200,7 +201,7 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			// 结算收尾：账变已由钱包完成，这里把「本地对账标记 + 回放记录 + 事件登记」
 			// 收进同一个事务。事务提交成功即保证事件不会丢（由 outbox 负责投递），
 			// 取代原先的裸 `go publishSettledEvent(...)`（投递失败无人知晓）。
-			if err := l.recordSettled(req, sessionData, outcome, betAmount, balance); err != nil {
+			if err := l.recordSettled(req, sessionData, outcome, betAmount, balance, gameCfg.MerchantID); err != nil {
 				// 不阻断下注返回：钱已在钱包侧结算完成，此处失败由 pending_transactions
 				// （phase=bet_debited）与 rollback 服务的对账兜住。
 				logx.Errorf("record settled bookkeeping failed: roundId=%s err=%v", req.RoundId, err)
@@ -222,19 +223,20 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 	return resp, nil
 }
 
-func (l *BetLogic) recordPending(req *types.BetReq, betAmount money.Amount, outcome prng.Outcome, opType string, err error) {
+func (l *BetLogic) recordPending(req *types.BetReq, betAmount money.Amount, outcome prng.Outcome, opType string, insertionErr error, merchantID uint64) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	_, insertErr := l.svcCtx.PendingOps.Insert(ctx, &model.WalletPendingOp{
 		RoundID:      req.RoundId,
+		MerchantID:   merchantID,
 		MerchantCode: req.MerchantId,
 		UserID:       req.UserId,
 		OpType:       opType,
 		BetAmount:    betAmount.Minor(),
 		WinAmount:    outcome.WinAmount.Minor(),
 		Status:       model.PendingStatusPending,
-		LastError:    sql.NullString{String: err.Error(), Valid: err != nil},
+		LastError:    sql.NullString{String: insertionErr.Error(), Valid: insertionErr != nil},
 	})
 	if insertErr != nil {
 		logx.Errorf("record pending op failed: roundId=%s err=%v", req.RoundId, insertErr)
@@ -256,6 +258,7 @@ func (l *BetLogic) recordSettled(
 	outcome prng.Outcome,
 	betAmount money.Amount,
 	balance money.Amount,
+	merchantID uint64,
 ) error {
 	trace.Record(l.ctx, l.svcCtx.Trace, "rgs", "settlement.complete", req.RoundId, "ok", "", 0)
 
@@ -263,13 +266,18 @@ func (l *BetLogic) recordSettled(
 		txConn := sqlx.NewSqlConnFromSession(session)
 
 		// 1) 本地对账标记：该局已结算，rollback 服务不会再当孤儿单处理
-		if err := model.NewPendingTransactionsModel(txConn).MarkSettled(ctx, req.RoundId); err != nil {
+		//
+		// 注意：这两张表的唯一键都是 (merchant_id, round_id)，所以 merchant_id
+		// 必须如实写入。若留 0（列默认值），多商户下不同商户的同一 roundId 会
+		// 落到同一个 (0, roundId) 上互相覆盖，唯一键形同虚设。
+		if err := model.NewPendingTransactionsModel(txConn).MarkSettled(ctx, merchantID, req.RoundId); err != nil {
 			return fmt.Errorf("mark pending_transaction settled: %w", err)
 		}
 
 		// 2) 确定性回放记录（供 /verify 与 /replay 使用）
 		if err := model.NewGameRoundReplayModel(txConn).Insert(ctx, &model.GameRoundReplay{
 			RoundID:      req.RoundId,
+			MerchantID:   merchantID,
 			MerchantCode: req.MerchantId,
 			UserID:       req.UserId,
 			GameCode:     req.GameCode,
@@ -311,8 +319,11 @@ func (l *BetLogic) recordSettled(
 			return fmt.Errorf("build settled envelope: %w", err)
 		}
 		if err := l.svcCtx.Outbox.InsertInTx(ctx, session, &outbox.Record{
-			ID:           settledID,
-			Topic:        kafka.TopicRoundSettled,
+			ID:    settledID,
+			Topic: kafka.TopicRoundSettled,
+			// merchant_id 与 merchant_code 都要落：前者是入库口径（merchants.id），
+			// 后者是信令口径。event_outbox 不设 merchant_id 就查不出"某商户的待投递事件"。
+			MerchantID:   merchantID,
 			PartitionKey: req.UserId, // 同玩家进同一分区，保证时序
 			Payload:      env,
 		}); err != nil {
@@ -344,6 +355,7 @@ func (l *BetLogic) recordSettled(
 			if err := l.svcCtx.Outbox.InsertInTx(ctx, session, &outbox.Record{
 				ID:           bigwinID,
 				Topic:        kafka.TopicEventBigwin,
+				MerchantID:   merchantID,
 				PartitionKey: req.UserId,
 				Payload:      bwEnv,
 			}); err != nil {

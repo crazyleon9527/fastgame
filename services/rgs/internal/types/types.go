@@ -92,6 +92,10 @@ type BetResp struct {
 
 type ReplayReq struct {
 	RoundId string `path:"roundId"`
+	// MerchantId 是商户编码（与 /game/bet 的 merchantId 同一套取值）。
+	// round_id 只在商户内唯一（唯一键 uk_merchant_round = merchant_id + round_id），
+	// 带上它才能保证取到的是本商户那一局；不传则退回「按 round_id 取最近一条」。
+	MerchantId string `form:"merchantId,optional"`
 }
 
 type ReplayComputeReq struct {

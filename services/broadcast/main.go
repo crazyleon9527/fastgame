@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"fastgame/pkg/async"
 	applog "fastgame/pkg/log"
 	"fastgame/services/broadcast/internal/hub"
 	"fastgame/services/broadcast/internal/worker"
@@ -63,11 +65,16 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go func() {
-		if err := w.Run(ctx); err != nil && err != context.Canceled {
-			logx.Must(err)
+
+	// 后台任务统一交给 async.Runner：panic 会被 recover 并打日志（裸 goroutine
+	// 里的 panic 会直接终止进程），进程退出前可以 Drain 等在途任务结束。
+	tasks := async.New("broadcast")
+	tasks.Run(ctx, func(runCtx context.Context) {
+		if err := w.Run(runCtx); err != nil && err != context.Canceled {
+			// 原来是 logx.Must(err)：消费循环一报错就 panic 打挂整个 websocket 服务
+			logx.Errorf("kafka consumer stopped: %v", err)
 		}
-	}()
+	})
 
 	upgrader := websocket.Upgrader{CheckOrigin: makeCheckOrigin(c.CORS.AllowedOrigins)}
 
@@ -89,12 +96,21 @@ func main() {
 	addr := fmt.Sprintf("%s:%d", c.Host, c.Port)
 	logx.Infof("broadcast websocket started at http://%s/ws/bigwin", addr)
 	server := &http.Server{Addr: addr, Handler: mux}
-	go func() {
+	tasks.Run(ctx, func(context.Context) {
 		<-ctx.Done()
-		_ = server.Shutdown(context.Background())
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
 		_ = w.Close()
-	}()
+	})
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logx.Must(err)
+	}
+
+	// 退出前等在途任务收尾（超时会打日志而不是静默丢弃）
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer drainCancel()
+	if err := tasks.Shutdown(drainCtx); err != nil {
+		logx.Errorf("broadcast shutdown: %v", err)
 	}
 }

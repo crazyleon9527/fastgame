@@ -3,33 +3,18 @@ package trace
 import (
 	"context"
 	"net/http"
-	"strings"
 
-	"github.com/google/uuid"
+	"fastgame/pkg/traceid"
 )
 
-const HeaderTraceID = "X-Trace-Id"
+// HeaderTraceID 链路 ID 的 HTTP Header 名（实现见 pkg/traceid）。
+const HeaderTraceID = traceid.HeaderTraceID
 
-type ctxKey struct{}
+// IDFromRequest 读取或生成链路 ID。
+func IDFromRequest(r *http.Request) string { return traceid.IDFromRequest(r) }
 
-// IDFromRequest reads or generates a trace id from HTTP headers.
-func IDFromRequest(r *http.Request) string {
-	if id := strings.TrimSpace(r.Header.Get(HeaderTraceID)); id != "" {
-		return id
-	}
-	return uuid.NewString()
-}
+// WithID 把链路 ID 写入 context。
+func WithID(ctx context.Context, traceID string) context.Context { return traceid.WithID(ctx, traceID) }
 
-func WithID(ctx context.Context, traceID string) context.Context {
-	if traceID == "" {
-		traceID = uuid.NewString()
-	}
-	return context.WithValue(ctx, ctxKey{}, traceID)
-}
-
-func ID(ctx context.Context) string {
-	if v, ok := ctx.Value(ctxKey{}).(string); ok && v != "" {
-		return v
-	}
-	return ""
-}
+// ID 读取 context 里的链路 ID。
+func ID(ctx context.Context) string { return traceid.ID(ctx) }
