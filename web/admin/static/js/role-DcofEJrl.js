@@ -1,0 +1,1 @@
+import{an as i,ao as o}from"./index-DSzT7CjU.js";function t(){var e,n;const r=i().getItem(o);return(n=(e=r==null?void 0:r.roles)==null?void 0:e[0])!=null?n:"viewer"}function s(){return t()!=="viewer"}function u(){return t()==="admin"}export{s as c,u as i};

@@ -43,7 +43,21 @@ function handRank(routeInfo: any) {
 function ascending(arr: any[]) {
   arr.forEach((v, index) => {
     // 当rank不存在时，根据顺序自动创建，首页路由永远在第一位
-    if (handRank(v)) v.meta.rank = index + 2;
+    //
+    // 注意：有些路由本来就没有 meta（例如 /error/403 这种纯 redirect 路由、
+    // 通配兜底路由）。handRank 把"没有 meta"等同于"没有 rank"从而返回 true，
+    // 此时直接写 v.meta.rank 会抛
+    //   TypeError: Cannot set properties of undefined (setting 'rank')
+    //
+    // 这个异常发生在 initRouter() 的 promise 链里，而 main.ts 为了屏蔽
+    // Element Plus 弹窗的 cancel/close，给 window 挂了 unhandledrejection 监听
+    // 并调用 preventDefault()，于是异常既不出现在控制台、也逃不到页面上——
+    // 现象就是「后台登录页永远转圈，没有任何报错」。所以这里必须先把 meta 补上，
+    // 并默认 showLink:false：没有 meta 的路由本来就没有标题，不该进侧边菜单。
+    if (handRank(v)) {
+      const meta = (v.meta ??= { showLink: false });
+      meta.rank = index + 2;
+    }
   });
   return arr.sort(
     (a: { meta: { rank: number } }, b: { meta: { rank: number } }) => {
