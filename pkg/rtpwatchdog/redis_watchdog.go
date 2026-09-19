@@ -11,14 +11,20 @@ import (
 
 // RedisWatchdog 跨 Consumer 副本共享的滑动窗口（Redis List + LTRIM）
 type RedisWatchdog struct {
-	rdb  *redis.Client
-	cfg  Config
+	rdb    *redis.Client
+	cfg    Config
 	prefix string
 }
 
 func NewRedis(rdb *redis.Client, cfg Config) *RedisWatchdog {
 	if cfg.GlobalMax <= 0 {
 		cfg = DefaultConfig()
+	}
+	if cfg.MinSamples <= 0 {
+		cfg.MinSamples = DefaultConfig().MinSamples
+	}
+	if cfg.AlertCooldown <= 0 {
+		cfg.AlertCooldown = DefaultConfig().AlertCooldown
 	}
 	return &RedisWatchdog{rdb: rdb, cfg: cfg, prefix: "rtp:watch"}
 }
@@ -61,11 +67,20 @@ func (w *RedisWatchdog) pushSample(ctx context.Context, key, sample string, max 
 }
 
 func (w *RedisWatchdog) evalKey(ctx context.Context, key, scopeType, scopeValue string, in RecordInput) (Alert, bool, error) {
+	// 冷却期内不再重复判定：窗口一旦越线，之后每一局都会再命中，
+	// 不设冷却就会刷出成百条 risk_alerts + 黑名单 upsert。
+	alertedKey := "rtp:alerted:" + key
+	if n, err := w.rdb.Exists(ctx, alertedKey).Result(); err != nil {
+		return Alert{}, false, err
+	} else if n > 0 {
+		return Alert{}, false, nil
+	}
+
 	items, err := w.rdb.LRange(ctx, key, 0, -1).Result()
 	if err != nil {
 		return Alert{}, false, err
 	}
-	if len(items) < 10 {
+	if len(items) < w.cfg.MinSamples {
 		return Alert{}, false, nil
 	}
 	var totalBet, totalWin int64
@@ -84,6 +99,12 @@ func (w *RedisWatchdog) evalKey(ctx context.Context, key, scopeType, scopeValue 
 	if rtpPPM <= w.cfg.ThresholdPPM {
 		return Alert{}, false, nil
 	}
+
+	// 打上冷却标记（TTL 到期后重新开始评估）
+	if err := w.rdb.Set(ctx, alertedKey, "1", w.cfg.AlertCooldown).Err(); err != nil {
+		return Alert{}, false, err
+	}
+
 	return Alert{
 		ScopeType:    scopeType,
 		ScopeValue:   scopeValue,

@@ -21,11 +21,13 @@
 - 金额统一 `pkg/money`，scale=10000 的 minor units。
 
 ## 已知未修问题（按严重程度）
-1. **RGS 结算用的 `pkg/prng` 赔付表期望 RTP ≈ 863.75%**（55% miss / 35% 拿 1.5–5x / 10% 拿 50–100x），另有 `multiplierFromRange` 的 `uint64` 乘法溢出。实测前十几局 RTP 1300–1800%。`pkg/rtpwatchdog` 会据此把游戏置 `rtp:flag:game:<商户>:<游戏>`（TTL 24h）、把玩家置 `rtp:suspend:user:<用户>`，之后下注被 403 `access denied`。仓库里 `engine/games/fishing` 的 PAR 表实现是 ~96%，但 `engine.UniversalHost` 无人构造（死代码）。这是"服务不可用"的根因。
-2. `blacklist:user_id:10001` 这类 Redis 黑名单键 TTL=-1 且库里已无对应 `risk_blacklist` 行 —— 直接删库里的行不会清 Redis（`SyncAll` 只增不减），会永久封禁该用户。
-3. `pkg/prng` 把明文 `server_seed` 随每次下注返回；`GET /api/v1/game/replay/:roundId` 无需鉴权（现已支持可选 `merchantId` 限定商户）。
-4. `audit_logs` 从未写入；RBAC 缺失角色时回退 `admin`；TOTP 开关硬编码关闭。
-5. wallet 慢响应按失败处理但不落补偿记录（`pkg/wallet/breaker.go`）；锁 TTL 3s < 钱包超时 5s。
+1. ~~RGS 结算用 864% RTP 的旧赔付表~~ **已修（2026-09-20）**：赔付表统一到 `pkg/par.Default96`（精确 96%），RGS 结算（`pkg/prng.outcomeFromRoll`）、`engine/games/fishing` 插件、客户端验算 `web/shared/prng-money.js` 三处共用同一张表；插件改成由 provably-fair 种子确定性推演（原先是 `crypto/rand`，无法回放/验证）。`pkg/prng/js_parity_test.go` 会真调 node 逐局比对客户端与服务端口径。
+2. ~~`blacklist:user_id:*` 孤儿键永久封禁~~ **已修**：`security.Blacklist.Reconcile` 以库为准做全量对账（含删除库中已不存在的键），RGS/后台启动时执行。
+3. watchdog 误报 **已修**：原实现 10 局 + $100 就判定，正常波动（10 局里一个 20x）就会超过 180% 阈值 → flagged 游戏 + 封禁玩家 + 全部下注 403。现 `MinSamples` 默认 2000（按 6σ 上界推导）、告警冷却 10 分钟、自动封禁必须带过期时间（原来写的是永久封禁）。
+4. `pkg/prng` 把明文 `server_seed` 随每次下注返回；`GET /api/v1/game/replay/:roundId` 无需鉴权（现已支持可选 `merchantId` 限定商户）。
+5. `audit_logs` 从未写入；RBAC 缺失角色时回退 `admin`；TOTP 开关硬编码关闭。
+6. wallet 慢响应按失败处理但不落补偿记录（`pkg/wallet/breaker.go`）；锁 TTL 3s < 钱包超时 5s。
+7. `engine.UniversalHost` / `engine/turn_logic.go` 仍是死代码（没有服务构造它）；RGS 走的是 `pkg/prng` + `pkg/par`。若将来要接插件路径，注意别退回 `crypto/rand`。
 
 ## 约定
 - 后台/模型/文档注释一律**简体中文**。

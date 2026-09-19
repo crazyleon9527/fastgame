@@ -8,6 +8,7 @@ import (
 	"fastgame/internal/model"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 type Blacklist struct {
@@ -84,10 +85,62 @@ func (b *Blacklist) SyncItem(ctx context.Context, item *model.RiskBlacklist) err
 }
 
 func (b *Blacklist) SyncAll(ctx context.Context, items []*model.RiskBlacklist) error {
+	return b.Reconcile(ctx, items)
+}
+
+// Reconcile 以数据库为准做全量对账：
+//
+//  1. 库里的每一行同步到 Redis（有效则封禁、失效或 status!=1 则解封）；
+//  2. **删除库里已经不存在的 Redis 键**。
+//
+// 第 2 步是必需的：只做"遍历库里的行"是只增不减的单向同步，
+// 直接从数据库删掉/改掉一行（运维手工处理时很常见）会留下永久封禁的
+// 孤儿键（TTL=-1），被封的用户再也无法下注，而库里查不到任何依据。
+//
+// 只清理 blacklist:<listType>:<value> 形式的键，不会碰到其他业务键。
+func (b *Blacklist) Reconcile(ctx context.Context, items []*model.RiskBlacklist) error {
+	expected := make(map[string]struct{}, len(items))
 	for _, item := range items {
+		if item == nil || item.ListValue == "" {
+			continue
+		}
+		expected[blacklistKey(item.ListType, item.ListValue)] = struct{}{}
 		if err := b.SyncItem(ctx, item); err != nil {
 			return err
 		}
 	}
+
+	live, err := b.keys(ctx)
+	if err != nil {
+		return err
+	}
+	for _, key := range live {
+		if _, ok := expected[key]; ok {
+			continue
+		}
+		if err := b.client.Del(ctx, key).Err(); err != nil {
+			return err
+		}
+		logx.Infof("[BLACKLIST] 清理库中已不存在的孤儿封禁键: %s", key)
+	}
 	return nil
+}
+
+// keys 用 SCAN 枚举所有 blacklist:* 键（不用 KEYS，避免在大 key 空间下阻塞 Redis）。
+func (b *Blacklist) keys(ctx context.Context) ([]string, error) {
+	var (
+		cursor uint64
+		out    []string
+	)
+	for {
+		batch, next, err := b.client.Scan(ctx, cursor, "blacklist:*", 200).Result()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, batch...)
+		if next == 0 {
+			return out, nil
+		}
+		cursor = next
+	}
 }

@@ -42,6 +42,12 @@ type RtpWatchConf struct {
 	GlobalMax    int
 	PlayerMax    int
 	ThresholdPPM int64
+	// MinSamples 触发告警所需的最少局数（0 = 用 pkg/rtpwatchdog 的统计默认值 2000）。
+	// 调小它会让正常波动被误判成 RTP 漂移：窗口小时单局 20x 就能把窗口 RTP
+	// 推到 180% 阈值以上。
+	MinSamples int
+	// AlertCooldown 同一对象两次告警的最小间隔（如 "10m"，0 = 默认 10m）。
+	AlertCooldown string
 }
 
 type BatchConf struct {

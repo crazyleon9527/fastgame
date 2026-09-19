@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"fastgame/internal/model"
 	"fastgame/pkg/kafka"
 	"fastgame/pkg/outbox"
 	"fastgame/services/consumer/internal/config"
 	"fastgame/services/consumer/internal/svc"
+	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )

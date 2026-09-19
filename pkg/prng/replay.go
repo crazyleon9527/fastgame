@@ -57,7 +57,7 @@ func (e *Engine) ComputeReplay(serverSeed, clientSeed, nonce string, betAmount m
 		Roll:           roll,
 	}
 
-	outcome := e.outcomeFromRoll(roll, serverSeed, clientSeed, nonce, betAmount)
+	outcome := e.outcomeFromRoll(roll, betAmount)
 	outcome.Roll = roll
 
 	weatherRoll, _ := RollIndexUint64(serverSeed, clientSeed, nonce, 2)

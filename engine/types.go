@@ -16,6 +16,12 @@ type TurnInput struct {
 	BetAmount    money.Amount `json:"bet_amount"`
 	IsDemo       bool         `json:"is_demo"`
 
+	// Provably-fair 输入。插件必须用这三个字段做确定性推演：
+	// roll = HMAC(ServerSeed, ClientSeed:RoundID:0)，结果可被客户端独立复现。
+	// 缺失时插件应直接报错，而不是退回随机数——那会让回放与验证失去意义。
+	ServerSeed string `json:"server_seed"`
+	ClientSeed string `json:"client_seed"`
+
 	// 客户端自定义参数 (例如: 钓鱼的鱼竿等级、抛竿力度，生肖的选线等)
 	ExtraParams map[string]any `json:"extra_params"`
 }

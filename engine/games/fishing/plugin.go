@@ -2,125 +2,98 @@ package fishing
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/big"
-	"sort"
 
 	"fastgame/engine"
 	"fastgame/pkg/money"
+	"fastgame/pkg/par"
+	"fastgame/pkg/prng"
 )
 
 const (
 	GameCodeFishing = "fishing_tycoon"
 	MathVersionV1   = "v1.0.0_tier96"
-	TargetRTP       = 96.00
 )
 
 // FishingPlugin 钓鱼大亨数学推演插件
 type FishingPlugin struct {
-	table        []FishDef
-	cumulative   []uint32 // 权重前缀和，用于二分极速查找
-	totalWeight  uint32
+	table *par.Table
 }
 
 func init() {
 	// 启动时自动完成预编译并注册进 Universal Host
-	plugin := NewFishingPlugin(DefaultPARTable96)
-	engine.RegisterPlugin(plugin)
+	engine.RegisterPlugin(NewFishingPlugin(DefaultPARTable96))
 }
 
 func NewFishingPlugin(table []FishDef) *FishingPlugin {
-	p := &FishingPlugin{
-		table:      table,
-		cumulative: make([]uint32, len(table)),
-	}
-
-	var sum uint32
-	for i, item := range table {
-		sum += item.Weight
-		p.cumulative[i] = sum
-	}
-	p.totalWeight = sum
-	return p
+	return &FishingPlugin{table: par.NewTable(table)}
 }
 
 func (p *FishingPlugin) GameCode() string {
 	return GameCodeFishing
 }
 
-// CalculateOutcome 核心推演 (目标耗时 < 30微秒)
-func (p *FishingPlugin) CalculateOutcome(ctx context.Context, in *engine.TurnInput) (*engine.TurnOutcome, error) {
-	// 1. 生成 Provably Fair 种子对 (客户端可核验公正性)
-	serverSeed, serverSeedHash, err := generateSeedPair()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate seed pair: %w", err)
+// CalculateOutcome 核心推演。
+//
+// 结果由 provably-fair 的 roll 决定：roll = HMAC-SHA256(serverSeed, clientSeed:roundId:0)
+// 的高 64 位，再按 PAR 表权重区间定位命中项。这与 RGS 结算（pkg/prng）用的是
+// 同一套算法和同一张表，因此 /verify 与 /replay 能独立复现派彩。
+//
+// 上一版这里用 crypto/rand 直接抽结果，并现场生成一对新种子——那样开奖结果与
+// 返回给客户端的种子毫无关系，既无法回放也无法验证，属于必须修掉的缺陷。
+func (p *FishingPlugin) CalculateOutcome(_ context.Context, in *engine.TurnInput) (*engine.TurnOutcome, error) {
+	if in == nil {
+		return nil, fmt.Errorf("nil turn input")
+	}
+	if in.ServerSeed == "" || in.ClientSeed == "" || in.RoundID == "" {
+		return nil, fmt.Errorf("provably fair inputs required: server_seed / client_seed / round_id")
 	}
 
-	// 2. 伪随机数采样 (落在 [0, totalWeight) 范围内)
-	nBig, err := rand.Int(rand.Reader, big.NewInt(int64(p.totalWeight)))
+	roll, err := prng.RollUint64(in.ServerSeed, in.ClientSeed, in.RoundID)
 	if err != nil {
-		return nil, fmt.Errorf("rng generation failed: %w", err)
+		return nil, fmt.Errorf("provably fair roll failed: %w", err)
 	}
-	pick := uint32(nBig.Uint64())
 
-	// 3. 前缀和二分查找命中目标鱼种 (O(log N) 耗时约为几纳秒)
-	idx := sort.Search(len(p.cumulative), func(i int) bool {
-		return p.cumulative[i] > pick
+	hit := p.table.Sample(roll)
+	winAmount := money.Multiplier(hit.MultiplierMinor).Apply(in.BetAmount)
+
+	payloadJSON, _ := json.Marshal(map[string]any{
+		"caught":         hit.ID > 0,
+		"fish_id":        hit.ID,
+		"fish_name":      hit.Name,
+		"tier":           hit.Tier,
+		"multiplier":     hit.Multiplier(),
+		"tension_ms":     hit.TensionMs,
+		"is_big_win":     hit.MultiplierMinor >= 50*par.Scale,
+		"coin_drop_tier": getCoinDropTier(hit.Multiplier()),
 	})
-	hitFish := p.table[idx]
-
-	// 4. 派彩金额计算 (单位: 分)
-	winAmountMinor := int64(float64(in.BetAmount.Minor()) * hitFish.Multiplier)
-	winAmount := money.AmountFromMinor(winAmountMinor)
-
-	// 5. 组装给 Cocos 客户端还原动效的 Presentation Payload
-	payloadMap := map[string]any{
-		"caught":         hitFish.FishID > 0,
-		"fish_id":        hitFish.FishID,
-		"fish_name":      hitFish.Name,
-		"tier":           hitFish.Tier,
-		"multiplier":     hitFish.Multiplier,
-		"tension_ms":     hitFish.TensionMs,
-		"is_big_win":     hitFish.Multiplier >= 50.0,
-		"coin_drop_tier": getCoinDropTier(hitFish.Multiplier),
-	}
-	payloadJSON, _ := json.Marshal(payloadMap)
 
 	return &engine.TurnOutcome{
 		WinAmount:           winAmount,
-		PayoutMultiplier:    hitFish.Multiplier,
+		PayoutMultiplier:    hit.Multiplier(),
 		MathVersion:         MathVersionV1,
-		RtpApplied:          TargetRTP,
-		ServerSeed:          serverSeed,
-		ServerSeedHash:      serverSeedHash,
-		ClientSeed:          in.RoundID, // 默认关联注单号作为客户端因子
-		Nonce:               1,
+		RtpApplied:          p.table.RTP() * 100,
+		ServerSeed:          in.ServerSeed,
+		ServerSeedHash:      prng.HashServerSeed(in.ServerSeed),
+		ClientSeed:          in.ClientSeed,
+		Nonce:               0, // roll 索引：0 即主开奖 roll
 		PresentationPayload: string(payloadJSON),
 	}, nil
 }
 
-func getCoinDropTier(mult float64) string {
-	if mult >= 100.0 {
-		return "FOUNTAIN" // 爆裂金币喷泉
-	} else if mult >= 20.0 {
-		return "BURST"    // 大量金币迸发
-	} else if mult > 0.0 {
-		return "NORMAL"   // 普通金币收集
-	}
-	return "NONE"
-}
+// TableRTP 暴露本插件表的理论 RTP（百分比），供监控与自检使用。
+func (p *FishingPlugin) TableRTP() float64 { return p.table.RTP() * 100 }
 
-func generateSeedPair() (string, string, error) {
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", "", err
+func getCoinDropTier(mult float64) string {
+	switch {
+	case mult >= 100.0:
+		return "FOUNTAIN" // 爆裂金币喷泉
+	case mult >= 20.0:
+		return "BURST" // 大量金币迸发
+	case mult > 0.0:
+		return "NORMAL" // 普通金币收集
+	default:
+		return "NONE"
 	}
-	seed := hex.EncodeToString(bytes)
-	h := sha256.Sum256([]byte(seed))
-	hash := hex.EncodeToString(h[:])
-	return seed, hash, nil
 }

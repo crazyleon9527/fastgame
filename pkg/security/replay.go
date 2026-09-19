@@ -10,10 +10,10 @@ import (
 )
 
 type ReplayGuard struct {
-	client   *redis.Client
-	window   time.Duration
-	maxSkew  time.Duration
-	ttl      time.Duration
+	client  *redis.Client
+	window  time.Duration
+	maxSkew time.Duration
+	ttl     time.Duration
 }
 
 func NewReplayGuard(client *redis.Client, window, maxSkew, ttl time.Duration) *ReplayGuard {

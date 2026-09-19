@@ -26,8 +26,16 @@ RtpWatch:
   Enabled: true
   UseRedis: true
   GlobalMax: 10000
-  PlayerMax: 200
+  # 窗口必须不小于 MinSamples，否则该维度永远不会告警（启动时会自动抬高并打日志）
+  PlayerMax: 2000
   ThresholdPPM: 1800000
+  # 触发告警所需的最少局数。本游戏单局派彩 σ≈6 倍投注额（最高 500x），
+  # 10 局窗口里一个 20x 就能把窗口 RTP 推到 180% 阈值以上，
+  # 于是正常波动被误判成 RTP 漂移 → flagged 游戏 + 封禁玩家 + 全部下注 403。
+  # 2000 是按 6σ 上界推导出的下限（详见 pkg/rtpwatchdog.Config.MinSamples）。
+  MinSamples: 2000
+  # 同一对象两次告警的最小间隔，避免窗口越线后逐局刷屏
+  AlertCooldown: 10m
 
 Batch:
   MaxSize: 2000

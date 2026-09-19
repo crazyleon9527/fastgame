@@ -2,63 +2,122 @@ package fishing
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"fastgame/engine"
 	"fastgame/pkg/money"
+	"fastgame/pkg/par"
+	"fastgame/pkg/prng"
 )
 
+// TestFishingRTPConvergence 蒙特卡洛校验赔付表的 RTP 收敛。
+//
+// 现在推演是确定性的（roll 由 provably-fair 种子派生），所以这里既验证 RTP，
+// 也顺带验证"同一输入永远得到同一结果"——上一版用 crypto/rand 抽结果，
+// 这条断言根本写不出来。
 func TestFishingRTPConvergence(t *testing.T) {
 	plugin := NewFishingPlugin(DefaultPARTable96)
 	ctx := context.Background()
 
-	const iterations = 10_000_000    // 模拟 1,000 万次下注
-	betPerSpin := money.FromMajor(1) // 每注 $1.00 (100分)
+	const iterations = 1_000_000
+	bet := money.FromMajor(1)
 
-	var totalBet int64
-	var totalWin int64
-
-	t.Logf("🚀 开始执行 %d 次蒙特卡洛模拟压测...", iterations)
+	var totalBet, totalWin int64
 	start := time.Now()
-
-	in := &engine.TurnInput{
-		RoundID:   "test_round_sim",
-		BetAmount: betPerSpin,
-	}
-
 	for i := 0; i < iterations; i++ {
+		in := &engine.TurnInput{
+			RoundID:    fmt.Sprintf("round-%d", i),
+			ServerSeed: "sim-server-seed",
+			ClientSeed: "sim-client-seed",
+			BetAmount:  bet,
+		}
 		outcome, err := plugin.CalculateOutcome(ctx, in)
 		if err != nil {
 			t.Fatalf("推演出错: %v", err)
 		}
-		totalBet += betPerSpin.Minor()
+		if i == 0 {
+			again, err := plugin.CalculateOutcome(ctx, in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if again.WinAmount != outcome.WinAmount || again.PayoutMultiplier != outcome.PayoutMultiplier {
+				t.Fatalf("同一输入两次推演结果不同：%+v vs %+v", outcome, again)
+			}
+			if outcome.ServerSeedHash != prng.HashServerSeed(in.ServerSeed) {
+				t.Fatal("server_seed_hash 与 server_seed 不匹配")
+			}
+		}
+		totalBet += bet.Minor()
 		totalWin += outcome.WinAmount.Minor()
 	}
-
 	elapsed := time.Since(start)
+
+	actualRTP := float64(totalWin) / float64(totalBet) * 100
 	avgLatencyUs := float64(elapsed.Microseconds()) / float64(iterations)
-	actualRTP := (float64(totalWin) / float64(totalBet)) * 100
+	t.Logf("目标 RTP: %.4f%% | %d 局实测: %.4f%% | 单次平均 %.2f 微秒",
+		TargetRTP, iterations, actualRTP, avgLatencyUs)
 
-	t.Logf("✅ 压测完成! 总耗时: %s (单次平均耗时: %.2f 微秒)", elapsed, avgLatencyUs)
-	t.Logf("🎯 目标 RTP: %.2f%% | 实际测出 RTP: %.4f%%", TargetRTP, actualRTP)
-
-	// 容差按统计显著度设定，而不是拍脑袋的固定值：
-	//   单局派彩标准差 σ ≈ 14.8（$1 注：90% 得 0、7.5% 均值 3.25、2.5% 得 75）
-	//   1000 万局 → RTP 的标准误 SE = σ / sqrt(n) ≈ 14.8 / 3162 ≈ 0.47%
-	// 原 ±0.15% 只有约 0.32σ，导致每次运行都有较高概率随机失败
-	// （实测三次分别落在 96.16% / 96.18% / 96.05%，正是正常抽样波动）。
-	// 取 ±1.5% ≈ 3σ：既能挡住"模型算错"（真错的偏差是百分之几十），
-	// 又不会因随机波动误报。
-	const tolerance = 1.5
-	diff := actualRTP - TargetRTP
-	if diff < -tolerance || diff > tolerance {
+	// 容差按统计显著度设定：
+	//   单局派彩 σ ≈ 6.04（0.5x/1x/2x/5x/... 的方差贡献主要在 100x~500x 尾巴）
+	//   100 万局 → SE = 6.04/1000 ≈ 0.60%，±2% 约 3.3σ
+	// 真错的话偏差是百分之几百（旧表是 864%），不可能落进这个区间。
+	const tolerance = 2.0
+	if diff := actualRTP - TargetRTP; diff < -tolerance || diff > tolerance {
 		t.Errorf("❌ RTP 收敛偏差过大: %.4f%% (超出 ±%.1f%% 允许边界)", diff, tolerance)
-	} else {
-		t.Logf("🎉 数学模型验证合格! 偏差仅为: %.4f%%", diff)
 	}
 
 	if avgLatencyUs > 50.0 {
 		t.Errorf("❌ 运算耗时超标: %.2f 微秒 > 50 微秒", avgLatencyUs)
+	}
+}
+
+// TestFishingPluginRejectsMissingSeeds —— 缺 provably-fair 输入时必须报错。
+// 静默退回随机数会让"可验证公平"变成一句空话。
+func TestFishingPluginRejectsMissingSeeds(t *testing.T) {
+	plugin := NewFishingPlugin(DefaultPARTable96)
+	if _, err := plugin.CalculateOutcome(context.Background(), &engine.TurnInput{
+		RoundID: "r1", BetAmount: money.FromMajor(1),
+	}); err == nil {
+		t.Fatal("缺少 server_seed/client_seed 时应报错")
+	}
+}
+
+// TestFishingPluginUsesPARTable —— 插件结果必须等于 PAR 表按 roll 的采样，
+// 且与 pkg/prng（RGS 结算口径）完全一致。
+func TestFishingPluginUsesPARTable(t *testing.T) {
+	plugin := NewFishingPlugin(DefaultPARTable96)
+	bet := money.FromMajor(1)
+
+	for i := 0; i < 2000; i++ {
+		roundID := fmt.Sprintf("parity-%d", i)
+		roll, err := prng.RollUint64("srv", "cli", roundID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hit := par.Default96.Sample(roll)
+
+		out, err := plugin.CalculateOutcome(context.Background(), &engine.TurnInput{
+			RoundID: roundID, ServerSeed: "srv", ClientSeed: "cli", BetAmount: bet,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if out.PayoutMultiplier != hit.Multiplier() {
+			t.Fatalf("roundID=%s：插件倍率 %v，PAR 表 %v", roundID, out.PayoutMultiplier, hit.Multiplier())
+		}
+
+		// 与结算口径对齐
+		e := prng.NewEngine("default")
+		settle, _, err := e.Spin("srv", "cli", roundID, bet)
+		e.Release()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if settle.WinAmount != out.WinAmount {
+			t.Fatalf("roundID=%s：结算派彩 %d，插件派彩 %d —— 两条链路口径不一致",
+				roundID, settle.WinAmount.Minor(), out.WinAmount.Minor())
+		}
 	}
 }
