@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"fastgame/pkg/money"
-
 	applog "fastgame/pkg/log"
+	"fastgame/pkg/money"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/breaker"
@@ -21,7 +20,7 @@ type BreakerConfig struct {
 }
 
 func DefaultBreakerConfig() BreakerConfig {
-	return BreakerConfig{SlowThreshold: 500 * time.Millisecond}
+	return BreakerConfig{SlowThreshold: 1500 * time.Millisecond}
 }
 
 type breakerClient struct {
@@ -99,7 +98,6 @@ func (c *breakerClient) run(ctx context.Context, merchantID string, op string, f
 				logx.Field("op", op),
 				logx.Field(applog.KeyDurationMs, elapsed.Milliseconds()),
 			)
-			return fmt.Errorf("%w: %s took %s", ErrSlowResponse, op, elapsed)
 		}
 		return nil
 	})
@@ -113,14 +111,24 @@ func (c *breakerClient) run(ctx context.Context, merchantID string, op string, f
 	return nil
 }
 
-func (c *breakerClient) GetBalance(ctx context.Context, merchantID string, userID string) (money.Amount, error) {
+func (c *breakerClient) GetBalance(ctx context.Context, merchantID, userID, currency string) (money.Amount, error) {
 	var balance money.Amount
 	err := c.run(ctx, merchantID, "GetBalance", func() error {
 		var err error
-		balance, err = c.inner.GetBalance(ctx, merchantID, userID)
+		balance, err = c.inner.GetBalance(ctx, merchantID, userID, currency)
 		return err
 	})
 	return balance, err
+}
+
+func (c *breakerClient) Settle(ctx context.Context, req SettleReq) (*SettleResult, error) {
+	var result *SettleResult
+	err := c.run(ctx, req.MerchantID, "Settle", func() error {
+		var err error
+		result, err = c.inner.Settle(ctx, req)
+		return err
+	})
+	return result, err
 }
 
 func (c *breakerClient) Bet(ctx context.Context, req BetReq) (*Result, error) {
@@ -149,11 +157,31 @@ func (c *breakerClient) Rollback(ctx context.Context, req RollbackReq) error {
 	})
 }
 
-func (c *breakerClient) CheckTransaction(ctx context.Context, merchantID string, userID string, roundID string) (*TxCheckResult, error) {
+func (c *breakerClient) CheckTransaction(ctx context.Context, merchantID, userID, roundID string) (*TxCheckResult, error) {
 	var result *TxCheckResult
 	err := c.run(ctx, merchantID, "CheckTransaction", func() error {
 		var err error
 		result, err = c.inner.CheckTransaction(ctx, merchantID, userID, roundID)
+		return err
+	})
+	return result, err
+}
+
+func (c *breakerClient) TransferIn(ctx context.Context, req TransferReq) (*TransferResult, error) {
+	var result *TransferResult
+	err := c.run(ctx, req.MerchantID, "TransferIn", func() error {
+		var err error
+		result, err = c.inner.TransferIn(ctx, req)
+		return err
+	})
+	return result, err
+}
+
+func (c *breakerClient) TransferOut(ctx context.Context, req TransferReq) (*TransferResult, error) {
+	var result *TransferResult
+	err := c.run(ctx, req.MerchantID, "TransferOut", func() error {
+		var err error
+		result, err = c.inner.TransferOut(ctx, req)
 		return err
 	})
 	return result, err

@@ -8,8 +8,10 @@ import (
 )
 
 var (
-	ErrCircuitOpen  = errors.New("wallet circuit open")
-	ErrSlowResponse = errors.New("wallet slow response")
+	ErrCircuitOpen      = errors.New("wallet circuit open")
+	ErrSlowResponse     = errors.New("wallet slow response")
+	ErrInsufficientFund = errors.New("insufficient balance")
+	ErrMerchantDisabled = errors.New("merchant wallet disabled")
 )
 
 const (
@@ -27,11 +29,41 @@ type TxCheckResult struct {
 }
 
 type Client interface {
-	GetBalance(ctx context.Context, merchantID string, userID string) (money.Amount, error)
+	// GetBalance 查询余额
+	GetBalance(ctx context.Context, merchantID, userID, currency string) (money.Amount, error)
+
+	// Settle 免转核心原子结算接口 (Bet + Win 单次完成)
+	Settle(ctx context.Context, req SettleReq) (*SettleResult, error)
+
+	// Bet 与 Win 保留兼容旧链路或单边调用
 	Bet(ctx context.Context, req BetReq) (*Result, error)
 	Win(ctx context.Context, req WinReq) (*Result, error)
+
+	// Rollback 冲正/回滚补偿接口
 	Rollback(ctx context.Context, req RollbackReq) error
-	CheckTransaction(ctx context.Context, merchantID string, userID string, roundID string) (*TxCheckResult, error)
+
+	// CheckTransaction 查单对账
+	CheckTransaction(ctx context.Context, merchantID, userID, roundID string) (*TxCheckResult, error)
+
+	// TransferIn/Out 针对转账钱包
+	TransferIn(ctx context.Context, req TransferReq) (*TransferResult, error)
+	TransferOut(ctx context.Context, req TransferReq) (*TransferResult, error)
+}
+
+type SettleReq struct {
+	MerchantID    string
+	UserID        string
+	GameCode      string
+	RoundID       string
+	TransactionID string
+	Currency      string
+	BetAmount     money.Amount
+	WinAmount     money.Amount
+}
+
+type SettleResult struct {
+	Balance       money.Amount
+	TransactionID string
 }
 
 type BetReq struct {
@@ -49,13 +81,28 @@ type WinReq struct {
 }
 
 type RollbackReq struct {
-	MerchantID string
-	UserID     string
-	RoundID    string
-	Amount     money.Amount
-	Reason     string
+	MerchantID            string
+	UserID                string
+	RoundID               string
+	RollbackTransactionID string
+	NewTransactionID      string
+	Amount                money.Amount
+	Reason                string
 }
 
 type Result struct {
 	Balance money.Amount
+}
+
+type TransferReq struct {
+	MerchantID string
+	UserID     string
+	TransferID string
+	Amount     money.Amount
+	Currency   string
+}
+
+type TransferResult struct {
+	GameBalance money.Amount
+	TransferID  string
 }

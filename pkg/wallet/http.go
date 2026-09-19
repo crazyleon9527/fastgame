@@ -50,6 +50,7 @@ func NewHTTPClient(cfg HTTPConfig) *HTTPClient {
 type balanceReq struct {
 	MerchantID string `json:"merchantId"`
 	UserID     string `json:"userId"`
+	Currency   string `json:"currency,omitempty"`
 }
 
 type balanceResp struct {
@@ -68,13 +69,60 @@ type txResp struct {
 	Balance int64 `json:"balance"`
 }
 
-func (c *HTTPClient) GetBalance(ctx context.Context, merchantID string, userID string) (money.Amount, error) {
+func (c *HTTPClient) GetBalance(ctx context.Context, merchantID, userID, currency string) (money.Amount, error) {
 	var resp balanceResp
 	err := c.post(ctx, "/api/v1/wallet/balance", balanceReq{
 		MerchantID: merchantID,
 		UserID:     userID,
+		Currency:   currency,
 	}, &resp)
 	return money.AmountFromMinor(resp.Balance), err
+}
+
+type settleReqPayload struct {
+	MerchantCode  string `json:"merchantCode"`
+	UserID        string `json:"userId"`
+	GameCode      string `json:"gameCode"`
+	RoundID       string `json:"roundId"`
+	TransactionID string `json:"transactionId"`
+	Currency      string `json:"currency"`
+	BetAmount     int64  `json:"betAmount"`
+	WinAmount     int64  `json:"winAmount"`
+	Timestamp     int64  `json:"timestamp"`
+}
+
+type settleRespPayload struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		Balance       int64  `json:"balance"`
+		TransactionID string `json:"transactionId"`
+	} `json:"data"`
+}
+
+func (c *HTTPClient) Settle(ctx context.Context, req SettleReq) (*SettleResult, error) {
+	var resp settleRespPayload
+	err := c.post(ctx, "/api/v1/spi/wallet/settle", settleReqPayload{
+		MerchantCode:  req.MerchantID,
+		UserID:        req.UserID,
+		GameCode:      req.GameCode,
+		RoundID:       req.RoundID,
+		TransactionID: req.TransactionID,
+		Currency:      req.Currency,
+		BetAmount:     req.BetAmount.Minor(),
+		WinAmount:     req.WinAmount.Minor(),
+		Timestamp:     time.Now().Unix(),
+	}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Code != 0 {
+		return nil, fmt.Errorf("wallet spi error: code=%d msg=%s", resp.Code, resp.Message)
+	}
+	return &SettleResult{
+		Balance:       money.AmountFromMinor(resp.Data.Balance),
+		TransactionID: resp.Data.TransactionID,
+	}, nil
 }
 
 func (c *HTTPClient) Bet(ctx context.Context, req BetReq) (*Result, error) {
@@ -116,9 +164,9 @@ func (c *HTTPClient) Rollback(ctx context.Context, req RollbackReq) error {
 }
 
 type checkTxReq struct {
-	MerchantID string `json:"merchantId"`
-	UserID     string `json:"userId"`
-	RoundID    string `json:"roundId"`
+	MerchantID    string `json:"merchantId"`
+	UserID        string `json:"userId"`
+	TransactionID string `json:"transactionId"`
 }
 
 type checkTxResp struct {
@@ -128,12 +176,12 @@ type checkTxResp struct {
 	WinAmount int64  `json:"winAmount"`
 }
 
-func (c *HTTPClient) CheckTransaction(ctx context.Context, merchantID string, userID string, roundID string) (*TxCheckResult, error) {
+func (c *HTTPClient) CheckTransaction(ctx context.Context, merchantID, userID, roundID string) (*TxCheckResult, error) {
 	var resp checkTxResp
 	err := c.post(ctx, "/api/v1/wallet/check-transaction", checkTxReq{
-		MerchantID: merchantID,
-		UserID:     userID,
-		RoundID:    roundID,
+		MerchantID:    merchantID,
+		UserID:        userID,
+		TransactionID: roundID,
 	}, &resp)
 	if err != nil {
 		return nil, err
@@ -144,6 +192,14 @@ func (c *HTTPClient) CheckTransaction(ctx context.Context, merchantID string, us
 		BetAmount: money.AmountFromMinor(resp.BetAmount),
 		WinAmount: money.AmountFromMinor(resp.WinAmount),
 	}, nil
+}
+
+func (c *HTTPClient) TransferIn(ctx context.Context, req TransferReq) (*TransferResult, error) {
+	return nil, ErrMerchantDisabled
+}
+
+func (c *HTTPClient) TransferOut(ctx context.Context, req TransferReq) (*TransferResult, error) {
+	return nil, ErrMerchantDisabled
 }
 
 func (c *HTTPClient) post(ctx context.Context, path string, body any, dest any) error {
