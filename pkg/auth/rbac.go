@@ -54,5 +54,10 @@ func operatorCanWrite(path, method string) bool {
 	if method == http.MethodPost && strings.HasSuffix(path, "/platform/games") {
 		return false
 	}
+	// 人工调账直接改玩家资金（登记一笔钱包侧的人工加减款），
+	// 与"新建商户/轮换密钥"同级，只允许超管发起：运营误操作一次就是资金差错。
+	if method == http.MethodPost && strings.HasSuffix(path, "/ledger/adjustments") {
+		return false
+	}
 	return method == http.MethodPost || method == http.MethodPut || method == http.MethodDelete
 }

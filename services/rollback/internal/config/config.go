@@ -15,9 +15,9 @@ type Config struct {
 }
 
 type KafkaConf struct {
-	Brokers []string
-	GroupID string
-	Topic   string
+	Brokers  []string
+	GroupID  string
+	Topic    string
 	DLQTopic string
 }
 

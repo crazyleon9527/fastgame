@@ -20,34 +20,34 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				middleware.RateLimitMiddleware(serverCtx.RateLimit),
 			},
 			[]rest.Route{
-			{
-				// 查询玩家余额
-				Method:  http.MethodGet,
-				Path:    "/game/balance",
-				Handler: BalanceHandler(serverCtx),
-			},
-			{
-				// 创建游戏会话 (下发 Session Token + Server Seed Hash)
-				Method:  http.MethodPost,
-				Path:    "/game/session",
-				Handler: SessionHandler(serverCtx),
-			},
-			{
-				// 玩家抛竿/下注并结算
-				Method:  http.MethodPost,
-				Path:    "/game/bet",
-				Handler: BetHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodGet,
-				Path:    "/game/replay/:roundId",
-				Handler: ReplayHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodPost,
-				Path:    "/game/replay/compute",
-				Handler: ReplayComputeHandler(serverCtx),
-			},
+				{
+					// 查询玩家余额
+					Method:  http.MethodGet,
+					Path:    "/game/balance",
+					Handler: BalanceHandler(serverCtx),
+				},
+				{
+					// 创建游戏会话 (下发 Session Token + Server Seed Hash)
+					Method:  http.MethodPost,
+					Path:    "/game/session",
+					Handler: SessionHandler(serverCtx),
+				},
+				{
+					// 玩家抛竿/下注并结算
+					Method:  http.MethodPost,
+					Path:    "/game/bet",
+					Handler: BetHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/game/replay/:roundId",
+					Handler: ReplayHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodPost,
+					Path:    "/game/replay/compute",
+					Handler: ReplayComputeHandler(serverCtx),
+				},
 			}...,
 		),
 		rest.WithPrefix("/api/v1"),

@@ -12,6 +12,7 @@ import (
 	"fastgame/pkg/gameconfig"
 	"fastgame/pkg/idempotent"
 	"fastgame/pkg/kafka"
+	"fastgame/pkg/ledger"
 	"fastgame/pkg/lock"
 	"fastgame/pkg/money"
 	"fastgame/pkg/outbox"
@@ -48,6 +49,10 @@ type ServiceContext struct {
 	DB               sqlx.SqlConn
 	Outbox           *outbox.Store
 	OutboxDispatcher *outbox.Dispatcher
+	// Ledger 账变唯一收口：下注/派彩/撤单的余额变动都必须经它记账。
+	// sink 走事务性发件箱（RGS 已经在跑 OutboxDispatcher），
+	// 因此"账变了但事件没发出去"不可能发生。
+	Ledger *ledger.Poster
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -83,7 +88,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 			c.Security.IPLimitPerSec, c.Security.IPLimitPerSec,
 			c.Security.UserLimitPerSec, c.Security.UserLimitPerSec,
 		),
-		Session:    session.NewStore(rdb, c.Session.TTL()),
+		Session:     session.NewStore(rdb, c.Session.TTL()),
 		PendingOps:  model.NewWalletPendingOpsModel(conn),
 		PendingTx:   model.NewPendingTransactionsModel(conn),
 		ReplayStore: model.NewGameRoundReplayModel(conn),
@@ -95,6 +100,11 @@ func NewServiceContext(c config.Config) *ServiceContext {
 
 	// 派发器依赖已构造好的 svcCtx（需要其中的 Kafka producer），故在其之后装配。
 	svcCtx.OutboxDispatcher = newOutboxDispatcher(conn, svcCtx)
+
+	// 账变收口：下注/派彩/撤单的余额变动统一走它记账。
+	// sink 用事务性发件箱——账变事件与账变流水同事务提交，RGS 已在跑派发器，
+	// 因此事件不会只留在库里。
+	svcCtx.Ledger = ledger.NewPoster(conn, ledger.NewOutboxSink(svcCtx.Outbox, "rgs-api"))
 
 	if c.CH.Addr != "" {
 		writer, err := clickhouse.NewWriterWithAuth(c.CH.Addr, c.CH.Database, c.CH.User, c.CH.Password)

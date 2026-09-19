@@ -20,16 +20,16 @@ const (
 
 // WalletPendingOp 对应表 wallet_pending_ops：钱包待对账
 type WalletPendingOp struct {
-	Id           uint64         `db:"id"` // 主键
-	RoundID      string         `db:"round_id"` // 局 ID，同时作为 nonce
-	MerchantID   uint64         `db:"merchant_id"` // 商户 ID（merchants.id），唯一键前导列
+	Id           uint64         `db:"id"`            // 主键
+	RoundID      string         `db:"round_id"`      // 局 ID，同时作为 nonce
+	MerchantID   uint64         `db:"merchant_id"`   // 商户 ID（merchants.id），唯一键前导列
 	MerchantCode string         `db:"merchant_code"` // 商户编码
-	UserID       string         `db:"user_id"` // 玩家 ID
-	OpType       string         `db:"op_type"` // 操作类型：win_failed / win_timeout / rollback
-	BetAmount    int64          `db:"bet_amount"` // 下注额，minor units
-	WinAmount    int64          `db:"win_amount"` // 派彩额，minor units
-	Status       string         `db:"status"` // 状态：pending / done / failed
-	RetryCount   int64          `db:"retry_count"` // 已重试次数
+	UserID       string         `db:"user_id"`       // 玩家 ID
+	OpType       string         `db:"op_type"`       // 操作类型：win_failed / win_timeout / rollback
+	BetAmount    int64          `db:"bet_amount"`    // 下注额，minor units
+	WinAmount    int64          `db:"win_amount"`    // 派彩额，minor units
+	Status       string         `db:"status"`        // 状态：pending / done / failed
+	RetryCount   int64          `db:"retry_count"`   // 已重试次数
 	LastError    sql.NullString `db:"last_error"`
 	CreatedAt    time.Time      `db:"created_at"`
 	UpdatedAt    time.Time      `db:"updated_at"`

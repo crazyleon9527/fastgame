@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,7 @@ import (
 	"fastgame/pkg/gameconfig"
 	"fastgame/pkg/idempotent"
 	"fastgame/pkg/kafka"
+	"fastgame/pkg/ledger"
 	"fastgame/pkg/lock"
 	"fastgame/pkg/money"
 	"fastgame/pkg/outbox"
@@ -107,6 +109,13 @@ const stubMerchantID uint64 = 1
 
 func newIntegrationSvcCtx(t *testing.T, prodSecurity bool) *svc.ServiceContext {
 	t.Helper()
+	return newIntegrationSvcCtxWithWallet(t, prodSecurity, nil)
+}
+
+// newIntegrationSvcCtxWithWallet 允许注入自定义钱包客户端。
+// 传 nil 用默认的 mock 钱包；需要模拟"钱包失败"的场景时传一个会报错的实现。
+func newIntegrationSvcCtxWithWallet(t *testing.T, prodSecurity bool, w wallet.Client) *svc.ServiceContext {
+	t.Helper()
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	ctx := context.Background()
@@ -122,6 +131,9 @@ func newIntegrationSvcCtx(t *testing.T, prodSecurity bool) *svc.ServiceContext {
 				PrivateKey: sql.NullString{String: testMerchantSecret, Valid: true},
 			},
 		}
+	}
+	if w == nil {
+		w = wallet.NewMockClient(money.FromMajor(10000))
 	}
 
 	return &svc.ServiceContext{
@@ -139,7 +151,7 @@ func newIntegrationSvcCtx(t *testing.T, prodSecurity bool) *svc.ServiceContext {
 		Redis:      rdb,
 		Lock:       lock.NewRedisLock(rdb),
 		Idempotent: idempotent.NewStore(rdb, time.Hour),
-		Wallet:     wallet.NewMockClient(money.FromMajor(10000)),
+		Wallet:     w,
 		GameConfig: stubGameConfig{},
 		Kafka:      kafka.NewProducer([]string{"127.0.0.1:1"}),
 		Guard: security.NewGuard(security.Config{
@@ -158,6 +170,12 @@ func newIntegrationSvcCtx(t *testing.T, prodSecurity bool) *svc.ServiceContext {
 		// 用与 internal/model 测试一致的 DSN，可用 MYSQL_DSN 覆盖。
 		DB:     sqlx.NewMysql(integrationDSN()),
 		Outbox: outbox.NewStore(sqlx.NewMysql(integrationDSN())),
+		// 账变收口也走真实库：下注与派彩都会写 game_transactions，
+		// 于是集成测试顺带覆盖账变链路（迁移 35/36 未应用时会直接失败）。
+		Ledger: ledger.NewPoster(
+			sqlx.NewMysql(integrationDSN()),
+			ledger.NewOutboxSink(outbox.NewStore(sqlx.NewMysql(integrationDSN())), "rgs-api-test"),
+		),
 	}
 }
 
@@ -247,9 +265,159 @@ func TestBetGoldenPathSessionEnvelope(t *testing.T) {
 	assertReplayMerchantID(t, roundID, stubMerchantID)
 }
 
+// failingWinWallet 只在 Win 上失败，其余委托给 mock 钱包。
+// 用来验证"派彩失败 → 账变记 PENDING_RETRY 且不动余额"这条接线：
+// 这是最容易悄悄断掉的一环（记账被删掉不会有任何报错，只是补偿对账时才发现少了一半）。
+type failingWinWallet struct {
+	inner *wallet.MockClient
+}
+
+func (w *failingWinWallet) GetBalance(ctx context.Context, merchantID, userID string) (money.Amount, error) {
+	return w.inner.GetBalance(ctx, merchantID, userID)
+}
+
+func (w *failingWinWallet) Bet(ctx context.Context, req wallet.BetReq) (*wallet.Result, error) {
+	return w.inner.Bet(ctx, req)
+}
+
+func (w *failingWinWallet) Win(context.Context, wallet.WinReq) (*wallet.Result, error) {
+	return nil, errors.New("探针：模拟钱包派彩超时")
+}
+
+func (w *failingWinWallet) Rollback(ctx context.Context, req wallet.RollbackReq) error {
+	return w.inner.Rollback(ctx, req)
+}
+
+func (w *failingWinWallet) CheckTransaction(ctx context.Context, merchantID, userID, roundID string) (*wallet.TxCheckResult, error) {
+	return w.inner.CheckTransaction(ctx, merchantID, userID, roundID)
+}
+
+// TestBetWinFailureRecordsPendingRetryLedger —— 派彩失败时账本必须留痕且不动余额。
+//
+// 断言的是三件事：
+//  1. 响应是 202 + settlementStatus=pending（下注本身成功、结算待补偿）；
+//  2. game_transactions 里有 (merchant, round, WIN, PENDING_RETRY) 这一条，
+//     金额等于该局应派彩额；
+//  3. 这条流水的 balance_before == balance_after —— 钱到底动没动还没确认，
+//     绝不能改本地余额镜像。
+//
+// 首次派彩尝试是 PENDING_RETRY、补偿成功后再补一条 SUCCESS，
+// 这正是账变幂等键必须带 status 的原因。
+func TestBetWinFailureRecordsPendingRetryLedger(t *testing.T) {
+	db, err := sql.Open("mysql", integrationDSN())
+	if err != nil {
+		t.Skipf("跳过：%v", err)
+	}
+	defer db.Close()
+	if err := db.Ping(); err != nil {
+		t.Skipf("跳过：MySQL 不可达（%v）", err)
+	}
+
+	const prefix = "zz-pending-retry-"
+	t.Cleanup(func() {
+		db.Exec("DELETE FROM game_transactions WHERE round_id LIKE ?", prefix+"%")
+		db.Exec("DELETE FROM game_replay_dummy WHERE 1=0") // no-op，占位保持语句对齐
+		db.Exec("DELETE FROM game_round_replay WHERE round_id LIKE ?", prefix+"%")
+		db.Exec("DELETE FROM pending_transactions WHERE round_id LIKE ?", prefix+"%")
+		db.Exec("DELETE FROM wallet_pending_ops WHERE round_id LIKE ?", prefix+"%")
+	})
+	db.Exec("DELETE FROM game_transactions WHERE round_id LIKE ?", prefix+"%")
+	db.Exec("DELETE FROM game_round_replay WHERE round_id LIKE ?", prefix+"%")
+	db.Exec("DELETE FROM pending_transactions WHERE round_id LIKE ?", prefix+"%")
+	db.Exec("DELETE FROM wallet_pending_ops WHERE round_id LIKE ?", prefix+"%")
+
+	svcCtx := newIntegrationSvcCtxWithWallet(t, false, &failingWinWallet{inner: wallet.NewMockClient(money.FromMajor(10000))})
+
+	sessionBody, _ := json.Marshal(types.SessionReq{
+		MerchantId: "m001", UserId: "10001", GameCode: "fishing", ClientSeed: "pending-retry-seed",
+	})
+	sreq := httptest.NewRequest(http.MethodPost, "/api/v1/game/session", bytes.NewReader(sessionBody))
+	sreq.Header.Set("Content-Type", "application/json")
+	sreq.RemoteAddr = "127.0.0.1:1234"
+	sw := httptest.NewRecorder()
+	SessionHandler(svcCtx)(sw, sreq)
+	if sw.Code != http.StatusOK {
+		t.Fatalf("session status=%d body=%s", sw.Code, sw.Body.String())
+	}
+	var sessionResp types.SessionResp
+	if err := json.Unmarshal(sw.Body.Bytes(), &sessionResp); err != nil {
+		t.Fatal(err)
+	}
+
+	// 派彩是否发生由 PAR 表决定（约 43% 的局有派彩），因此多试几局直到遇到一次派彩。
+	// 40 局全空杆的概率约 0.57^40 ≈ 4e-10，真出现说明赔付表被改坏了。
+	var hitRound string
+	var wantWin int64
+	for i := 0; i < 40; i++ {
+		roundID := fmt.Sprintf("%s%d", prefix, i)
+		ts := strconv.FormatInt(time.Now().Unix(), 10)
+		envSig := security.SignEnvelope(sessionResp.DynamicSessionKey, roundID, "cast", ts)
+		betBody, _ := json.Marshal(types.BetReq{
+			MerchantId:   "m001",
+			UserId:       "10001",
+			SessionToken: sessionResp.SessionToken,
+			GameCode:     "fishing",
+			Action:       "cast",
+			BetAmount:    100000,
+			RoundId:      roundID,
+			SequenceId:   sessionResp.NextSequenceId + uint64(i),
+		})
+		breq := httptest.NewRequest(http.MethodPost, "/api/v1/game/bet", bytes.NewReader(betBody))
+		breq.Header.Set("Content-Type", "application/json")
+		// 该测试配置只跳过商户签名，会话信封签名仍要校验
+		breq.Header.Set(security.HeaderTimestamp, ts)
+		breq.Header.Set(security.HeaderSessionSign, envSig)
+		breq.RemoteAddr = "127.0.0.1:1234"
+		bw := httptest.NewRecorder()
+		BetHandler(svcCtx)(bw, breq)
+		if bw.Code != http.StatusOK && bw.Code != http.StatusAccepted {
+			t.Fatalf("bet status=%d body=%s", bw.Code, bw.Body.String())
+		}
+		var betResp types.BetResp
+		if err := json.Unmarshal(bw.Body.Bytes(), &betResp); err != nil {
+			t.Fatal(err)
+		}
+		if betResp.SettlementStatus == "pending" {
+			if bw.Code != http.StatusAccepted {
+				t.Errorf("结算待补偿时应当返回 202，实际 %d", bw.Code)
+			}
+			hitRound, wantWin = roundID, betResp.WinAmount
+			break
+		}
+	}
+	if hitRound == "" {
+		t.Fatal("40 局都没遇到派彩，无法验证 PENDING_RETRY 接线（赔付表可能被改坏）")
+	}
+	if wantWin <= 0 {
+		t.Fatalf("待补偿局的派彩额 = %d，应大于 0", wantWin)
+	}
+
+	var (
+		gotStatus string
+		gotAmount int64
+		before    int64
+		after     int64
+	)
+	err = db.QueryRow(
+		`SELECT status, amount, balance_before, balance_after FROM game_transactions
+		 WHERE merchant_id = ? AND round_id = ? AND tx_type = 'WIN'`, stubMerchantID, hitRound).
+		Scan(&gotStatus, &gotAmount, &before, &after)
+	if err != nil {
+		t.Fatalf("派彩失败后没有留下账变流水（接线断了）: %v", err)
+	}
+	if gotStatus != "PENDING_RETRY" {
+		t.Errorf("流水状态 = %s，期望 PENDING_RETRY", gotStatus)
+	}
+	if gotAmount != wantWin {
+		t.Errorf("流水金额 = %d，期望 %d", gotAmount, wantWin)
+	}
+	if before != after {
+		t.Errorf("待补偿流水不应改动余额镜像: before=%d after=%d", before, after)
+	}
+}
+
 // assertReplayMerchantID 校验回放记录确实落在期望商户下：
 // (merchant_id, round_id) 这一行必须存在。若结算收尾没把商户写进唯一键前导列，
-// 落库的会是 (0, round_id)，这里就查不到，测试失败。
 // MySQL 不可达时跳过，避免把单元测试变成环境依赖。
 func assertReplayMerchantID(t *testing.T, roundID string, want uint64) {
 	t.Helper()
@@ -266,6 +434,8 @@ func assertReplayMerchantID(t *testing.T, roundID string, want uint64) {
 	t.Cleanup(func() {
 		db.Exec("DELETE FROM game_round_replay WHERE round_id = ?", roundID)
 		db.Exec("DELETE FROM pending_transactions WHERE round_id = ?", roundID)
+		db.Exec("DELETE FROM wallet_pending_ops WHERE round_id = ?", roundID)
+		db.Exec("DELETE FROM game_transactions WHERE round_id = ?", roundID)
 		db.Exec("DELETE FROM event_outbox WHERE payload LIKE CONCAT('%', ?, '%')", roundID)
 	})
 

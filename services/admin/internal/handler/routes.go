@@ -43,6 +43,19 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 					Path:    "/audit-logs",
 					Handler: AuditLogListHandler(serverCtx),
 				},
+				// 账变：人工调账是写接口，与 createBlacklist / createMerchant /
+				// rotateMerchantKey 一样挂在 AuthMiddleware + TotpGateMiddleware 之下
+				// （JWT 鉴权 + RBAC + 二次验证门禁），不额外放宽任何一条。
+				{
+					Method:  http.MethodPost,
+					Path:    "/ledger/adjustments",
+					Handler: LedgerAdjustmentHandler(serverCtx),
+				},
+				{
+					Method:  http.MethodGet,
+					Path:    "/ledger/transactions",
+					Handler: LedgerTransactionListHandler(serverCtx),
+				},
 				{
 					Method:  http.MethodGet,
 					Path:    "/export/merchant-games",

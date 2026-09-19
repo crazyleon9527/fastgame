@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"fastgame/internal/model"
+	"fastgame/pkg/ledger"
 	"fastgame/pkg/money"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rollback/internal/svc"
@@ -68,7 +69,7 @@ func (r *Reconciler) processPending(ctx context.Context) {
 }
 
 func (r *Reconciler) retryWin(ctx context.Context, op *model.WalletPendingOp) {
-	_, err := r.svcCtx.Wallet.Win(ctx, wallet.WinReq{
+	result, err := r.svcCtx.Wallet.Win(ctx, wallet.WinReq{
 		MerchantID: op.MerchantCode,
 		UserID:     op.UserID,
 		RoundID:    op.RoundID,
@@ -80,6 +81,25 @@ func (r *Reconciler) retryWin(ctx context.Context, op *model.WalletPendingOp) {
 		}
 		return
 	}
+
+	// 补偿成功 = 钱真的到账了，必须在账本上补一条 SUCCESS 流水。
+	// 首次失败时 RGS 记的是 (merchant, round, WIN, PENDING_RETRY)，
+	// 幂等键带终态，所以这条 SUCCESS 不会被当成重复丢掉。
+	// 以钱包返回的余额为准做快照，可顺带发现本地镜像与钱包的偏差。
+	walletBalance := result.Balance
+	postLedger(ctx, r.svcCtx, ledgerPosting{
+		merchantID:    op.MerchantID,
+		merchantCode:  op.MerchantCode,
+		userID:        op.UserID,
+		roundID:       op.RoundID,
+		typeCode:      model.TxTypeWin,
+		amount:        op.WinAmount,
+		walletBalance: &walletBalance,
+		remark:        "补偿重试派彩成功",
+		refType:       "wallet_pending_op",
+		refID:         op.OpType,
+	})
+
 	if err := r.svcCtx.PendingOps.MarkDone(ctx, op.Id); err != nil {
 		logx.Errorf("mark done: id=%d err=%v", op.Id, err)
 	}
@@ -101,8 +121,70 @@ func (r *Reconciler) retryRollback(ctx context.Context, op *model.WalletPendingO
 		return
 	}
 
+	// 撤单回滚同样要在账本上留痕：这笔下注被退回了。
+	// wallet.Rollback 不返回余额，因此钱包快照留空，balance_after 用本地推算值。
+	postLedger(ctx, r.svcCtx, ledgerPosting{
+		merchantID:   op.MerchantID,
+		merchantCode: op.MerchantCode,
+		userID:       op.UserID,
+		roundID:      op.RoundID,
+		typeCode:     model.TxTypeRollback,
+		amount:       op.BetAmount,
+		remark:       "撤单回滚退款",
+		refType:      "wallet_pending_op",
+		refID:        op.OpType,
+	})
+
 	if err := r.svcCtx.PendingOps.MarkDone(ctx, op.Id); err != nil {
 		logx.Errorf("mark done: id=%d err=%v", op.Id, err)
 	}
 	logx.Infof("reconciled pending op: roundId=%s type=%s", op.RoundID, op.OpType)
+}
+
+// ledgerPosting 是补偿入账的参数包，避免每个调用点重复拼一长串字段。
+type ledgerPosting struct {
+	merchantID    uint64
+	merchantCode  string
+	userID        string
+	roundID       string
+	gameCode      string
+	typeCode      string
+	amount        int64 // minor units
+	walletBalance *money.Amount
+	remark        string
+	refType       string
+	refID         string
+}
+
+// postLedger 记一笔补偿账变（包级函数，两个对账循环共用）。
+//
+// 记账失败不阻断补偿流程（钱已经退回/付出去了），但必须打 error：
+// 账本缺一条是资金事实的缺失，运维要能看见并补。
+func postLedger(ctx context.Context, svcCtx *svc.ServiceContext, in ledgerPosting) {
+	if svcCtx == nil || svcCtx.Ledger == nil || in.merchantID == 0 || in.amount <= 0 {
+		return
+	}
+	res, err := svcCtx.Ledger.Post(ctx, ledger.Posting{
+		TypeCode:      in.typeCode,
+		MerchantID:    in.merchantID,
+		MerchantCode:  in.merchantCode,
+		UserID:        in.userID,
+		GameCode:      in.gameCode,
+		RoundID:       in.roundID,
+		Amount:        money.AmountFromMinor(in.amount),
+		WalletBalance: in.walletBalance,
+		Status:        model.LedgerStatusSuccess,
+		RefType:       in.refType,
+		RefID:         in.refID,
+		Remark:        in.remark,
+	})
+	if err != nil {
+		logx.Errorf("补记账变失败: roundId=%s type=%s amount=%d err=%v",
+			in.roundID, in.typeCode, in.amount, err)
+		return
+	}
+	if res.Drift.Minor() != 0 {
+		logx.Errorf("补记账变发现差额: roundId=%s type=%s drift=%d（本地镜像与钱包不一致，需核查）",
+			in.roundID, in.typeCode, res.Drift.Minor())
+	}
 }

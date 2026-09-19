@@ -13,6 +13,23 @@
 - Docker Desktop/WSL2 的 IPv6 端口转发是坏的：Windows 把 `sponge.localhost` 解析成 `::1`，后台走该域名会 502。用 `curl -H "Host: sponge.localhost" http://127.0.0.1:18000/admin/` 验证。
 - 推 GitHub 需要走系统代理：`git -c http.proxy=http://127.0.0.1:19828 -c https.proxy=http://127.0.0.1:19828 push origin main`（直连 github.com:443 超时）。
 
+## 账变体系（迁移 35/36，2026-09-20 落地）
+- 三张表 + 一个收口，参考 platform-api 的 `transaction_type` / `transaction` / `CashService.AddTransaction`：
+  - `transaction_types` 账变类型表：**变动方向是数据不是代码**。`io_type(IN/OUT)`、`balance_change(INCREASE/DECREASE/NONE)`、`frozen_change`。调用方只传 `TypeCode` + 正数金额，方向由表决定，所以调用点不可能写错符号。已种子：BET/WIN/REFUND/ROLLBACK/PROMO_CREDIT/ADJUST_ADD/ADJUST_SUB。
+  - `game_transactions` 账变流水：每笔带 `balance_before/after` 快照 + `drift_minor`（不可解释差额）+ `external_tx_id`（钱包侧凭据号）+ `extra_data`。
+  - `player_accounts` 影子账户：`balance_minor` 是**钱包返回值的镜像**，钱包才是权威。
+  - `pkg/ledger.Poster`：唯一写入口。`Post`（自动开事务）/ `PostInTx`（并入调用方事务）。流程＝按 code 取类型 → `SELECT ... FOR UPDATE` 锁账户 → 记 before → 按类型算 after → 插流水（幂等判定）→ 改镜像 → 同事务登记 outbox 事件。
+- 幂等键 `uk_merchant_round_type_status(merchant_id, round_id, tx_type, status)`。**必须带 status**：补偿场景下同一局的 WIN 先落 `PENDING_RETRY`（钱没动）再落 `SUCCESS`（钱到账），少了 status 第二条会被当重复丢掉，变成"钱到了账上没有"。人工调账 `round_id` 为 NULL，不受该键约束。
+- 关键语义：**钱包返回了余额时以钱包为准，本地算成负数不拒绝、而是记 drift**。镜像为空（玩家首次出现）时若按"余额不足"拒绝，这笔真实资金变动就从账本上消失了。只有"既没钱包余额、镜像也不足"（如人工调账）才拒绝。
+- 接入点：RGS 的 `wallet.Bet` 成功后（独立事务，`postBet`）、`recordSettled` 事务内的派彩 WIN、派彩失败时记 `PENDING_RETRY`；rollback 的 `Reconciler`/`OrphanReconciler` 补偿成功后补记 SUCCESS。
+- 后台两个接口（`services/admin`，与其它写接口同组：AuthMiddleware + TotpGateMiddleware + JWT）：
+  - `POST /api/v1/admin/ledger/adjustments` 人工调账：登记"钱包侧已做过的人工调整"，`externalTxId`/`remark` 必填，`WalletBalance=nil` 时按类型推算镜像；操作人 id/用户名/IP 写进 `extra_data`；**只允许 admin 角色**（`pkg/auth/rbac.go` 的 `operatorCanWrite` 按 `/ledger/adjustments` 拦截）。已知未做：同一 `externalTxId` 重复提交会落两条流水。
+  - `GET /api/v1/admin/ledger/transactions` 流水查询：支持 `merchantId/userId/txType/roundId/status/driftOnly/startTime/endTime` 分页；`typeName` 用 `ListEnabledTypes` 一次查表映射，不做 N+1。
+  - admin 的 `svc.ServiceContext` 用 `Ledger`（sink 传 nil）、`LedgerModel`、`DB sqlx.SqlConn`（字段名对齐 RGS）。
+- 账变事件 topic `game.ledger.posted`（`pkg/ledger.OutboxSink`）。目前只有 RGS 跑 outbox dispatcher 所以只有它配了 sink；admin/rollback 传 nil，等接入结算/对账时再补 dispatcher。
+- 排查入口：`SELECT * FROM game_transactions WHERE drift_minor <> 0`、`player_accounts.drift_count`。**dev 环境跨服务补偿必然报 drift**——mock 钱包是进程内独立状态（`pkg/wallet/mock.go` 的 `balances` map 每进程一份），生产用共享钱包服务时才有意义。
+- `internal/model/biz/` 下 31 个 goctl 模型里 **27 个没有对应的表**（`game_transactions` 曾在其列，现已在 `internal/model/ledger.go` 手写落地）。其余（`merchant_contracts` GGR/NGR 结算模式、`merchant_financial_periods` 账单、`merchant_reconciliation_diffs` 对账差异、`promo_*` 等）仍未落地，是后续结算/对账阶段的现成设计。
+
 ## 数据库与迁移
 - 迁移文件放 `docker/mysql/init/NN-<name>-migration.sql`，用 `scripts\apply-migration.ps1 <版本号前缀>` 应用（内部 `docker cp` + `mysql -e "source ..."`，避免 Windows 管道编码问题）。已应用的迁移**不再修改**，续作用新编号文件。
 - ClickHouse 迁移放 `docker/clickhouse/init/`，用 `scripts\apply_clickhouse_migration.ps1`（`--multiquery --queries-file`）。**绝不能把多条语句管道进 clickhouse-client**：曾因此只执行了 RENAME/DROP 就截断，把 `game_round_settled` 等表打没了。改表结构一律「staging 新表 → 拷数据 → RENAME」。

@@ -26,6 +26,11 @@ func TestCanAccess(t *testing.T) {
 		{RoleViewer, http.MethodPost, "/api/v1/admin/reports/daily-settlements/sync", false},
 		{RoleOperator, http.MethodPost, "/api/v1/admin/reports/daily-settlements/sync", true},
 		{RoleOperator, http.MethodPost, "/api/v1/admin/reports/daily-settlements/1/confirm", true},
+		// 人工调账动的是玩家资金，只允许超管；查询流水只读，运营可用。
+		{RoleOperator, http.MethodPost, "/api/v1/admin/ledger/adjustments", false},
+		{RoleAdmin, http.MethodPost, "/api/v1/admin/ledger/adjustments", true},
+		{RoleOperator, http.MethodGet, "/api/v1/admin/ledger/transactions", true},
+		{RoleViewer, http.MethodGet, "/api/v1/admin/ledger/transactions", true},
 	}
 	for _, c := range cases {
 		got := CanAccess(c.role, c.method, c.path)

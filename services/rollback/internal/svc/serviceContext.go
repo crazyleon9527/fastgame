@@ -6,6 +6,7 @@ import (
 	"fastgame/internal/model"
 	"fastgame/pkg/clickhouse"
 	"fastgame/pkg/kafka"
+	"fastgame/pkg/ledger"
 	"fastgame/pkg/money"
 	"fastgame/pkg/wallet"
 	"fastgame/services/rollback/internal/config"
@@ -22,6 +23,14 @@ type ServiceContext struct {
 	PendingOps model.WalletPendingOpsModel
 	PendingTx  model.PendingTransactionsModel
 	Wallet     wallet.Client
+	DB         sqlx.SqlConn
+	// Ledger 账变收口。补偿只要真的动了钱（退款/回滚/补派彩）就必须记账，
+	// 否则账本上会缺掉"钱回来了"这一半——对账时只看得见扣款、看不见退款。
+	//
+	// sink 传 nil（见 NewServiceContext 注释）：rollback 服务没有跑 outbox
+	// dispatcher，账变事件的投递留到接入结算/对账时再补；
+	// 账变流水本身照常落 MySQL，审计能力不受影响。
+	Ledger *ledger.Poster
 }
 
 func NewServiceContext(c config.Config) (*ServiceContext, error) {
@@ -43,7 +52,11 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 		Merchants:  model.NewMerchantsModel(conn),
 		PendingOps: model.NewWalletPendingOpsModel(conn),
 		PendingTx:  model.NewPendingTransactionsModel(conn),
-		Wallet:     newWalletClient(c.Wallet, nil),
+		DB:         conn,
+		// sink = nil：本服务没有 outbox dispatcher，先把流水落库；
+		// 账变事件等结算/对账接入时再一并打开。
+		Ledger: ledger.NewPoster(conn, nil),
+		Wallet: newWalletClient(c.Wallet, nil),
 	}, nil
 }
 

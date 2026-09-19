@@ -227,6 +227,93 @@ type I18nDictionaryResp struct {
 	Messages map[string]string `json:"messages"`
 }
 
+// LedgerAdjustmentReq 人工调账请求。
+//
+// 为什么必填 externalTxId 与 remark：玩家余额的权威在商户钱包侧，本地台账
+// 只是镜像。人工调账**不是**在本地凭空改余额，而是登记一笔"已经在钱包侧
+// 做过的人工调整"，所以钱包凭证号与调整原因是审计的最低要求——缺了任何
+// 一条，事后都无法回答"这笔钱凭什么动"。
+type LedgerAdjustmentReq struct {
+	MerchantId  uint64 `json:"merchantId" validate:"required"`
+	UserId      string `json:"userId" validate:"required"`
+	TypeCode    string `json:"typeCode" validate:"required"`
+	AmountMinor int64  `json:"amountMinor" validate:"required"`
+	// ExternalTxId 商户钱包侧的人工调整凭证号。
+	ExternalTxId string `json:"externalTxId" validate:"required"`
+	// Remark 调整原因（写入流水的 remark，便于只查流水就能还原上下文）。
+	Remark   string `json:"remark" validate:"required"`
+	Currency string `json:"currency,optional"`
+	// OperatorIp 客户端 IP，由 handler 用 pkg/httputil.ClientIP 取出后填入；
+	// logic 拿不到 http.Request，所以在这里传进来写入 extra_data 供审计追溯。
+	OperatorIp string `json:"-"`
+}
+
+// LedgerAdjustmentResp 人工调账返回体。金额一律 minor units（scale=10000）。
+type LedgerAdjustmentResp struct {
+	TransactionId      string `json:"transactionId"`
+	TxType             string `json:"txType"`
+	Direction          string `json:"direction"`
+	AmountMinor        int64  `json:"amountMinor"`
+	BalanceBeforeMinor int64  `json:"balanceBeforeMinor"`
+	BalanceAfterMinor  int64  `json:"balanceAfterMinor"`
+	Status             string `json:"status"`
+	// DriftMinor 不可解释差额（钱包余额 - 本地按类型推算）。人工调账不传
+	// 钱包余额（本地推算镜像自洽），因此恒为 0；字段保留是为了与其它账变
+	// 响应结构统一，客户端不必区分接口。
+	DriftMinor int64 `json:"driftMinor"`
+	// Duplicated=true 表示命中幂等键，本次没有再动余额镜像。
+	Duplicated bool `json:"duplicated"`
+}
+
+// LedgerTransactionListReq 账变流水查询条件，全部可选。
+type LedgerTransactionListReq struct {
+	MerchantId uint64 `form:"merchantId,optional"`
+	UserId     string `form:"userId,optional"`
+	TxType     string `form:"txType,optional"`
+	RoundId    string `form:"roundId,optional"`
+	Status     string `form:"status,optional"`
+	// DriftOnly=true 只看存在不可解释差额的流水（本地镜像与钱包对不上的那些）。
+	DriftOnly bool `form:"driftOnly,optional"`
+	// StartTime/EndTime 支持 "2006-01-02 15:04:05"、"2006-01-02" 与 RFC3339；
+	// 不带时区的一律按 UTC 解释（账变时间以 UTC 入库）。
+	StartTime string `form:"startTime,optional"`
+	EndTime   string `form:"endTime,optional"`
+	Page      int    `form:"page,default=1"`
+	PageSize  int    `form:"pageSize,default=20"`
+}
+
+// LedgerTransactionItem 账变流水列表项。金额一律 minor units（scale=10000）。
+type LedgerTransactionItem struct {
+	Id            uint64 `json:"id"`
+	TransactionId string `json:"transactionId"`
+	ExternalTxId  string `json:"externalTxId"`
+	TxType        string `json:"txType"`
+	Direction     string `json:"direction"`
+	MerchantId    uint64 `json:"merchantId"`
+	MerchantCode  string `json:"merchantCode"`
+	UserId        string `json:"userId"`
+	GameCode      string `json:"gameCode"`
+	RoundId       string `json:"roundId"`
+	Currency      string `json:"currency"`
+	Amount        int64  `json:"amount"`
+	BalanceBefore int64  `json:"balanceBefore"`
+	BalanceAfter  int64  `json:"balanceAfter"`
+	// DriftMinor 不可解释差额：钱包返回余额 - 本地按类型推算余额。
+	DriftMinor int64  `json:"driftMinor"`
+	Status     string `json:"status"`
+	Remark     string `json:"remark"`
+	// TypeName 账变类型中文名（来自 transaction_types，一次性查表映射，避免 N+1）。
+	TypeName  string `json:"typeName"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+type LedgerTransactionListResp struct {
+	List     []LedgerTransactionItem `json:"list"`
+	Total    int64                   `json:"total"`
+	Page     int                     `json:"page"`
+	PageSize int                     `json:"pageSize"`
+}
+
 type LocaleItem struct {
 	Code       string `json:"code"`
 	Name       string `json:"name"`

@@ -9,6 +9,7 @@ import (
 
 	"fastgame/internal/model"
 	"fastgame/pkg/kafka"
+	"fastgame/pkg/ledger"
 	"fastgame/pkg/lock"
 	applog "fastgame/pkg/log"
 	"fastgame/pkg/money"
@@ -124,6 +125,13 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 			return xerr.ErrWalletBetFailed
 		}
 
+		// 下注扣款必须在钱包确认成功后立刻记账：这是资金已经动了的既成事实。
+		// 记在独立事务里（而不是等结算事务），否则一旦结算前进程崩溃，
+		// 这笔已扣的钱在账变流水里就完全不存在了。
+		// 记账失败不阻断下注返回：钱已经扣了，pending_transactions（phase=bet_debited）
+		// 与 rollback 服务的对账会兜住，日志里会留下错误。
+		l.postBet(req, gameCfg.MerchantID, betAmount, betResult.Balance)
+
 		if err := l.svcCtx.PendingTx.Insert(l.ctx, &model.PendingTransaction{
 			TraceID:         trace.ID(l.ctx),
 			RoundID:         req.RoundId,
@@ -178,6 +186,15 @@ func (l *BetLogic) Bet(req *types.BetReq) (*types.BetResp, error) {
 				}
 				settlementStatus = "pending"
 				balance = betResult.Balance
+				// 派彩失败/超时：钱到底动没动未知，因此账变只留痕（PENDING_RETRY）、
+				// 不动余额镜像。补偿链路确认后再补一条 SUCCESS 流水
+				// ——幂等键带终态，(merchant, round, WIN, PENDING_RETRY) 与
+				// (merchant, round, WIN, SUCCESS) 可以并存，不会被当成重复。
+				l.postLedger(req, gameCfg.MerchantID, model.TxTypeWin, outcome.WinAmount,
+					nil, model.LedgerStatusPendingRetry, "派彩失败待补偿", map[string]any{
+						"op_type":    opType,
+						"last_error": err.Error(),
+					})
 			} else {
 				balance = winResult.Balance
 			}
@@ -243,12 +260,78 @@ func (l *BetLogic) recordPending(req *types.BetReq, betAmount money.Amount, outc
 	}
 }
 
+// postBet 记录下注扣款（钱包已确认扣款成功）。
+//
+// 记账失败不阻断下注：钱已经扣了，回滚返回错误没有意义，
+// 而且 pending_transactions（phase=bet_debited）与 rollback 服务会兜住这笔单。
+// 但必须打 error 日志——账变缺一条是资金账本上的实事，运维要能看到。
+func (l *BetLogic) postBet(req *types.BetReq, merchantID uint64, betAmount money.Amount, walletBalance money.Amount) {
+	res, err := l.svcCtx.Ledger.Post(l.ctx, ledger.Posting{
+		TypeCode:      model.TxTypeBet,
+		MerchantID:    merchantID,
+		MerchantCode:  req.MerchantId,
+		UserID:        req.UserId,
+		GameCode:      req.GameCode,
+		RoundID:       req.RoundId,
+		Amount:        betAmount,
+		WalletBalance: &walletBalance,
+		Status:        model.LedgerStatusSuccess,
+		RefType:       "game_round",
+		RefID:         req.RoundId,
+		Remark:        "下注扣款",
+	})
+	if err != nil {
+		logx.Errorf("post bet ledger failed: roundId=%s err=%v", req.RoundId, err)
+		return
+	}
+	if res.Drift.Minor() != 0 {
+		logx.Errorf("bet ledger drift: roundId=%s drift=%d（本地推算与钱包余额不一致，需核查）",
+			req.RoundId, res.Drift.Minor())
+	}
+}
+
+// postLedger 记录非成功终态的账变（派彩失败/超时等待补偿）。
+//
+// 只有钱包明确拒绝或超时才知道"钱没动/不知动没动"，此时不能改本地余额镜像，
+// 因此这类流水仅留痕，由补偿链路确认后再补一条 SUCCESS。
+func (l *BetLogic) postLedger(
+	req *types.BetReq,
+	merchantID uint64,
+	typeCode string,
+	amount money.Amount,
+	walletBalance *money.Amount,
+	status, remark string,
+	extra map[string]any,
+) {
+	if amount <= 0 {
+		return
+	}
+	if _, err := l.svcCtx.Ledger.Post(l.ctx, ledger.Posting{
+		TypeCode:      typeCode,
+		MerchantID:    merchantID,
+		MerchantCode:  req.MerchantId,
+		UserID:        req.UserId,
+		GameCode:      req.GameCode,
+		RoundID:       req.RoundId,
+		Amount:        amount,
+		WalletBalance: walletBalance,
+		Status:        status,
+		RefType:       "game_round",
+		RefID:         req.RoundId,
+		Remark:        remark,
+		Extra:         extra,
+	}); err != nil {
+		logx.Errorf("post ledger failed: roundId=%s type=%s status=%s err=%v",
+			req.RoundId, typeCode, status, err)
+	}
+}
+
 // recordSettled 在一个事务里完成结算收尾：
 //
-//	MarkSettled（本地对账标记）+ 回放记录 + 结算事件登记（outbox）
+//	MarkSettled（本地对账标记）+ 回放记录 + 派彩账变 + 结算事件登记（outbox）
 //
-// 三者同事务提交，因此「事件一定不会丢」这件事由数据库保证，而不是靠
-// goroutine 是否跑成功。投递交给 outbox.Dispatcher（失败会退避重试）。
+// 四者同事务提交，因此「事件一定不会丢」「账变了但回放没记」都由数据库保证，
+// 而不是靠 goroutine 是否跑成功。投递交给 outbox.Dispatcher（失败会退避重试）。
 //
 // 旁路的 trace 埋点与幂等结果缓存不进事务：前者是观测数据，
 // 后者是 Redis，都不应与资金相关的事务成败互相牵连。
@@ -264,6 +347,29 @@ func (l *BetLogic) recordSettled(
 
 	return l.svcCtx.DB.TransactCtx(l.ctx, func(ctx context.Context, session sqlx.Session) error {
 		txConn := sqlx.NewSqlConnFromSession(session)
+
+		// 0) 派彩账变：和回放记录、结算事件同事务。
+		// 钱包刚返回的 balance 是权威值，作为 balance_after 快照；
+		// 若与本地按类型推算不一致，差额会记进 drift_minor 并被日志告警。
+		if outcome.WinAmount > 0 {
+			walletBalance := balance
+			if _, err := l.svcCtx.Ledger.PostInTx(ctx, txConn, session, ledger.Posting{
+				TypeCode:      model.TxTypeWin,
+				MerchantID:    merchantID,
+				MerchantCode:  req.MerchantId,
+				UserID:        req.UserId,
+				GameCode:      req.GameCode,
+				RoundID:       req.RoundId,
+				Amount:        outcome.WinAmount,
+				WalletBalance: &walletBalance,
+				Status:        model.LedgerStatusSuccess,
+				RefType:       "game_round",
+				RefID:         req.RoundId,
+				Remark:        "结算派彩",
+			}); err != nil {
+				return fmt.Errorf("post win ledger: %w", err)
+			}
+		}
 
 		// 1) 本地对账标记：该局已结算，rollback 服务不会再当孤儿单处理
 		//

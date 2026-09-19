@@ -6,7 +6,7 @@
 >
 > 重新生成：`powershell -ExecutionPolicy Bypass -File .\scripts\gen_database_doc.ps1`
 
-**当前规模：36 张基表 + 2 个视图**（information_schema 实测）
+**当前规模：41 张基表 + 2 个视图**（information_schema 实测）
 
 ---
 
@@ -120,7 +120,7 @@
 
 以下列均为 BIGINT minor units（Scale=10000）：
 
-`commission_rules.min_fee_minor` · `daily_settlements.total_bet` · `daily_settlements.total_win` · `game_round_replay.bet_amount` · `games.min_bet_minor` · `games.max_bet_minor` · `merchant_games.min_bet_minor` · `merchant_games.max_bet_minor` · `merchant_settlement_lines.total_bet_minor` · `merchant_settlement_lines.total_win_minor` · `merchant_settlement_lines.commission_minor` · `merchant_settlement_lines.amount_minor` · `pending_transactions.bet_amount` · `pending_transactions.win_amount` · `player_merchant_profiles.lifetime_bet_minor` · `player_merchant_profiles.lifetime_win_minor` · `risk_alerts.total_bet` · `risk_alerts.total_win` · `settlement_periods.total_bet_minor` · `settlement_periods.total_win_minor` · `settlement_periods.ggr_minor` · `settlement_periods.commission_minor` · `settlement_periods.net_payable_minor` · `v_merchant_game_lobby.merchant_min_bet_minor` · `v_merchant_game_lobby.merchant_max_bet_minor` · `v_merchant_game_lobby.game_min_bet_minor` · `v_merchant_game_lobby.game_max_bet_minor` · `v_merchant_game_lobby.effective_min_bet_minor` · `v_merchant_game_lobby.effective_max_bet_minor` · `v_merchant_game_lobby_i18n.effective_min_bet_minor` · `v_merchant_game_lobby_i18n.effective_max_bet_minor` · `wallet_pending_ops.bet_amount` · `wallet_pending_ops.win_amount`
+`commission_rules.min_fee_minor` · `daily_settlements.total_bet` · `daily_settlements.total_win` · `game_round_replay.bet_amount` · `game_transactions.drift_minor` · `games.min_bet_minor` · `games.max_bet_minor` · `merchant_games.min_bet_minor` · `merchant_games.max_bet_minor` · `merchant_settlement_lines.total_bet_minor` · `merchant_settlement_lines.total_win_minor` · `merchant_settlement_lines.commission_minor` · `merchant_settlement_lines.amount_minor` · `pending_transactions.bet_amount` · `pending_transactions.win_amount` · `player_accounts.balance_minor` · `player_accounts.frozen_minor` · `player_accounts.last_drift_minor` · `player_merchant_profiles.lifetime_bet_minor` · `player_merchant_profiles.lifetime_win_minor` · `risk_alerts.total_bet` · `risk_alerts.total_win` · `settlement_periods.total_bet_minor` · `settlement_periods.total_win_minor` · `settlement_periods.ggr_minor` · `settlement_periods.commission_minor` · `settlement_periods.net_payable_minor` · `v_merchant_game_lobby.merchant_min_bet_minor` · `v_merchant_game_lobby.merchant_max_bet_minor` · `v_merchant_game_lobby.game_min_bet_minor` · `v_merchant_game_lobby.game_max_bet_minor` · `v_merchant_game_lobby.effective_min_bet_minor` · `v_merchant_game_lobby.effective_max_bet_minor` · `v_merchant_game_lobby_i18n.effective_min_bet_minor` · `v_merchant_game_lobby_i18n.effective_max_bet_minor` · `wallet_pending_ops.bet_amount` · `wallet_pending_ops.win_amount`
 
 ---
 
@@ -508,10 +508,10 @@
 |---|---|:--:|---|---|---|
 | `id` | bigint unsigned | 否 | - | PK | 主键 |
 | `trace_id` | varchar(64) | 否 | - | IDX | 全链路 TraceID |
-| `round_id` | varchar(64) | 否 | - | UK | 局 ID，同时作为 nonce |
-| `merchant_id` | bigint unsigned | 是 | - | IDX | 商户 ID（merchants.id） |
+| `round_id` | varchar(64) | 否 | - | IDX | 局 ID，同时作为 nonce |
+| `merchant_id` | bigint unsigned | 否 | `0` | IDX | 商户 ID（merchants.id），0=未归属 |
 | `merchant_code` | varchar(32) | 否 | - |  | 商户编码 |
-| `user_id` | bigint unsigned | 否 | - |  | 玩家 ID |
+| `user_id` | varchar(64) | 否 | - |  | 下游玩家唯一ID |
 | `game_code` | varchar(32) | 否 | - |  | 游戏编码 |
 | `phase` | varchar(32) | 否 | - |  | 阶段：bet_debited/win_pending/settled/orphan |
 | `status` | varchar(16) | 否 | `pending` | IDX | 状态：pending/done/failed |
@@ -528,11 +528,12 @@
 **索引**
 
 - `idx_merchant_id_status`（普通）：`merchant_id`, `status`, `updated_at`
+- `idx_round_id`（普通）：`round_id`
 - `idx_status_created`（普通）：`status`, `created_at`
 - `idx_status_updated`（普通）：`status`, `updated_at`
 - `idx_trace_id`（普通）：`trace_id`
 - `PRIMARY`（主键）：`id`
-- `uk_round_id`（唯一）：`round_id`
+- `uk_merchant_round`（唯一）：`merchant_id`, `round_id`
 
 #### `wallet_pending_ops`
 
@@ -542,9 +543,9 @@
 |---|---|:--:|---|---|---|
 | `id` | bigint unsigned | 否 | - | PK | 主键 |
 | `round_id` | varchar(128) | 否 | - | IDX | 局 ID，同时作为 nonce |
-| `merchant_id` | bigint unsigned | 是 | - | IDX | 商户 ID（merchants.id） |
+| `merchant_id` | bigint unsigned | 否 | `0` | IDX | 商户 ID（merchants.id），0=未归属 |
 | `merchant_code` | varchar(64) | 否 | - | IDX | 商户编码 |
-| `user_id` | bigint unsigned | 否 | - |  | 玩家 ID |
+| `user_id` | varchar(64) | 否 | - |  | 下游玩家唯一ID |
 | `op_type` | varchar(32) | 否 | - |  | 操作类型：win_failed / win_timeout / rollback |
 | `bet_amount` | bigint | 否 | `0` |  | 下注额，minor units |
 | `win_amount` | bigint | 否 | `0` |  | 派彩额，minor units |
@@ -558,9 +559,10 @@
 
 - `idx_merchant_id_status`（普通）：`merchant_id`, `status`, `updated_at`
 - `idx_merchant_status`（普通）：`merchant_code`, `status`, `updated_at`
+- `idx_round_id`（普通）：`round_id`
 - `idx_status_updated`（普通）：`status`, `updated_at`
 - `PRIMARY`（主键）：`id`
-- `uk_round_op`（唯一）：`round_id`, `op_type`
+- `uk_merchant_round_op`（唯一）：`merchant_id`, `round_id`, `op_type`
 
 #### `game_round_replay`
 
@@ -569,10 +571,10 @@
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|:--:|---|---|---|
 | `id` | bigint unsigned | 否 | - | PK | 主键 |
-| `round_id` | varchar(64) | 否 | - | UK | 局 ID，同时作为 nonce |
-| `merchant_id` | bigint unsigned | 是 | - | IDX | 商户 ID（merchants.id） |
+| `round_id` | varchar(64) | 否 | - | IDX | 局 ID，同时作为 nonce |
+| `merchant_id` | bigint unsigned | 否 | `0` | IDX | 商户 ID（merchants.id），0=未归属 |
 | `merchant_code` | varchar(32) | 否 | - | IDX | 商户编码 |
-| `user_id` | bigint unsigned | 否 | - | IDX | 玩家 ID |
+| `user_id` | varchar(64) | 否 | - | IDX | 下游玩家唯一ID |
 | `game_code` | varchar(32) | 否 | - | IDX | 游戏编码 |
 | `server_seed` | varchar(128) | 否 | - |  | 服务端种子（hex） |
 | `client_seed` | varchar(128) | 否 | - |  | 客户端种子 |
@@ -586,9 +588,10 @@
 - `idx_game_created`（普通）：`game_code`, `created_at`
 - `idx_merchant_created`（普通）：`merchant_code`, `created_at`
 - `idx_merchant_id_created`（普通）：`merchant_id`, `created_at`
+- `idx_round_id`（普通）：`round_id`
 - `idx_user_created`（普通）：`user_id`, `created_at`
 - `PRIMARY`（主键）：`id`
-- `uk_round_id`（唯一）：`round_id`
+- `uk_merchant_round`（唯一）：`merchant_id`, `round_id`
 
 ### D. 风控
 
@@ -1163,28 +1166,37 @@ i18n：
 | `28-i18n-audit-dashboard` | Admin i18n for audit logs and dashboard |
 | `29-repair-column-comments` | Restore Chinese column comments damaged by wrong charset |
 | `30-translate-comments` | Translate English table/column comments into Simplified Chinese |
+| `32-outbox` | Transactional outbox (event_outbox) + consumer dedup (processed_events) |
+| `33-merchant-scoped-keys` | Scope unique keys by merchant_id on reconciliation tables |
+| `34-round-id-index` | Add single-column round_id indexes for merchant-unscoped read paths |
+| `35-ledger` | Land the ledger: transaction_types + game_transactions + player_accounts |
+| `36-ledger-idempotency-by-status` | Include terminal status in ledger idempotency key so compensation entries can coexist |
 
 > 注意：03 / 07 / 09 / 10 四个迁移脚本**未登记** `schema_migrations`（只有 11–28 登记了）。排查历史请一并查看 `docker/mysql/init/` 下的原始文件。
 
 ## 八、模型覆盖情况
 
-`internal/model/` 只为 **12 张表**提供了模型，其余 **24 张基表无模型**：
+`internal/model/` 只为 **12 张表**提供了模型，其余 **29 张基表无模型**：
 
 | 有模型 | 无模型 |
 |---|---|
 | `admin_users` | `merchant_game_versions` |
 | `audit_logs` | `game_rtp_tiers` |
 | `daily_settlements` | `game_categories` |
-| `game_configs` | `i18n_messages` |
-| `game_round_replay` | `api_rate_limits` |
-| `merchants` | `locales` |
-| `pending_transactions` | `i18n_message_translations` |
-| `risk_alerts` | `i18n_entity_translations` |
-| `risk_blacklist` | `merchant_currencies` |
-| `roles` | `merchant_locales` |
-| `settlement_periods` | `commission_rules` |
-| `wallet_pending_ops` | `merchant_settlement_lines` |
+| `game_configs` | `processed_events` |
+| `game_round_replay` | `i18n_messages` |
+| `merchants` | `api_rate_limits` |
+| `pending_transactions` | `player_accounts` |
+| `risk_alerts` | `locales` |
+| `risk_blacklist` | `i18n_message_translations` |
+| `roles` | `transaction_types` |
+| `settlement_periods` | `i18n_entity_translations` |
+| `wallet_pending_ops` | `merchant_currencies` |
+|  | `merchant_locales` |
+|  | `commission_rules` |
+|  | `merchant_settlement_lines` |
 |  | `game_sessions` |
+|  | `event_outbox` |
 |  | `player_merchant_profiles` |
 |  | `game_client_versions` |
 |  | `game_maintenance_windows` |
@@ -1193,6 +1205,7 @@ i18n：
 |  | `games` |
 |  | `currencies` |
 |  | `merchant_webhooks` |
+|  | `game_transactions` |
 |  | `merchant_games` |
 |  | `schema_archive_policies` |
 |  | `i18n_bundles` |

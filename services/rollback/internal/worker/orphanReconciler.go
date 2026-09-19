@@ -97,7 +97,7 @@ func (r *OrphanReconciler) reconcileOne(ctx context.Context, tx *model.PendingTr
 }
 
 func (r *OrphanReconciler) retryWin(ctx context.Context, tx *model.PendingTransaction) {
-	_, err := r.svcCtx.Wallet.Win(ctx, wallet.WinReq{
+	result, err := r.svcCtx.Wallet.Win(ctx, wallet.WinReq{
 		MerchantID: tx.MerchantCode,
 		UserID:     tx.UserID,
 		RoundID:    tx.RoundID,
@@ -107,6 +107,23 @@ func (r *OrphanReconciler) retryWin(ctx context.Context, tx *model.PendingTransa
 		r.bumpRetry(ctx, tx.Id, err.Error())
 		return
 	}
+	// 补偿成功即钱已到账，账本上必须补一条 SUCCESS 派彩流水。
+	// 首次失败时 RGS 记的是 (merchant, round, WIN, PENDING_RETRY)，
+	// 幂等键带终态，因此这条 SUCCESS 不会被当成重复而丢弃。
+	walletBalance := result.Balance
+	postLedger(ctx, r.svcCtx, ledgerPosting{
+		merchantID:    tx.MerchantID,
+		merchantCode:  tx.MerchantCode,
+		userID:        tx.UserID,
+		roundID:       tx.RoundID,
+		gameCode:      tx.GameCode,
+		typeCode:      model.TxTypeWin,
+		amount:        tx.WinAmount,
+		walletBalance: &walletBalance,
+		remark:        "孤儿单补派彩成功",
+		refType:       "pending_transaction",
+		refID:         tx.Phase,
+	})
 	r.markDone(ctx, tx, "win compensated")
 }
 
@@ -122,6 +139,21 @@ func (r *OrphanReconciler) rollbackBet(ctx context.Context, tx *model.PendingTra
 		r.bumpRetry(ctx, tx.Id, err.Error())
 		return
 	}
+	// 下注被退回：账本上要记一笔 ROLLBACK（IN/INCREASE）。
+	// 否则账本只有扣款没有退款，对账必然不平。
+	// wallet.Rollback 不返回余额，钱包快照留空，balance_after 用本地推算值。
+	postLedger(ctx, r.svcCtx, ledgerPosting{
+		merchantID:   tx.MerchantID,
+		merchantCode: tx.MerchantCode,
+		userID:       tx.UserID,
+		roundID:      tx.RoundID,
+		gameCode:     tx.GameCode,
+		typeCode:     model.TxTypeRollback,
+		amount:       tx.BetAmount,
+		remark:       "孤儿单撤单退回下注",
+		refType:      "pending_transaction",
+		refID:        tx.Phase,
+	})
 	r.markDone(ctx, tx, "bet rolled back")
 }
 
