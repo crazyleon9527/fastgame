@@ -6,9 +6,13 @@ MaxBytes: 1048576
 
 Log:
   ServiceName: rgs-api
-  Mode: console
+  Mode: file             # file 模式写入本地
+  Path: logs/rgs-api     # 隔离为子目录！各服务互不影响，如 logs/admin-api, logs/consumer
   Level: info
-  Encoding: plain
+  Compress: true         # 历史日志自动 gzip 压缩 (生成如 error.2026-09-19.gz)
+  KeepDays: 7            # 日志自动保留 7 天，过期自动清理
+  StackCooldownMillis: 100
+  Rotation: daily        # daily 每天定时切分 (或 size 按大小切分)
 
 MySQL:
   DataSource: fastgame:fastgame_pass@tcp(localhost:13306)/fastgame?charset=utf8mb4&parseTime=true&loc=UTC
