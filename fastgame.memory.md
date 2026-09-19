@@ -49,6 +49,19 @@
 ## 约定
 - 后台/模型/文档注释一律**简体中文**。
 - 提交信息用中文，说明「为什么」而不只是「改了什么」。
-- `web/admin/` 的构建产物（index.html + static/*）**不提交**。
 - 后台 goroutine 一律用 `pkg/async.Runner`（panic 兜底 + 并发闸门 + 可 Drain + trace 继承），不要再写裸 `go func()`。
 - 链路 ID 原语在 `pkg/traceid`（叶子包），`pkg/trace` 转发；这是为了让 `pkg/async` 能继承 trace 而不与 `pkg/trace` 形成 import 环。
+
+## 后台前端（web/admin-vue → web/admin）
+- 源码在 `web/admin-vue/`（vue-pure-admin），`scripts/deploy-admin.ps1` 用 `npm run build` 构建后**清空并覆盖** `web/admin/`（保留 README.md 与 uploads）。
+- **`web/admin/` 的构建产物是入库的**（52 个跟踪文件，含 index.html）。所以改了 UI 必须重建**并把产物一起提交**，否则别人克隆下来还是旧（甚至坏的）页面。（早先"构建产物不提交"的记录是错的，已按实际 git 状态纠正。）
+- `web/admin/index.html` 响应头没有 Cache-Control，只有 ETag/Last-Modified，浏览器会做启发式缓存 → 更新后让用户普通刷新即可，硬刷新（Ctrl+Shift+R）最稳。
+- **验证 UI 必须用真浏览器，不能只看 HTTP 状态码**：`main.ts` 给 window 挂了 `unhandledrejection` 监听并在 `reason instanceof Error` 时 `preventDefault()`（本意是屏蔽 Element Plus 弹窗的 cancel/close），会把真实异常从控制台一并抹掉。曾经因此出现"接口全 200、资源全 200、控制台无报错，但登录页永远转圈"（根因：`ascending()` 对无 meta 的路由写 `v.meta.rank` 抛错 → `await initRouter()` rejected → `app.mount()` 永不执行）。
+  - 自检工具：`node scripts/verify_admin_login.mjs`（渲染登录表单 → 是否仍停在 index.html 的 `.loader` → 登录 → 是否离开 /login → 菜单是否生成 → 有无 4xx/5xx → 打印被吞掉的异常）。
+- 本机没有全局 playwright，但 **DSH 自带 `playwright-core`**，配合系统 Chrome 可以驱动真浏览器：
+  `node <脚本> <URL> "C:\Users\94350\AppData\Local\Programs\DeepSeekGUI\resources\dsh\node_modules\playwright-core"`，`executablePath` 指向 `C:\Program Files\Google\Chrome\Application\chrome.exe`。内嵌 browser 工具会拒绝回环地址，所以本地页面只能这样验。
+
+## 账变类型表（transaction_types）
+- **是存表的**（迁移 35，7 条种子：BET/WIN/REFUND/ROLLBACK/PROMO_CREDIT/ADJUST_ADD/ADJUST_SUB），`game_transactions.type_id` 是权威关联，`tx_type`/`direction` 是**故意冗余**（出账/排查不必 join）。
+- 后台目前**只暴露了流水查询与人工调账两个接口，没有类型列表/管理接口**，所以类型表在后台"看不见"，只能在流水列表里看到 `typeName`。要展示/停用类型需要补 `GET /api/v1/admin/ledger/types`。
+- 其它仍是字符串枚举、无字典表的"类型"列：`wallet_pending_ops.op_type`、`pending_transactions.phase`/`expected_action`、`merchant_settlement_lines.line_type`、`commission_rules.rule_type`、`risk_blacklist.list_type`。
