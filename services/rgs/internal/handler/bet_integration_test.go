@@ -308,15 +308,19 @@ func TestBetWinFailureRecordsPendingRetryLedger(t *testing.T) {
 	if err != nil {
 		t.Skipf("跳过：%v", err)
 	}
-	defer db.Close()
 	if err := db.Ping(); err != nil {
+		db.Close()
 		t.Skipf("跳过：MySQL 不可达（%v）", err)
 	}
+
+	// 注意注册顺序与 t.Cleanup 的 LIFO 语义：
+	// 关闭连接必须**最后**执行，否则清理语句会落在已关闭的连接上静默失败，
+	// 每跑一次测试就在开发库里留一批探针行（这个坑踩过一次）。
+	t.Cleanup(func() { db.Close() })
 
 	const prefix = "zz-pending-retry-"
 	t.Cleanup(func() {
 		db.Exec("DELETE FROM game_transactions WHERE round_id LIKE ?", prefix+"%")
-		db.Exec("DELETE FROM game_replay_dummy WHERE 1=0") // no-op，占位保持语句对齐
 		db.Exec("DELETE FROM game_round_replay WHERE round_id LIKE ?", prefix+"%")
 		db.Exec("DELETE FROM pending_transactions WHERE round_id LIKE ?", prefix+"%")
 		db.Exec("DELETE FROM wallet_pending_ops WHERE round_id LIKE ?", prefix+"%")
@@ -425,10 +429,12 @@ func assertReplayMerchantID(t *testing.T, roundID string, want uint64) {
 	if err != nil {
 		t.Skipf("跳过 merchant_id 校验：%v", err)
 	}
-	defer db.Close()
 	if err := db.Ping(); err != nil {
+		db.Close()
 		t.Skipf("跳过 merchant_id 校验：MySQL 不可达（%v）", err)
 	}
+	// t.Cleanup 是 LIFO：先注册关闭，保证清理语句执行时连接仍然可用
+	t.Cleanup(func() { db.Close() })
 
 	// 本测试新建的行自己清掉，避免污染开发库
 	t.Cleanup(func() {

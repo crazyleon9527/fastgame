@@ -59,7 +59,7 @@ func testWorker(t *testing.T, requireEnvelope bool) (*Worker, *sql.DB) {
 
 func TestParseMessageEnvelopeAndBare(t *testing.T) {
 	w, db := testWorker(t, false)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 
 	evt := kafka.RoundSettledEvent{
 		EventID:    "01a0b67a-0000-7000-8000-000000000001",
@@ -126,7 +126,7 @@ func TestParseMessageEnvelopeAndBare(t *testing.T) {
 
 func TestClaimIdempotencyBlocksDuplicate(t *testing.T) {
 	w, db := testWorker(t, false)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	ctx := context.Background()
 
 	eventID := "01a0b67a-0000-7000-8000-0000000000ff"
@@ -156,7 +156,7 @@ func TestClaimIdempotencyBlocksDuplicate(t *testing.T) {
 
 func TestClaimIdempotencyNoGhostRowOnRollback(t *testing.T) {
 	w, db := testWorker(t, false)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	ctx := context.Background()
 
 	eventID := "01a0b67a-0000-7000-8000-0000000000ee"

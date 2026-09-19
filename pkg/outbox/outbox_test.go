@@ -47,7 +47,7 @@ func openDB(t *testing.T) *sql.DB {
 func newConn(t *testing.T) sqlx.SqlConn {
 	t.Helper()
 	db := openDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	return sqlx.NewMysql(dsn())
 }
 
@@ -100,7 +100,7 @@ func isolatePending(t *testing.T, db *sql.DB) {
 
 func TestOutboxRollsBackWithBusinessTx(t *testing.T) {
 	db := openDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	conn := newConn(t)
 	store := NewStore(conn)
 	ctx := context.Background()
@@ -140,7 +140,7 @@ func TestOutboxRollsBackWithBusinessTx(t *testing.T) {
 
 func TestOutboxClaimDeliverSettle(t *testing.T) {
 	db := openDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	conn := newConn(t)
 	store := NewStore(conn)
 	ctx := context.Background()
@@ -184,7 +184,7 @@ func TestOutboxClaimDeliverSettle(t *testing.T) {
 
 func TestOutboxRetryThenFail(t *testing.T) {
 	db := openDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	conn := newConn(t)
 	store := NewStore(conn)
 	ctx := context.Background()
@@ -239,7 +239,7 @@ func TestOutboxRetryThenFail(t *testing.T) {
 
 func TestIdempotencyAcquireInTx(t *testing.T) {
 	db := openDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	conn := newConn(t)
 	idem := NewIdempotency(conn)
 	ctx := context.Background()
@@ -286,7 +286,7 @@ func TestIdempotencyAcquireInTx(t *testing.T) {
 // 事件永久丢失。这正是 platform-api 把旧 wrapper 式 API 标 Deprecated 的原因。
 func TestIdempotencyRollbackReleasesSlot(t *testing.T) {
 	db := openDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	conn := newConn(t)
 	idem := NewIdempotency(conn)
 	ctx := context.Background()
@@ -346,7 +346,7 @@ func TestIdempotencyRollbackReleasesSlot(t *testing.T) {
 
 func TestReapStuckInFlight(t *testing.T) {
 	db := openDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	conn := newConn(t)
 	store := NewStore(conn)
 	ctx := context.Background()
@@ -394,7 +394,7 @@ VALUES (?, 'game.round.settled', 'U-stuck', ?, ?, 1, ?, 'dead-instance', ?)`,
 
 func TestSettleOnlyMarksClaimedRows(t *testing.T) {
 	db := openDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	conn := newConn(t)
 	store := NewStore(conn)
 	ctx := context.Background()

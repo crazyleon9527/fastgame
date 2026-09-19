@@ -97,7 +97,7 @@ func checkGeneratedModel(t *testing.T, db *sql.DB, table string, fields []string
 
 func TestSchemaGeneratedModelsMatchLiveTables(t *testing.T) {
 	db := openTestDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 
 	checkGeneratedModel(t, db, "merchants", builder.RawFieldNames(&Merchants{}))
 	checkGeneratedModel(t, db, "admin_users", builder.RawFieldNames(&AdminUsers{}))
@@ -108,7 +108,7 @@ func TestSchemaGeneratedModelsMatchLiveTables(t *testing.T) {
 // 手写模型的结构体字段必须是实际列的子集（多出来的列会在 Scan 时报错）
 func TestSchemaCustomModelStructsSubsetOfLive(t *testing.T) {
 	db := openTestDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 
 	cases := []struct {
 		table  string
@@ -164,7 +164,7 @@ func liveColumnTypes(t *testing.T, db *sql.DB, table string) map[string]string {
 // user.status 声明 varchar(191) 而 Go 用 uint8 的同类漂移）。
 func TestSchemaStringIDColumnsAreVarchar(t *testing.T) {
 	db := openTestDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 
 	// Go 侧为 string 的 ID 列 —— 与 migration 10-user-id-string（USER_ID 统一为 VARCHAR(64)）对应
 	requirements := []struct {
@@ -196,7 +196,7 @@ func TestSchemaStringIDColumnsAreVarchar(t *testing.T) {
 // goctl 生成代码里 Insert/Update 的 "?, ?, ?" 是硬编码的，加字段时极易漏改。
 func TestSchemaGeneratedSQLExecutes(t *testing.T) {
 	db := openTestDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	conn := sqlx.NewMysql(os.Getenv("MYSQL_DSN"))
 	if os.Getenv("MYSQL_DSN") == "" {
 		conn = sqlx.NewMysql(defaultDSN)
@@ -249,7 +249,7 @@ func TestSchemaGeneratedSQLExecutes(t *testing.T) {
 // admin_users 的生成模型曾遗漏 totp_* 三列，导致 Insert 的列数与占位符数不匹配。
 func TestSchemaAdminUsersGeneratedSQLExecutes(t *testing.T) {
 	db := openTestDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	dsn := os.Getenv("MYSQL_DSN")
 	if dsn == "" {
 		dsn = defaultDSN
@@ -294,7 +294,7 @@ func TestSchemaAdminUsersGeneratedSQLExecutes(t *testing.T) {
 // TestSchemaGameConfigsGeneratedSQLExecutes
 func TestSchemaGameConfigsGeneratedSQLExecutes(t *testing.T) {
 	db := openTestDB(t)
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	dsn := os.Getenv("MYSQL_DSN")
 	if dsn == "" {
 		dsn = defaultDSN
