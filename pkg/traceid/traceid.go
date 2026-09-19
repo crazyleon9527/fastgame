@@ -14,6 +14,7 @@ import (
 )
 
 const HeaderTraceID = "X-Trace-Id"
+const HeaderRequestID = "X-Request-Id"
 
 type ctxKey struct{}
 
@@ -22,7 +23,12 @@ func IDFromRequest(r *http.Request) string {
 	if r == nil {
 		return uuid.NewString()
 	}
+	// 优先提取统一的 X-Trace-Id[cite: 30]
 	if id := strings.TrimSpace(r.Header.Get(HeaderTraceID)); id != "" {
+		return id
+	}
+	// 兼容可能由网关注入的 X-Request-Id
+	if id := strings.TrimSpace(r.Header.Get(HeaderRequestID)); id != "" {
 		return id
 	}
 	return uuid.NewString()

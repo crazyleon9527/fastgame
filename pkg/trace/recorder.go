@@ -2,62 +2,141 @@ package trace
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	"fastgame/pkg/async"
 	"fastgame/pkg/clickhouse"
 
 	"github.com/google/uuid"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
+const (
+	defaultBatchSize    = 1000            // 满 1000 条触发批量刷盘
+	defaultFlushTimeout = 1 * time.Second // 最长等待 1 秒刷盘一次
+	defaultChanBuffer   = 10000           // 本地内存缓冲深度
+)
+
 type CHRecorder struct {
 	writer *clickhouse.Writer
-	// spans 负责把埋点写入从请求路径上摘下来。
-	// 之前是每写一条 span 起一个裸 goroutine：无上限、panic 会打挂进程、
-	// 进程退出时在途写入被静默丢弃。现在有并发闸门 + panic 兜底 + 可 Drain。
-	spans   *async.Runner
+	queue  chan clickhouse.TraceSpanRow
+
 	dropped atomic.Int64
+	closed  atomic.Bool
+	done    chan struct{}
+	wg      sync.WaitGroup
 }
 
 func NewCHRecorder(w *clickhouse.Writer) *CHRecorder {
-	return &CHRecorder{
+	r := &CHRecorder{
 		writer: w,
-		spans: async.New("trace-recorder",
-			async.WithMaxConcurrency(traceWriterConcurrency),
-			async.WithDrainTimeout(traceWriterDrainTimeout),
-		),
+		queue:  make(chan clickhouse.TraceSpanRow, defaultChanBuffer),
+		done:   make(chan struct{}),
+	}
+
+	r.wg.Add(1)
+	go r.batchWorker()
+
+	return r
+}
+
+func (r *CHRecorder) batchWorker() {
+	defer r.wg.Done()
+
+	batch := make([]clickhouse.TraceSpanRow, 0, defaultBatchSize)
+	ticker := time.NewTicker(defaultFlushTimeout)
+	defer ticker.Stop()
+
+	// 定时采样队列堆积水位的 Ticker
+	queueMetricTicker := time.NewTicker(200 * time.Millisecond)
+	defer queueMetricTicker.Stop()
+
+	flush := func() {
+		if len(batch) == 0 || r.writer == nil {
+			return
+		}
+
+		start := time.Now()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := r.writer.BatchInsertTraceSpans(ctx, batch)
+		cancel()
+
+		duration := time.Since(start).Seconds()
+		batchFlushDuration.Observe(duration)
+
+		if err != nil {
+			batchFlushCounter.WithLabelValues("failed").Inc()
+			logx.Errorw("trace_batch_flush_failed",
+				logx.Field("count", len(batch)),
+				logx.Field("duration_sec", duration),
+				logx.Field("err", err),
+			)
+		} else {
+			batchFlushCounter.WithLabelValues("success").Inc()
+		}
+
+		batch = make([]clickhouse.TraceSpanRow, 0, defaultBatchSize)
+	}
+
+	for {
+		select {
+		case <-r.done:
+			for {
+				select {
+				case row := <-r.queue:
+					batch = append(batch, row)
+					if len(batch) >= defaultBatchSize {
+						flush()
+					}
+				default:
+					flush()
+					queueLengthGauge.Set(0)
+					return
+				}
+			}
+
+		case row := <-r.queue:
+			batch = append(batch, row)
+			if len(batch) >= defaultBatchSize {
+				flush()
+			}
+
+		case <-ticker.C:
+			flush()
+
+		case <-queueMetricTicker.C:
+			queueLengthGauge.Set(float64(len(r.queue)))
+		}
 	}
 }
 
-const (
-	// traceWriterConcurrency 限制同时在途的 span 写入数。
-	// 埋点是旁路数据：宁可丢弃也不能把下游 ClickHouse 和本进程内存拖垮。
-	traceWriterConcurrency  = 256
-	traceWriterDrainTimeout = 3 * time.Second
-)
-
-// Close 等待在途埋点写完，供进程优雅退出时调用。
+// Close 优雅停机并清空队列
 func (r *CHRecorder) Close(ctx context.Context) error {
-	if r == nil || r.spans == nil {
+	if r == nil || r.closed.Swap(true) {
 		return nil
 	}
-	return r.spans.Shutdown(ctx)
-}
+	close(r.done)
 
-// Stats 暴露埋点丢弃/panic 计数，便于监控"埋点是否在悄悄丢数据"。
-func (r *CHRecorder) Stats() async.Stats {
-	if r == nil || r.spans == nil {
-		return async.Stats{}
+	done := make(chan struct{})
+	go func() {
+		r.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	return r.spans.Stats()
 }
 
 func (r *CHRecorder) Record(ctx context.Context, span Span) {
-	if r == nil || r.writer == nil {
+	if r == nil || r.writer == nil || r.closed.Load() {
 		return
 	}
+
 	traceID := span.TraceID
 	if traceID == "" {
 		traceID = ID(ctx)
@@ -65,13 +144,21 @@ func (r *CHRecorder) Record(ctx context.Context, span Span) {
 	if traceID == "" {
 		return
 	}
+
 	spanID := span.SpanID
 	if spanID == "" {
 		spanID = uuid.NewString()
 	}
+
 	occurredAt := span.OccurredAt
 	if occurredAt.IsZero() {
 		occurredAt = time.Now().UTC()
+	}
+
+	// 截断超大报文，避免击穿存储
+	detail := span.Detail
+	if len(detail) > 2048 {
+		detail = detail[:2048] + "...(truncated)"
 	}
 
 	row := clickhouse.TraceSpanRow{
@@ -81,30 +168,20 @@ func (r *CHRecorder) Record(ctx context.Context, span Span) {
 		Operation:  span.Operation,
 		RoundID:    span.RoundID,
 		Status:     span.Status,
-		Detail:     span.Detail,
+		Detail:     detail,
 		DurationMs: span.DurationMs,
 		OccurredAt: occurredAt,
 	}
-	// 入队失败（埋点积压到上限或进程正在退出）直接放弃这条 span：
-	// 埋点是旁路数据，不能反压到资金主链路。
-	ok := r.spans.Go(ctx, func(taskCtx context.Context) {
-		c, cancel := context.WithTimeout(taskCtx, 3*time.Second)
-		defer cancel()
-		if err := r.writer.BatchInsertTraceSpans(c, []clickhouse.TraceSpanRow{row}); err != nil {
-			// 字段名与 pkg/log 的 KeyErr/KeyRoundID 保持一致（这里不能 import pkg/log，
-			// 否则 pkg/log -> pkg/trace -> pkg/log 形成环）。
-			logx.WithContext(taskCtx).Errorw("trace_span_insert_failed",
-				logx.Field("err", err),
-				logx.Field("round_id", row.RoundID),
-			)
-		}
-	})
-	if !ok {
+
+	select {
+	case r.queue <- row:
+		spanRecordedCounter.Inc()
+	default:
 		r.dropped.Add(1)
+		spanDroppedCounter.Inc()
 	}
 }
 
-// Dropped 返回因积压而被丢弃的埋点数。
 func (r *CHRecorder) Dropped() int64 {
 	if r == nil {
 		return 0
