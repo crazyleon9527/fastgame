@@ -1,20 +1,17 @@
 package outbox
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 	"time"
 )
 
-// Backoff 投递失败的退避策略。
-//
-// 采用固定档位而非纯指数：早期快速重试（1s/5s/30s）能兜住 Kafka 短暂抖动，
-// 后期拉长（2h/6h）避免无意义地反复打日志与打 Kafka。
-// 每档叠加 ±20% 抖动，防止多实例在同一时刻齐步重试（thundering herd）。
+// Backoff 投递失败的退避策略
 type Backoff struct {
 	tiers []time.Duration
 }
 
-// DefaultBackoff 七档退避，与 platform-api 的档位一致。
+// DefaultBackoff 七档退避
 func DefaultBackoff() Backoff {
 	return Backoff{tiers: []time.Duration{
 		1 * time.Second,
@@ -27,7 +24,7 @@ func DefaultBackoff() Backoff {
 	}}
 }
 
-// NewBackoff 自定义档位（测试用）。
+// NewBackoff 自定义档位
 func NewBackoff(tiers ...time.Duration) Backoff {
 	if len(tiers) == 0 {
 		return DefaultBackoff()
@@ -35,7 +32,7 @@ func NewBackoff(tiers ...time.Duration) Backoff {
 	return Backoff{tiers: tiers}
 }
 
-// MaxRetries 达到该次数后置为 FAILED 并告警，不再自动重试。
+// MaxRetries 达到该次数后置为 FAILED 并告警
 func (b Backoff) MaxRetries() int {
 	if len(b.tiers) == 0 {
 		return 1
@@ -43,7 +40,7 @@ func (b Backoff) MaxRetries() int {
 	return len(b.tiers)
 }
 
-// Delay 第 attempt 次失败后的等待时长（attempt 从 1 开始）。
+// Delay 第 attempt 次失败后的等待时长（带 ±20% 安全抖动）
 func (b Backoff) Delay(attempt int) time.Duration {
 	if len(b.tiers) == 0 {
 		return time.Second
@@ -56,7 +53,17 @@ func (b Backoff) Delay(attempt int) time.Duration {
 		idx = len(b.tiers) - 1
 	}
 	base := b.tiers[idx]
-	// ±20% 抖动
-	jitter := time.Duration(rand.Int63n(int64(base)/5 + 1))
-	return base - time.Duration(int64(base)/10) + jitter
+
+	// 并发安全的加密级抖动计算，消除 math/rand 全局锁竞争
+	jitterRange := int64(base) / 5
+	if jitterRange <= 0 {
+		jitterRange = 1
+	}
+	n, err := rand.Int(rand.Reader, big.NewInt(jitterRange))
+	var jitter int64
+	if err == nil {
+		jitter = n.Int64()
+	}
+
+	return base - time.Duration(int64(base)/10) + time.Duration(jitter)
 }
