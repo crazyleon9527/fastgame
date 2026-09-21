@@ -8,8 +8,10 @@ import "fastgame/pkg/par"
 // 复制一份迟早会漂移，而漂移的后果是客户端验算算不出服务端的派彩。
 type FishDef = par.Entry
 
-// TargetRTP 是本表标注的理论 RTP（百分比口径，仅用于日志/自检）。
-var TargetRTP = par.Default96.RTP() * 100
+var (
+	// DefaultPARTable96 与 pkg/par 共享 96% 档位数据[cite: 40]
+	DefaultPARTable96 = par.Default96.Entries()
 
-// DefaultPARTable96 与 pkg/par 共用同一份表数据。
-var DefaultPARTable96 = par.Default96.Entries()
+	// DefaultPARTable94 共享 94% 档位数据
+	DefaultPARTable94 = par.Default94.Entries()
+)

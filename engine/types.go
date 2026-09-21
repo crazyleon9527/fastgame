@@ -16,13 +16,15 @@ type TurnInput struct {
 	BetAmount    money.Amount `json:"bet_amount"`
 	IsDemo       bool         `json:"is_demo"`
 
-	// Provably-fair 输入。插件必须用这三个字段做确定性推演：
-	// roll = HMAC(ServerSeed, ClientSeed:RoundID:0)，结果可被客户端独立复现。
-	// 缺失时插件应直接报错，而不是退回随机数——那会让回放与验证失去意义。
+	// RtpTier 指定该商户/局台采用的理论 RTP 档位（如 "96", "94"）
+	RtpTier string `json:"rtp_tier"`
+
+	// Provably-fair 输入
 	ServerSeed string `json:"server_seed"`
 	ClientSeed string `json:"client_seed"`
+	Nonce      uint64 `json:"nonce"` // 支持局内多次采样（如连击、免费摇奖、多发子弹）
 
-	// 客户端自定义参数 (例如: 钓鱼的鱼竿等级、抛竿力度，生肖的选线等)
+	// 客户端自定义参数 (例如: 炮台等级、道具等)
 	ExtraParams map[string]any `json:"extra_params"`
 }
 
@@ -39,15 +41,16 @@ type TurnOutcome struct {
 	ClientSeed     string `json:"client_seed"`
 	Nonce          uint64 `json:"nonce"`
 
-	// 纯前端视觉演播 JSON (透传给 Cocos，底层无需理解具体字段)
+	// 纯前端视觉演播 JSON
 	PresentationPayload string `json:"presentation_payload"`
 }
 
 // TurnResult 管道执行完毕返回给前端的最终结构
 type TurnResult struct {
 	RoundID             string       `json:"round_id"`
-	Balance             money.Amount `json:"balance"` // 账变后最新余额
+	Balance             money.Amount `json:"balance"` // 账变后真实余额 (严禁虚假累加)
 	WinAmount           money.Amount `json:"win_amount"`
 	PayoutMultiplier    float64      `json:"payout_multiplier"`
+	SettlementStatus    string       `json:"settlement_status"` // "settled" 或 "pending"
 	PresentationPayload string       `json:"presentation_payload"`
 }
