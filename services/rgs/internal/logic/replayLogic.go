@@ -28,14 +28,11 @@ func NewReplayLogic(ctx context.Context, svcCtx *svc.ServiceContext) *ReplayLogi
 }
 
 func (l *ReplayLogic) GetReplay(req *types.ReplayReq) (*types.ReplayResp, error) {
-	// round_id 只在商户内唯一，因此能拿到商户编码时一定要用它把查询限定到本商户；
-	// 拿不到（老客户端只传 roundId）时 merchantID=0，退回按 round_id 取最近一条，
-	// 此时若别的商户用过同一个 roundId，可能取到别家的回放——只读泄漏，非资金影响。
 	var merchantID uint64
 	if req.MerchantId != "" {
 		id, err := l.svcCtx.GameConfig.MerchantID(l.ctx, req.MerchantId)
 		if err != nil {
-			return nil, xerr.ErrInvalidRequest
+			return nil, xerr.ErrInvalidRequest.WithCause(err)
 		}
 		merchantID = id
 	}

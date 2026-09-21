@@ -26,11 +26,16 @@ type CHConf struct {
 }
 
 type MySQLConf struct {
-	DataSource string
+	DataSource   string
+	MaxOpenConns int `json:",optional"`
+	MaxIdleConns int `json:",optional"`
 }
 
 type RedisConf struct {
-	Addr string
+	Addr     string
+	Password string `json:",optional"`
+	DB       int    `json:",optional"`
+	PoolSize int    `json:",optional"`
 }
 
 type KafkaConf struct {

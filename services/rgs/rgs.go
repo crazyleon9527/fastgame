@@ -1,6 +1,3 @@
-// Code scaffolded by goctl. Safe to edit.
-// goctl 1.10.1
-
 package main
 
 import (
@@ -13,7 +10,8 @@ import (
 	"time"
 
 	"fastgame/pkg/async"
-	"fastgame/pkg/outbox"
+	"fastgame/pkg/trace"
+	"fastgame/pkg/xerr"
 	"fastgame/services/rgs/internal/config"
 	"fastgame/services/rgs/internal/handler"
 	"fastgame/services/rgs/internal/svc"
@@ -21,6 +19,7 @@ import (
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest"
+	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 var configFile = flag.String("f", "etc/rgs-api.yaml", "the config file")
@@ -34,6 +33,24 @@ func main() {
 	server := rest.MustNewServer(c.RestConf)
 	defer server.Stop()
 
+	// 1. 注册全局标准化错误拦截器，自动绑定 xerr.CodeError 与 TraceID
+	httpx.SetErrorHandlerCtx(func(ctx context.Context, err error) (int, any) {
+		traceID := trace.ID(ctx)
+		ce := xerr.FromError(err)
+
+		// 记录服务端内部错误链（脱敏面向前端的 msg，在日志中保留 cause）
+		if ce.Cause() != nil {
+			logx.WithContext(ctx).Errorf("[API-ERROR] code=%d msg=%s cause=%v", ce.Code(), ce.Msg(), ce.Cause())
+		}
+
+		resp := map[string]any{
+			"code":    ce.Code(),
+			"msg":     ce.Msg(),
+			"traceId": traceID,
+		}
+		return ce.HttpStatus(), resp
+	})
+
 	ctx := svc.NewServiceContext(c)
 	handler.RegisterHandlers(server, ctx)
 
@@ -42,42 +59,65 @@ func main() {
 			c.Wallet.Mock, c.Security.SkipMerchantSign)
 	}
 
-	// outbox 后台循环：派发结算事件 + 回收悬挂记录/清理历史。
-	// 用独立 ctx，随进程收到 SIGINT/SIGTERM 时优雅停止。
-	//
-	// 这些循环以及退出流程都交给 async.Runner 管理：
-	// 裸 goroutine 里的 panic 会直接打挂资金服务，进程退出时也无人等待收尾。
+	// 2. 启动后台协程池
 	bgCtx, stopBg := context.WithCancel(context.Background())
-	defer stopBg()
-
 	tasks := async.New("rgs-api")
-	tasks.Run(bgCtx, func(runCtx context.Context) { ctx.OutboxDispatcher.Run(runCtx, time.Second) })
+
+	// 派发器：每 1 秒将 outbox 表中已落盘的事件投递到 Kafka
 	tasks.Run(bgCtx, func(runCtx context.Context) {
-		outbox.NewMaintainer(ctx.DB, outbox.MaintainerConfig{}).Run(runCtx, time.Minute)
+		ctx.OutboxDispatcher.Run(runCtx, time.Second)
 	})
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	tasks.Run(context.Background(), func(context.Context) {
-		<-sigCh
-		logx.Info("[OUTBOX] shutdown signal received, stopping background loops")
-		stopBg()
-		server.Stop()
+	// 维护器：每 1 分钟通过 Redis 互斥锁单点回收挂起记录并清理历史数据
+	tasks.Run(bgCtx, func(runCtx context.Context) {
+		ctx.OutboxMaintainer.Run(runCtx, time.Minute)
 	})
 
 	logx.Info("[OUTBOX] dispatcher and maintainer started (dispatch 1s, maintain 1m)")
 
+	// 3. 监听系统退出信号，执行受控的四阶段停机流程
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigCh
+		logx.Infof("[SHUTDOWN] signal %v received, initiating graceful draining...", sig)
+
+		// 阶段 1：先切断入站流量，等待现有处理中的在途注单事务完成提交
+		server.Stop()
+		logx.Info("[SHUTDOWN] HTTP traffic drained")
+
+		// 阶段 2：执行最后一轮强刷，把在途请求写入 outbox 表的事件送入 Kafka
+		flushCtx, flushCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if n, err := ctx.OutboxDispatcher.DispatchOnce(flushCtx); err != nil {
+			logx.Errorf("[SHUTDOWN] final outbox dispatch failed: %v", err)
+		} else if n > 0 {
+			logx.Infof("[SHUTDOWN] dispatched %d remaining outbox event(s)", n)
+		}
+		flushCancel()
+
+		// 阶段 3：停止后台轮询任务
+		stopBg()
+	}()
+
 	fmt.Printf("Starting server at %s:%d...\n", c.Host, c.Port)
 	server.Start()
 
-	// server.Start() 返回即进程要退出：等在途的后台任务收尾（含埋点写入）。
-	// 超时只打日志，不静默丢弃——"有多少任务没跑完"是排障的关键信息。
+	// 阶段 4：server.Start() 返回后，回收在途协程与 ClickHouse 批量缓冲
 	drainCtx, drainCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer drainCancel()
+
 	if err := tasks.Shutdown(drainCtx); err != nil {
-		logx.Errorf("[OUTBOX] shutdown drain: %v", err)
+		logx.Errorf("[SHUTDOWN] async tasks drain error: %v", err)
 	}
-	if err := ctx.Trace.Close(drainCtx); err != nil {
-		logx.Errorf("[TRACE] shutdown drain: %v", err)
+
+	if ctx.Trace != nil {
+		if err := ctx.Trace.Close(drainCtx); err != nil {
+			logx.Errorf("[SHUTDOWN] trace recorder flush error: %v", err)
+		} else {
+			logx.Info("[SHUTDOWN] trace recorder flushed cleanly")
+		}
 	}
+
+	logx.Info("[SHUTDOWN] RGS server shutdown complete")
 }

@@ -45,24 +45,36 @@ type ServiceContext struct {
 	ReplayStore model.GameRoundReplayModel
 	Trace       *trace.CHRecorder
 
-	// DB 供需要事务的地方使用（例如把结算事件与业务写放进同一事务）
 	DB               sqlx.SqlConn
 	Outbox           *outbox.Store
 	OutboxDispatcher *outbox.Dispatcher
-	// Ledger 账变唯一收口：下注/派彩/撤单的余额变动都必须经它记账。
-	// sink 走事务性发件箱（RGS 已经在跑 OutboxDispatcher），
-	// 因此"账变了但事件没发出去"不可能发生。
-	Ledger *ledger.Poster
+	OutboxMaintainer *outbox.Maintainer
+	Ledger           *ledger.Poster
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	fieldcipher.Init(c.Security.MerchantKeyCipher)
 
-	rdb := goredis.NewClient(&goredis.Options{Addr: c.Redis.Addr})
+	poolSize := c.Redis.PoolSize
+	if poolSize <= 0 {
+		poolSize = 128
+	}
+
+	rdb := goredis.NewClient(&goredis.Options{
+		Addr:     c.Redis.Addr,
+		Password: c.Redis.Password,
+		DB:       c.Redis.DB,
+		PoolSize: poolSize,
+	})
+
 	conn := sqlx.NewMysql(c.MySQL.DataSource)
 	merchants := model.NewMerchantsModel(conn)
 
-	zeroRedis := zeroredis.MustNewRedis(zeroredis.RedisConf{Host: c.Redis.Addr, Type: "node"})
+	zeroRedis := zeroredis.MustNewRedis(zeroredis.RedisConf{
+		Host: c.Redis.Addr,
+		Pass: c.Redis.Password,
+		Type: "node",
+	})
 
 	svcCtx := &ServiceContext{
 		Config:     c,
@@ -92,18 +104,17 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		PendingOps:  model.NewWalletPendingOpsModel(conn),
 		PendingTx:   model.NewPendingTransactionsModel(conn),
 		ReplayStore: model.NewGameRoundReplayModel(conn),
-		// 事务性发件箱：结算事件不再裸 go func 投递 Kafka，而是与业务写同事务落表，
-		// 由 OutboxDispatcher 负责可靠投递（投递失败退避重试）。
-		DB:     conn,
-		Outbox: outbox.NewStore(conn),
+		DB:          conn,
+		Outbox:      outbox.NewStore(conn),
 	}
 
-	// 派发器依赖已构造好的 svcCtx（需要其中的 Kafka producer），故在其之后装配。
 	svcCtx.OutboxDispatcher = newOutboxDispatcher(conn, svcCtx)
 
-	// 账变收口：下注/派彩/撤单的余额变动统一走它记账。
-	// sink 用事务性发件箱——账变事件与账变流水同事务提交，RGS 已在跑派发器，
-	// 因此事件不会只留在库里。
+	// 传入 Redis 客户端激活多副本分布式互斥锁，防止多 Pod 并发扫描与死锁
+	svcCtx.OutboxMaintainer = outbox.NewMaintainer(conn, outbox.MaintainerConfig{
+		Redis: rdb,
+	})
+
 	svcCtx.Ledger = ledger.NewPoster(conn, ledger.NewOutboxSink(svcCtx.Outbox, "rgs-api"))
 
 	if c.CH.Addr != "" {
@@ -119,8 +130,6 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	return svcCtx
 }
 
-// newOutboxDispatcher 组装派发器。owner 用 "主机名:pid"，
-// SettleBatch 靠它 + status 双守卫，避免被 Reaper 回收后旧 owner 误标状态。
 func newOutboxDispatcher(conn sqlx.SqlConn, svcCtx *ServiceContext) *outbox.Dispatcher {
 	host, err := os.Hostname()
 	if err != nil {

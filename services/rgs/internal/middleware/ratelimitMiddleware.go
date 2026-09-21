@@ -14,9 +14,7 @@ func RateLimitMiddleware(gw *ratelimit.Gateway) func(http.HandlerFunc) http.Hand
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			if gw != nil && !gw.AllowIP(r.Context(), httputil.ClientIP(r)) {
-				httpx.WriteJsonCtx(r.Context(), w, http.StatusTooManyRequests, map[string]string{
-					"message": xerr.ErrRateLimited.Error(),
-				})
+				httpx.ErrorCtx(r.Context(), w, xerr.ErrRateLimited)
 				return
 			}
 			next(w, r)

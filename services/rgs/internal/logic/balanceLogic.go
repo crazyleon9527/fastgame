@@ -27,12 +27,14 @@ func NewBalanceLogic(ctx context.Context, svcCtx *svc.ServiceContext) *BalanceLo
 }
 
 func (l *BalanceLogic) Balance(req *types.BalanceReq) (*types.BalanceResp, error) {
-	balance, err := l.svcCtx.Wallet.GetBalance(l.ctx, req.MerchantId, req.UserId)
+	currency := "USD"
+
+	balance, err := l.svcCtx.Wallet.GetBalance(l.ctx, req.MerchantId, req.UserId, currency)
 	if err != nil {
 		if errors.Is(err, wallet.ErrCircuitOpen) || errors.Is(err, wallet.ErrSlowResponse) {
-			return nil, xerr.ErrWalletUnavailable
+			return nil, xerr.ErrWalletUnavailable.WithCause(err)
 		}
-		return nil, err
+		return nil, xerr.ErrWalletUnavailable.WithCause(err)
 	}
 
 	return &types.BalanceResp{Balance: balance.Minor()}, nil
