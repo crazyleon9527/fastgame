@@ -3,29 +3,33 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"fastgame/pkg/money"
 )
 
 type RtpReportRow struct {
-	MerchantID  uint64
-	GameCode    string
-	Hour        time.Time
-	TotalBet    float64
-	TotalWin    float64
-	TotalRounds uint64
-	ActualRtp   float64
+	MerchantID  uint64    `json:"merchantId"`
+	GameCode    string    `json:"gameCode"`
+	Hour        time.Time `json:"hour"`
+	TotalBet    float64   `json:"totalBet"`
+	TotalWin    float64   `json:"totalWin"`
+	TotalRounds uint64    `json:"totalRounds"`
+	ActualRtp   float64   `json:"actualRtp"`
 }
 
 func (w *Writer) QueryRtpReport(ctx context.Context, merchantID uint64, gameCode string, hours int) ([]RtpReportRow, error) {
+	if w == nil || w.conn == nil {
+		return nil, nil
+	}
 	if hours <= 0 {
 		hours = 24
 	}
 	since := time.Now().UTC().Add(-time.Duration(hours) * time.Hour)
 
-	scale := money.Scale
-	query := fmt.Sprintf(`
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf(`
 		SELECT
 			merchant_id,
 			game_code,
@@ -36,19 +40,20 @@ func (w *Writer) QueryRtpReport(ctx context.Context, merchantID uint64, gameCode
 			if(total_bet = 0, 0, toFloat64(total_win) / toFloat64(total_bet)) AS actual_rtp
 		FROM fastgame.mv_rtp_hourly
 		WHERE hour >= ?
-	`, scale, scale)
+	`, money.Scale, money.Scale))
+
 	args := []any{since}
 	if merchantID > 0 {
-		query += " AND merchant_id = ?"
+		sb.WriteString(" AND merchant_id = ?")
 		args = append(args, merchantID)
 	}
 	if gameCode != "" {
-		query += " AND game_code = ?"
+		sb.WriteString(" AND game_code = ?")
 		args = append(args, gameCode)
 	}
-	query += " ORDER BY hour DESC LIMIT 500"
+	sb.WriteString(" ORDER BY hour DESC LIMIT 500")
 
-	rows, err := w.conn.Query(ctx, query, args...)
+	rows, err := w.conn.Query(ctx, sb.String(), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -74,20 +79,26 @@ func (w *Writer) QueryRtpReport(ctx context.Context, merchantID uint64, gameCode
 }
 
 type DailySettlementRow struct {
-	MerchantID  uint64
-	SettleDate  time.Time
-	TotalBet    int64
-	TotalWin    int64
-	TotalRounds uint64
+	MerchantID  uint64    `json:"merchantId"`
+	SettleDate  time.Time `json:"settleDate"`
+	TotalBet    int64     `json:"totalBet"` // Minor units (分)
+	TotalWin    int64     `json:"totalWin"` // Minor units (分)
+	TotalRounds uint64    `json:"totalRounds"`
 }
 
 func (w *Writer) QueryDailySettlement(ctx context.Context, merchantID uint64, days int) ([]DailySettlementRow, error) {
+	if w == nil || w.conn == nil {
+		return nil, nil
+	}
 	if days <= 0 {
 		days = 7
 	}
-	since := time.Now().UTC().AddDate(0, 0, -days).Truncate(24 * time.Hour)
+	// 自然日 00:00:00 UTC 对齐
+	now := time.Now().UTC()
+	since := time.Date(now.Year(), now.Month(), now.Day()-days, 0, 0, 0, 0, time.UTC)
 
-	query := `
+	var sb strings.Builder
+	sb.WriteString(`
 		SELECT
 			merchant_id,
 			toDate(settled_at) AS settle_date,
@@ -96,15 +107,16 @@ func (w *Writer) QueryDailySettlement(ctx context.Context, merchantID uint64, da
 			count() AS total_rounds
 		FROM fastgame.game_round_settled
 		WHERE settled_at >= ?
-	`
+	`)
+
 	args := []any{since}
 	if merchantID > 0 {
-		query += " AND merchant_id = ?"
+		sb.WriteString(" AND merchant_id = ?")
 		args = append(args, merchantID)
 	}
-	query += " GROUP BY merchant_id, settle_date ORDER BY settle_date DESC, merchant_id ASC LIMIT 500"
+	sb.WriteString(" GROUP BY merchant_id, settle_date ORDER BY settle_date DESC, merchant_id ASC LIMIT 500")
 
-	rows, err := w.conn.Query(ctx, query, args...)
+	rows, err := w.conn.Query(ctx, sb.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("daily settlement: %w", err)
 	}
@@ -121,15 +133,18 @@ func (w *Writer) QueryDailySettlement(ctx context.Context, merchantID uint64, da
 	return result, rows.Err()
 }
 
-// Fallback query when materialized view is empty.
+// QueryRtpReportFromRaw 当物化视图为空或重建时的明细兜底查询
 func (w *Writer) QueryRtpReportFromRaw(ctx context.Context, merchantID uint64, gameCode string, hours int) ([]RtpReportRow, error) {
+	if w == nil || w.conn == nil {
+		return nil, nil
+	}
 	if hours <= 0 {
 		hours = 24
 	}
 	since := time.Now().UTC().Add(-time.Duration(hours) * time.Hour)
 
-	scale := money.Scale
-	query := fmt.Sprintf(`
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf(`
 		SELECT
 			merchant_id,
 			game_code,
@@ -140,21 +155,22 @@ func (w *Writer) QueryRtpReportFromRaw(ctx context.Context, merchantID uint64, g
 			if(sum(bet_amount) = 0, 0, toFloat64(sum(win_amount)) / toFloat64(sum(bet_amount))) AS actual_rtp
 		FROM fastgame.game_round_settled
 		WHERE settled_at >= ?
-	`, scale, scale)
+	`, money.Scale, money.Scale))
+
 	args := []any{since}
 	if merchantID > 0 {
-		query += " AND merchant_id = ?"
+		sb.WriteString(" AND merchant_id = ?")
 		args = append(args, merchantID)
 	}
 	if gameCode != "" {
-		query += " AND game_code = ?"
+		sb.WriteString(" AND game_code = ?")
 		args = append(args, gameCode)
 	}
-	query += " GROUP BY merchant_id, game_code, hour ORDER BY hour DESC LIMIT 500"
+	sb.WriteString(" GROUP BY merchant_id, game_code, hour ORDER BY hour DESC LIMIT 500")
 
-	rows, err := w.conn.Query(ctx, query, args...)
+	rows, err := w.conn.Query(ctx, sb.String(), args...)
 	if err != nil {
-		return nil, fmt.Errorf("rtp report: %w", err)
+		return nil, fmt.Errorf("rtp report raw: %w", err)
 	}
 	defer rows.Close()
 

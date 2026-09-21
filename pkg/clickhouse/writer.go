@@ -54,20 +54,29 @@ type Writer struct {
 	conn driver.Conn
 }
 
-func NewWriter(dsn string) (*Writer, error) {
-	conn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: []string{dsn},
+func defaultOptions(addr, database, user, password string) *clickhouse.Options {
+	return &clickhouse.Options{
+		Addr: []string{addr},
 		Auth: clickhouse.Auth{
-			Database: "fastgame",
+			Database: database,
+			Username: user,
+			Password: password,
 		},
 		Settings: clickhouse.Settings{
 			"max_execution_time": 60,
 		},
-		DialTimeout: 5 * time.Second,
+		DialTimeout:     5 * time.Second,
+		MaxOpenConns:    32,               // 最大连接数，保护 ClickHouse 服务端
+		MaxIdleConns:    8,                // 保持空闲连接
+		ConnMaxLifetime: 10 * time.Minute, // 定期轮换连接，防防火墙静默断连
 		Compression: &clickhouse.Compression{
 			Method: clickhouse.CompressionLZ4,
 		},
-	})
+	}
+}
+
+func NewWriter(dsn string) (*Writer, error) {
+	conn, err := clickhouse.Open(defaultOptions(dsn, "fastgame", "", ""))
 	if err != nil {
 		return nil, err
 	}
@@ -82,21 +91,7 @@ func NewWriter(dsn string) (*Writer, error) {
 }
 
 func NewWriterWithAuth(addr, database, user, password string) (*Writer, error) {
-	conn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: []string{addr},
-		Auth: clickhouse.Auth{
-			Database: database,
-			Username: user,
-			Password: password,
-		},
-		Settings: clickhouse.Settings{
-			"max_execution_time": 60,
-		},
-		DialTimeout: 5 * time.Second,
-		Compression: &clickhouse.Compression{
-			Method: clickhouse.CompressionLZ4,
-		},
-	})
+	conn, err := clickhouse.Open(defaultOptions(addr, database, user, password))
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +106,7 @@ func NewWriterWithAuth(addr, database, user, password string) (*Writer, error) {
 }
 
 func (w *Writer) BatchInsertRoundSettled(ctx context.Context, rows []RoundSettledRow) error {
-	if len(rows) == 0 {
+	if w == nil || w.conn == nil || len(rows) == 0 {
 		return nil
 	}
 
@@ -156,7 +151,7 @@ func (w *Writer) BatchInsertRoundSettled(ctx context.Context, rows []RoundSettle
 }
 
 func (w *Writer) BatchInsertWalletRollback(ctx context.Context, rows []WalletRollbackRow) error {
-	if len(rows) == 0 {
+	if w == nil || w.conn == nil || len(rows) == 0 {
 		return nil
 	}
 
@@ -203,7 +198,7 @@ func (w *Writer) BatchInsertWalletRollback(ctx context.Context, rows []WalletRol
 }
 
 func (w *Writer) BatchInsertTraceSpans(ctx context.Context, rows []TraceSpanRow) error {
-	if len(rows) == 0 {
+	if w == nil || w.conn == nil || len(rows) == 0 {
 		return nil
 	}
 
@@ -239,6 +234,9 @@ func (w *Writer) BatchInsertTraceSpans(ctx context.Context, rows []TraceSpanRow)
 }
 
 func (w *Writer) QueryTraceSpansByRoundID(ctx context.Context, roundID string) ([]TraceSpanRow, error) {
+	if w == nil || w.conn == nil {
+		return nil, nil
+	}
 	rows, err := w.conn.Query(ctx, `
 		SELECT trace_id, span_id, service, operation, round_id, status, detail, duration_ms, occurred_at
 		FROM fastgame.trace_spans
@@ -266,6 +264,9 @@ func (w *Writer) QueryTraceSpansByRoundID(ctx context.Context, roundID string) (
 }
 
 func (w *Writer) QueryTraceSpans(ctx context.Context, traceID string) ([]TraceSpanRow, error) {
+	if w == nil || w.conn == nil {
+		return nil, nil
+	}
 	rows, err := w.conn.Query(ctx, `
 		SELECT trace_id, span_id, service, operation, round_id, status, detail, duration_ms, occurred_at
 		FROM fastgame.trace_spans
@@ -293,5 +294,8 @@ func (w *Writer) QueryTraceSpans(ctx context.Context, traceID string) ([]TraceSp
 }
 
 func (w *Writer) Close() error {
+	if w == nil || w.conn == nil {
+		return nil
+	}
 	return w.conn.Close()
 }
