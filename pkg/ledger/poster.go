@@ -1,23 +1,3 @@
-// Package ledger 是账变的唯一收口。
-//
-// 参考 platform-api 的 CashService.AddTransaction / AddTransactionInTx，核心约定：
-//
-//  1. 变动方向是数据，不是代码。调用方只传 TypeCode + **正数**金额，
-//     由 transaction_types 决定加减可用余额还是冻结余额。调用点因此不可能
-//     写错符号，新增业务类型只要插一行数据。
-//  2. 余额快照随账变落库（balance_before/after）。对账不必从头累加，
-//     任意时间点都能核对。
-//  3. 只有一个写入口。任何绕过 Poster 直接改余额的代码，都会在下一次
-//     连续性校验里暴露成"不可解释差额"。
-//
-// 与 platform-api 的差异，也是 fastgame 的架构事实：
-//
-//	玩家余额的权威在**商户钱包**（外部服务）侧，fastgame 不拥有它。
-//	因此这里实现的是"影子账"——player_accounts 里的余额是钱包返回值的镜像：
-//	  · 钱包返回余额时，以钱包为准写入 balance_after；
-//	    若与本地按类型推算的结果不一致，把差额记进 drift_minor（不可解释差额）；
-//	  · 钱包没返回余额时（例如撤单回滚接口不回余额），用本地推算值续上。
-//	这样既不动资金主链路，又能立刻得到「可对账的流水 + 差异发现」能力。
 package ledger
 
 import (
@@ -26,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"fastgame/internal/model"
@@ -38,23 +19,15 @@ import (
 
 // 配置默认值
 const (
-	// defaultCurrency 玩家钱包的结算币种。fastgame 目前是单币种，
-	// 多币种接入时改为从商户配置读取。
 	defaultCurrency = "USD"
-	// typeCacheTTL 账变类型的内存缓存时长。类型表几乎不变，
-	// 但改了要能较快生效（例如紧急停用某个类型）。
-	typeCacheTTL = 30 * time.Second
-	// maxRemarkLen 与 game_transactions.remark 的列宽一致（varchar(255)）。
-	maxRemarkLen = 255
+	typeCacheTTL    = 30 * time.Second
+	maxRemarkLen    = 255
 )
 
-// ErrAmountNotPositive 金额必须为正数：方向由类型表决定，
-// 传负数会让"加减"和"方向"两处同时表达符号，必然出错。
+// ErrAmountNotPositive 金额必须为正数
 var ErrAmountNotPositive = errors.New("账变金额必须为正数")
 
-// ErrInsufficientBalance 余额不足（按类型推算后为负）。
-// 影子账下它不代表钱包真的拒绝，只说明本地镜像与请求矛盾——
-// 属于必须人工核查的异常，因此拒绝写入而不是记成 0。
+// ErrInsufficientBalance 余额不足
 var ErrInsufficientBalance = errors.New("余额不足，账变被拒绝")
 
 // Posting 一次账变请求
@@ -70,18 +43,16 @@ type Posting struct {
 	Currency     string
 	IsDemo       bool
 
-	// WalletBalance 是钱包返回的余额快照。传 nil 表示本次操作钱包没回余额，
-	// 此时 balance_after 用本地推算值（镜像自洽）。
+	// WalletBalance 钱包返回的余额快照
 	WalletBalance *money.Amount
-	// ExternalTxID 下游钱包返回的三方对账凭据号。
+	// ExternalTxID 下游钱包返回的三方对账凭据号
 	ExternalTxID string
-	// Status 账变终态。只有 SUCCESS 会改动余额镜像：
-	// FAILED / PENDING_RETRY 只留痕（钱没动，由补偿链路收尾）。
+	// Status 账变终态
 	Status string
 
-	// TransactionID 可留空（自动生成 UUID v7）。需要调用方自带幂等键时传入。
+	// TransactionID 可留空（自动生成）
 	TransactionID string
-	// RefType / RefID 关联业务对象，便于从流水反查来源。
+	// RefType / RefID 关联业务对象
 	RefType string
 	RefID   string
 	Remark  string
@@ -97,11 +68,7 @@ type Result struct {
 	Duplicated bool         // true = 命中幂等键，本次没有重复扣钱
 }
 
-// Sink 账变事件的出口。
-//
-// 做成接口而不是直接依赖 outbox：只有已经在跑 outbox dispatcher 的服务
-// （当前是 RGS）能把事件真正投递出去。其他服务先传 nil，
-// 待接入结算/对账时再补 dispatcher——账变本身的持久化不依赖它。
+// Sink 账变事件的出口
 type Sink interface {
 	PublishInTx(ctx context.Context, session sqlx.Session, entry *model.GameTransaction) error
 }
@@ -116,23 +83,23 @@ type Poster struct {
 	sink  Sink
 	now   Clock
 
-	types     map[string]*model.TransactionType
-	typesAt   time.Time
-	typesLoad bool
+	typeMu  sync.RWMutex
+	types   map[string]*model.TransactionType
+	typesAt time.Time
 }
 
-// NewPoster 构造收口。conn 用于「自动开事务」的 Post；
-// sink 可为 nil（不投递账变事件）。
+// NewPoster 构造收口
 func NewPoster(conn sqlx.SqlConn, sink Sink) *Poster {
 	return &Poster{
 		conn:  conn,
 		model: model.NewLedgerModel(),
 		sink:  sink,
 		now:   func() time.Time { return time.Now().UTC() },
+		types: make(map[string]*model.TransactionType),
 	}
 }
 
-// Post 自动开事务地记一笔账变。
+// Post 自动开事务地记一笔账变
 func (p *Poster) Post(ctx context.Context, in Posting) (*Result, error) {
 	var res *Result
 	err := p.conn.TransactCtx(ctx, func(ctx context.Context, session sqlx.Session) error {
@@ -146,13 +113,7 @@ func (p *Poster) Post(ctx context.Context, in Posting) (*Result, error) {
 	return res, nil
 }
 
-// PostInTx 在调用方事务内记一笔账变。
-//
-// 顺序很重要：先锁账户 → 再插流水（幂等判定）→ 最后改余额。
-// 反过来先改余额再插流水，一旦流水插入失败（撞幂等键）余额就多扣了一次。
-//
-// conn 是事务内连接（用于 SQL），session 是同一条事务（用于 outbox 事件）。
-// 不需要投递事件时 session 可以传 nil。
+// PostInTx 在调用方事务内记一笔账变
 func (p *Poster) PostInTx(ctx context.Context, conn sqlx.SqlConn, session sqlx.Session, in Posting) (*Result, error) {
 	if in.Amount <= 0 {
 		return nil, ErrAmountNotPositive
@@ -215,7 +176,7 @@ func (p *Poster) PostInTx(ctx context.Context, conn sqlx.SqlConn, session sqlx.S
 		entry.TransactionId = id
 	}
 
-	// 终态不是 SUCCESS 时钱没动：只留痕，余额镜像保持原值。
+	// 终态不是 SUCCESS 时钱没动：只留痕，余额镜像保持原值
 	if status != model.LedgerStatusSuccess {
 		inserted, err := p.model.InsertTransaction(ctx, conn, entry)
 		if err != nil {
@@ -227,13 +188,7 @@ func (p *Poster) PostInTx(ctx context.Context, conn sqlx.SqlConn, session sqlx.S
 		return &Result{Entry: entry, Account: acc, Type: txType}, nil
 	}
 
-	// 按类型推算新余额（方向来自类型表）
-	//
-	// enforceBalance 的取值很关键：只有"本地没有权威余额、也没拿到钱包余额"时
-	// 才拒绝负数。钱包返回了余额就说明钱确实动过，此时本地推算出负数
-	// 只能说明**镜像偏了**（例如玩家首次出现、镜像还没建立），
-	// 应当以钱包为准并把差额记成 drift，而不是拒绝记账——
-	// 拒绝的后果是这笔真实资金变动在账本上完全消失。
+	// 按类型推算新余额
 	enforceBalance := in.WalletBalance == nil
 	computed, frozenAfter, err := applyChange(acc, txType, in.Amount.Minor(), enforceBalance)
 	if err != nil {
@@ -241,7 +196,7 @@ func (p *Poster) PostInTx(ctx context.Context, conn sqlx.SqlConn, session sqlx.S
 	}
 	entry.FrozenAfter = frozenAfter
 
-	// 钱包返回余额时以钱包为准，并检查是否与推算一致
+	// 钱包返回余额时以钱包为准
 	after := computed
 	if in.WalletBalance != nil {
 		after = in.WalletBalance.Minor()
@@ -254,7 +209,6 @@ func (p *Poster) PostInTx(ctx context.Context, conn sqlx.SqlConn, session sqlx.S
 		return nil, err
 	}
 	if !inserted {
-		// 幂等命中：本条已记过，绝不能再改一次余额
 		return p.duplicated(ctx, conn, in)
 	}
 
@@ -275,9 +229,7 @@ func (p *Poster) PostInTx(ctx context.Context, conn sqlx.SqlConn, session sqlx.S
 		)
 	}
 
-	// 先取回流水主键再写账户：last_ledger_id 要指向本条流水。
-	// INSERT 之后驱动不一定回填 entry.Id，所以按唯一键回查；
-	// 回查失败不阻断（余额与流水已经一致，只影响 last_ledger_id 的精度）。
+	// 回查流水 ID
 	if saved, err := p.model.FindTransactionByTransactionID(ctx, conn, entry.TransactionId); err == nil && saved != nil {
 		entry.Id = saved.Id
 	}
@@ -296,8 +248,6 @@ func (p *Poster) PostInTx(ctx context.Context, conn sqlx.SqlConn, session sqlx.S
 	return &Result{Entry: entry, Account: acc, Type: txType, Drift: money.AmountFromMinor(entry.DriftMinor)}, nil
 }
 
-// duplicated 处理幂等命中：返回已存在的那条流水，且**不做任何余额变动**。
-// 幂等键含终态，因此 FAILED/PENDING_RETRY 与 SUCCESS 各自只记一次、互不干扰。
 func (p *Poster) duplicated(ctx context.Context, conn sqlx.SqlConn, in Posting) (*Result, error) {
 	status := in.Status
 	if status == "" {
@@ -325,15 +275,32 @@ func (p *Poster) duplicated(ctx context.Context, conn sqlx.SqlConn, in Posting) 
 	return &Result{Entry: existing, Duplicated: true}, nil
 }
 
-// typeByCode 取账变类型（带进程内缓存）。
-//
-// 取不到就报错熔断：绝不"猜一个方向"继续记账——方向猜错就是记反账，
-// 比拒绝一次请求严重得多。
+// typeByCode 带线程安全读写锁的类型查询
 func (p *Poster) typeByCode(ctx context.Context, conn sqlx.SqlConn, code string) (*model.TransactionType, error) {
 	if code == "" {
 		return nil, model.ErrTransactionTypeNotFound
 	}
-	if p.typesLoad && p.now().Sub(p.typesAt) < typeCacheTTL {
+
+	now := p.now()
+
+	// 1. 尝试读锁获取缓存
+	p.typeMu.RLock()
+	if now.Sub(p.typesAt) < typeCacheTTL && len(p.types) > 0 {
+		t, ok := p.types[code]
+		p.typeMu.RUnlock()
+		if ok {
+			return t, nil
+		}
+	} else {
+		p.typeMu.RUnlock()
+	}
+
+	// 2. 加写锁更新缓存
+	p.typeMu.Lock()
+	defer p.typeMu.Unlock()
+
+	// Double-Check 避免并发重读
+	if now.Sub(p.typesAt) < typeCacheTTL && len(p.types) > 0 {
 		if t, ok := p.types[code]; ok {
 			return t, nil
 		}
@@ -347,7 +314,8 @@ func (p *Poster) typeByCode(ctx context.Context, conn sqlx.SqlConn, code string)
 	for _, t := range list {
 		fresh[t.Code] = t
 	}
-	p.types, p.typesAt, p.typesLoad = fresh, p.now(), true
+	p.types = fresh
+	p.typesAt = now
 
 	t, ok := fresh[code]
 	if !ok {
@@ -356,13 +324,14 @@ func (p *Poster) typeByCode(ctx context.Context, conn sqlx.SqlConn, code string)
 	return t, nil
 }
 
-// InvalidateTypes 清掉类型缓存（后台改了类型表后调用）。
+// InvalidateTypes 清掉类型缓存
 func (p *Poster) InvalidateTypes() {
-	p.typesLoad = false
-	p.types = nil
+	p.typeMu.Lock()
+	defer p.typeMu.Unlock()
+	p.types = make(map[string]*model.TransactionType)
+	p.typesAt = time.Time{}
 }
 
-// directionOf 把 io_type 映射成流水里的资金流向冗余字段。
 func directionOf(ioType string) string {
 	if ioType == "OUT" {
 		return model.LedgerDirectionOut
@@ -370,14 +339,6 @@ func directionOf(ioType string) string {
 	return model.LedgerDirectionIn
 }
 
-// applyChange 按类型表的方向推算变动后的余额。
-//
-// enforceBalance=true 时余额不足/算完为负直接拒绝；false 时只做算术，
-// 把"算出来是负数"留给 drift 去表达（钱包返回了余额，钱确实动过，
-// 本地负数只说明镜像偏了）。
-//
-// 未知的变动配置一律报错（熔断），而不是当成 NONE 放行：
-// 配置写错时"静默不生效"会让账实不符且无人察觉。
 func applyChange(acc *model.PlayerAccount, t *model.TransactionType, amount int64, enforceBalance bool) (balance, frozen int64, err error) {
 	balance, frozen = acc.BalanceMinor, acc.FrozenMinor
 
@@ -413,8 +374,6 @@ func applyChange(acc *model.PlayerAccount, t *model.TransactionType, amount int6
 	return balance, frozen, nil
 }
 
-// encodeExtra 组装 extra_data。除调用方给的键值外，固定写入幂等键与备注来源，
-// 便于事后只靠一行流水还原"这笔钱是怎么来的"。
 func encodeExtra(in Posting) string {
 	extra := map[string]any{}
 	for k, v := range in.Extra {
@@ -436,8 +395,6 @@ func encodeExtra(in Posting) string {
 	return string(b)
 }
 
-// truncate 按 **rune** 截断，与 MySQL varchar(255) 的字符语义一致。
-// 按字节截断会把多字节 UTF-8 字符切坏，remark 里出现乱码。
 func truncate(s string, n int) string {
 	r := []rune(s)
 	if len(r) <= n {
