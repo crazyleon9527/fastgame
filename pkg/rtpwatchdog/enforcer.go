@@ -42,6 +42,7 @@ func (e *Enforcer) Handle(ctx context.Context, alert Alert) error {
 		action = "game_flagged"
 	}
 
+	// 1. 记录风控告警审计记录
 	if err := e.alerts.Insert(ctx, &model.RiskAlert{
 		AlertType:    "rtp_drift",
 		ScopeType:    alert.ScopeType,
@@ -55,40 +56,45 @@ func (e *Enforcer) Handle(ctx context.Context, alert Alert) error {
 		ActionTaken:  action,
 		Status:       "open",
 	}); err != nil {
-		logx.Errorf("risk alert insert failed: %v", err)
+		logx.WithContext(ctx).Errorf("risk alert insert failed: %v", err)
 	}
 
+	// 2. 玩家级处置：加入多租户挂起标记与自动过期黑名单
 	if alert.ScopeType == "user" && alert.UserID != "" {
-		key := fmt.Sprintf("rtp:suspend:user:%s", alert.UserID)
+		// Redis 熔断挂起 Key：带上 merchantCode 进行严格隔离
+		key := fmt.Sprintf("rtp:suspend:user:%s:%s", alert.MerchantCode, alert.UserID)
 		if err := e.redis.Set(ctx, key, "1", suspendTTL).Err(); err != nil {
 			return err
 		}
-		reason := fmt.Sprintf("auto rtp watchdog ppm=%d samples=%d", alert.RtpPPM, alert.SampleSize)
+
+		reason := fmt.Sprintf("auto rtp watchdog drift merchant=%s ppm=%d samples=%d", alert.MerchantCode, alert.RtpPPM, alert.SampleSize)
 		row := &model.RiskBlacklist{
 			ListType:  model.BlacklistTypeUserID,
-			ListValue: alert.ScopeValue,
+			ListValue: alert.UserID,
 			Reason:    reason,
 			Status:    1,
-			// 必须带过期时间：这是统计启发式的自动处置，误报必然存在
-			// （例如赔付表 bug 修好前的历史样本，或极端的正常波动）。
-			// 不留过期时间就会写出一条永久封禁（expires_at = NULL），
-			// 玩家再也无法下注，而后台查不出任何依据——这正是本次事故的形态。
 			ExpiresAt: sql.NullTime{Time: time.Now().Add(suspendTTL), Valid: true},
 		}
+
 		if _, err := e.blacklistDB.Upsert(ctx, row); err != nil {
-			logx.Errorf("auto blacklist user failed: %v", err)
+			logx.WithContext(ctx).Errorf("auto blacklist user failed: %v", err)
 		} else if err := e.blacklist.SyncItem(ctx, row); err != nil {
-			logx.Errorf("sync blacklist redis failed: %v", err)
+			logx.WithContext(ctx).Errorf("sync blacklist redis failed: %v", err)
 		}
-		logx.Errorf("[RTP-WATCHDOG] user suspended: userId=%s rtpPPM=%d", alert.ScopeValue, alert.RtpPPM)
+
+		logx.WithContext(ctx).Errorf("[RTP-WATCHDOG] user suspended: merchant=%s userId=%s rtpPPM=%d totalBet=%d totalWin=%d",
+			alert.MerchantCode, alert.UserID, alert.RtpPPM, alert.TotalBet, alert.TotalWin)
 	}
 
+	// 3. 游戏级处置：标记异常游戏
 	if alert.ScopeType == "game" {
 		key := fmt.Sprintf("rtp:flag:game:%s:%s", alert.MerchantCode, alert.GameCode)
 		if err := e.redis.Set(ctx, key, "1", suspendTTL).Err(); err != nil {
 			return err
 		}
-		logx.Errorf("[RTP-WATCHDOG] game flagged: game=%s rtpPPM=%d", alert.ScopeValue, alert.RtpPPM)
+		logx.WithContext(ctx).Errorf("[RTP-WATCHDOG] game flagged: merchant=%s game=%s rtpPPM=%d totalBet=%d totalWin=%d",
+			alert.MerchantCode, alert.GameCode, alert.RtpPPM, alert.TotalBet, alert.TotalWin)
 	}
+
 	return nil
 }
