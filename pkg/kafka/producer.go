@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	applog "fastgame/pkg/log"
 	"fastgame/pkg/trace"
 
 	"github.com/google/uuid"
@@ -77,33 +78,34 @@ type Producer struct {
 func NewProducer(brokers []string) *Producer {
 	return &Producer{
 		writer: &kafka.Writer{
-			Addr:     kafka.TCP(brokers...),
+			Addr: kafka.TCP(brokers...),
+			// 混合平衡器：当 Key 不为空时使用 Hash（保证同一用户/注单顺序），
+			// 当 Key 为空时自动回退为最小负载/轮询策略，避免全打到 0 号分区
 			Balancer: &kafka.Hash{},
-			// RequiredAcks 必须显式设置：kafka-go 的零值是 RequireNone（不等待 broker
-			// 确认），消息可能静默丢失而无任何报错。RequireAll 让 broker 落盘后再返回，
-			// 投递失败才可能被 outbox 捕获并重试。
+			// 强可靠性落盘确认：要求所有 ISR 副本落盘才返回，防止高并发下静默丢消息
 			RequiredAcks: kafka.RequireAll,
-			// 单条写入失败时重试次数（与 outbox 的退避重试互补：此处兜短暂网络抖动，
-			// 仍失败则交给 outbox 的 next_retry_at）。
+			// 启用 Snappy 高性能压缩：大幅降低注单 JSON 的网络 I/O 开销与 Kafka 磁盘占用
+			Compression: kafka.Snappy,
+			// 重试机制：配合应用层兜底瞬间的网络抖动
 			MaxAttempts: 3,
-			// 批量投递由 outbox 的 Dispatcher 控制节奏，这里缩短内部攒批时间，
-			// 避免事件要等 writer 攒够一批才真正发出。
+			// 攒批延时：10ms 平衡了极低延迟与合理的网络吞吐
 			BatchTimeout: 10 * time.Millisecond,
+			// 硬超时保护：防止 Broker 不可用时导致业务 Goroutine 挂起
+			WriteTimeout: 5 * time.Second,
+			ReadTimeout:  5 * time.Second,
 		},
 	}
 }
 
-// PublishRaw 投递已经序列化好的消息体（供 outbox 派发器使用）。
-// key 为空时由调用方保证稳定；此处不做二次封装，直接透传 body。
+// PublishRaw 投递已经序列化好的消息体（供 outbox 派发器等直接透传使用）
 func (p *Producer) PublishRaw(ctx context.Context, topic, key string, body []byte) error {
 	msg := kafka.Message{
 		Topic: topic,
 		Key:   []byte(key),
 		Value: body,
 	}
-	if tid := trace.ID(ctx); tid != "" {
-		msg.Headers = []kafka.Header{{Key: trace.HeaderTraceID, Value: []byte(tid)}}
-	}
+	applog.InjectKafkaHeader(ctx, &msg)
+
 	if err := p.writer.WriteMessages(ctx, msg); err != nil {
 		return fmt.Errorf("kafka publish raw to %s: %w", topic, err)
 	}
@@ -114,9 +116,13 @@ func (p *Producer) PublishRoundSettled(ctx context.Context, evt RoundSettledEven
 	if evt.EventID == "" {
 		evt.EventID = uuid.NewString()
 	}
+	if evt.TraceID == "" {
+		evt.TraceID = trace.ID(ctx)
+	}
 	if evt.SettledAt.IsZero() {
 		evt.SettledAt = time.Now().UTC()
 	}
+	// 按 UserID 作为 Key，保证同一玩家的所有注单事件在同一个 Partition 内严格保序
 	return p.publish(ctx, TopicRoundSettled, evt.UserID, evt)
 }
 
@@ -124,10 +130,18 @@ func (p *Producer) PublishBigWin(ctx context.Context, evt BigWinEvent) error {
 	if evt.EventID == "" {
 		evt.EventID = uuid.NewString()
 	}
+	if evt.TraceID == "" {
+		evt.TraceID = trace.ID(ctx)
+	}
 	if evt.OccurredAt.IsZero() {
 		evt.OccurredAt = time.Now().UTC()
 	}
-	return p.publish(ctx, TopicEventBigwin, "", evt)
+	// 广播事件使用 RoundID 或随机 Key，均匀打散到所有分区
+	key := evt.RoundID
+	if key == "" {
+		key = evt.EventID
+	}
+	return p.publish(ctx, TopicEventBigwin, key, evt)
 }
 
 func (p *Producer) PublishReconcileDLQ(ctx context.Context, evt ReconcileDLQEvent) error {
@@ -145,6 +159,9 @@ func (p *Producer) PublishWalletRollback(ctx context.Context, evt WalletRollback
 	if evt.EventID == "" {
 		evt.EventID = uuid.NewString()
 	}
+	if evt.TraceID == "" {
+		evt.TraceID = trace.ID(ctx)
+	}
 	if evt.OccurredAt.IsZero() {
 		evt.OccurredAt = time.Now().UTC()
 	}
@@ -154,19 +171,23 @@ func (p *Producer) PublishWalletRollback(ctx context.Context, evt WalletRollback
 func (p *Producer) publish(ctx context.Context, topic, key string, payload any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return fmt.Errorf("kafka marshal payload for %s: %w", topic, err)
 	}
+
 	msg := kafka.Message{
 		Topic: topic,
 		Key:   []byte(key),
 		Value: body,
 	}
-	if tid := trace.ID(ctx); tid != "" {
-		msg.Headers = []kafka.Header{{Key: trace.HeaderTraceID, Value: []byte(tid)}}
-	}
+	// 注入 Trace 上下文
+	applog.InjectKafkaHeader(ctx, &msg)
+
 	return p.writer.WriteMessages(ctx, msg)
 }
 
 func (p *Producer) Close() error {
+	if p == nil || p.writer == nil {
+		return nil
+	}
 	return p.writer.Close()
 }
